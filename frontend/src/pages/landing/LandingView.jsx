@@ -671,7 +671,7 @@ export default function LandingView({ words, wordShift }) {
             <div className="eyebrow" style={{ color: '#3F5FD8' }}>Templates</div>
             <h2 className="disp" style={{ margin: '14px 0 0', fontSize: 'clamp(36px,4.6vw,58px)', lineHeight: '1.02', fontWeight: '800', letterSpacing: '-0.04em' }}>ATS-friendly. <span className="serif" style={{ color: '#3F5FD8', fontSize: '1.08em' }}>Recruiter-approved.</span></h2>
           </div>
-          <p style={{ margin: '0', maxWidth: '380px', fontSize: '17px', lineHeight: '1.55', color: '#5A6075' }}>Start with the two templates recruiters see most. More on the way.</p>
+          <p style={{ margin: '0', maxWidth: '380px', fontSize: '17px', lineHeight: '1.55', color: '#5A6075' }}>Start with the template recruiters see most. More on the way.</p>
         </div>
         <div style={{ marginTop: '48px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: '20px' }}>
           {/* Jake's Resume */}
@@ -703,11 +703,11 @@ export default function LandingView({ words, wordShift }) {
             <div style={{ padding: '4px 4px 0', fontSize: '13px', color: '#5A6075' }}>The engineer’s favourite. One page, single column.</div>
           </div>
           {/* Elegant */}
-          <div className="rv lift" style={{ background: '#F3F4F8', borderRadius: '20px', padding: '18px' }}>
-            <div style={{ aspectRatio: '3/4', background: '#FFFFFF', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 1px 2px rgba(22,26,43,.06),0 10px 24px rgba(22,26,43,.06)' }}>
-              <img src={elegantTemplate} alt="Elegant resume template preview" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+          <div className="rv" style={{ background: '#F3F4F8', borderRadius: '20px', padding: '18px' }}>
+            <div style={{ aspectRatio: '3/4', background: '#FFFFFF', borderRadius: '10px', overflow: 'hidden', border: '1px dashed #C9CDD9' }}>
+              <img src={elegantTemplate} alt="Elegant resume template preview" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block', opacity: '.45' }} />
             </div>
-            <div style={{ padding: '16px 4px 2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}><span className="disp" style={{ fontSize: '18px', fontWeight: '700' }}>Elegant</span><span style={{ fontSize: '12px', fontWeight: '600', color: '#15803D', background: '#E8F5EC', borderRadius: '999px', padding: '4px 10px' }}>ATS-safe</span></div>
+            <div style={{ padding: '16px 4px 2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}><span className="disp" style={{ fontSize: '18px', fontWeight: '700', color: '#5A6075' }}>Elegant</span><span style={{ fontSize: '12px', fontWeight: '600', color: '#5A6075', background: '#FFFFFF', border: '1px solid #E4E6EE', borderRadius: '999px', padding: '4px 10px' }}>Coming soon</span></div>
             <div style={{ padding: '4px 4px 0', fontSize: '13px', color: '#5A6075' }}>Formal and refined, with clear section rules.</div>
           </div>
           {/* Classic: coming soon */}

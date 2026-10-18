@@ -51,16 +51,22 @@ There is no test runner yet.
 
 Ported from the Claude Design canvas "Honne Careers Landing Page" and the "Honne" design system; mirrors the conventions of the sibling Honne AI frontend (Vite, react-router, lucide-react, `@/` → `src/` alias, inline style objects). Tailwind is deliberately not used — its preflight reset breaks the design's inline SVG icons.
 
-Routes (`src/App.jsx`): `/` landing, `/login` sign in, `/home` CV studio, `/profile` create-from-scratch. Auth isn't wired (AUTH-1), so all routes are open and sign-in just navigates to `/home`.
+Routes (`src/App.jsx`): `/` landing, `/login` sign in, then inside `AppShell` (collapsible `Sidebar` + page): `/resumes` dashboard, `/new/template` → `/new/mode` → `/new/jd` → `/new/details` (wizard) or `/tailoring` (returning user), `/cv/:id` "Your CV is ready", `/profile`, `/settings`. `/home` redirects to `/resumes`. Auth isn't wired (AUTH-1), so all routes are open.
 
 Styling has two separate layers — keep them separate:
 - **Landing** (`src/pages/landing/`): `LandingView.jsx` is markup machine-converted from the design's `Main.dc.html`; `LandingPage.jsx` owns state (the rotating hero word). Its CSS in `landing.css` is scoped under `.hc-landing`, and its keyframes are prefixed `lp-`, because its class names (`.br`, `.rise`, `.dot`…) are generic. Hex colours are inline literals, as in the design.
-- **App screens** (sign in, studio, profile): shared `hc-` prefixed classes and `--hc-*` design tokens in `src/index.css` (tokens come from the design system's `tokens.json`). Use the tokens rather than new hex values.
+- **App screens**: shared `hc-` prefixed classes and `--hc-*` design tokens in `src/index.css` (tokens come from the design system's `tokens.json`). Use the tokens rather than new hex values.
 
-CV studio (`src/pages/studio/`) is a phase machine owned by `StudioPage.jsx`: `new` (add a CV) → `profile` (saved) → `gen` (tailoring job running) → `ready` (preview, chat edits, analysis). `?state=new|profile|ready|chat` opens a phase directly (the design's three "App home" artboards). Backend seams, each a mock to replace:
-- `useTailorJob.js` — simulated 4-step tailoring job (TAIL-3); swap the interval for polling/streaming the real job.
-- `AnalysisSection.jsx` — sample scores for the three analyses (ANA-1…3).
-- `src/data/sampleCv.js` — the design's sample CV, JD and profile file name.
-- "Download PDF" has no handler yet (`TODO(SAVE-1)`).
+Data (all mocked, session-only):
+- `src/state/` — `AppStoreProvider` holds profile, resumes, the new-resume draft and settings; screens use `useAppStore()`. `?user=new` on first load starts as a first-time user (no profile, no resumes).
+- `src/data/cvModel.js` — pure helpers between three shapes: **profile** (the user's facts, PROF-1), **doc** (a resume: per bullet `source` = profile fact, `text` = CV wording, `status` plain/edited/busy/review/kept) and **cv** (what `CvDoc` renders). `docToProfile` saves facts only, never tailored wording.
+- `src/services/mockApi.js` — backend seams (`tailorBullet`, `buildPdf`, `runAnalysis`) that throw specific errors (`TailorUnavailableError`, `TruthCheckError`, `PdfBuildError`). `?sim=ai-error|truth-error|pdf-error` forces each failure.
+- `src/hooks/useTailorJob.js` — simulated 4-step tailoring job (TAIL-3); swap the interval for the real job.
+- `src/data/sampleCv.js` — the design's sample profile, tailored bullets and JD.
 
-`src/components/CvDoc.jsx` renders a CV in the two P1 templates (`src/data/templates.js`); switching template only restyles (PDF-1: no LLM re-run). The profile page builds its live preview by mapping form state into the same CV shape.
+`src/components/CvDoc.jsx` renders a CV (`focus` highlights the section being edited; `CvThumb` is the scaled card thumbnail). Only Jake's Resume is live; Elegant, Classic and Modern are "Coming soon" (`src/data/templates.js`). Chat edits (CHAT-1…4) are not in this design and have no UI. The PDF isn't generated yet (`TODO(SAVE-1)`).
+
+## Deploy
+
+- **Frontend → Vercel.** Import the GitHub repo with **Root Directory = `frontend`**; `frontend/vercel.json` sets the Vite build, the SPA fallback (deep links like `/cv/cv1` serve `index.html`) and long caching for `/assets`. Production branch `main`; other branches get preview deploys.
+- **Backend → Render** (not built yet). The frontend reads its URL from `VITE_API_BASE_URL` (see `frontend/.env.example`) through `apiUrl()` in `src/services/apiConfig.js`, which throws in a production build if it's unset. Set it in Vercel's environment variables, and allow the Vercel domains in the backend's CORS config.
