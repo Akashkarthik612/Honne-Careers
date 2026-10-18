@@ -15,6 +15,14 @@ dist-e2e-local
 dist-smoke
 *.local
 
+# Env files (keep the example)
+.env
+.env.*
+!.env.example
+
+# Vercel CLI
+.vercel
+
 # Playwright
 /test-results/
 /playwright-report/
