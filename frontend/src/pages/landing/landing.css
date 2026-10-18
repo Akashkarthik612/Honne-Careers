@@ -1,0 +1,167 @@
+/* Landing page styles, from Main.dc.html. Scoped under .hc-landing; keyframes prefixed lp-. */
+.hc-landing .serif{font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-weight:400;letter-spacing:0}
+.hc-landing .disp{font-family:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif}
+.hc-landing .mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+.hc-landing .eyebrow{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+
+/* page motion */
+@keyframes lp-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.hc-landing .rise{animation:lp-rise .8s cubic-bezier(.2,.8,.2,1) both}
+.hc-landing .d1{animation-delay:.08s}.hc-landing .d2{animation-delay:.18s}.hc-landing .d3{animation-delay:.3s}.hc-landing .d4{animation-delay:.45s}
+@supports (animation-timeline: view()){.hc-landing .rv{animation:lp-rise linear both;animation-timeline:view();animation-range:entry 0% cover 26%}}
+@keyframes lp-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hc-landing .dot{animation:lp-pulse 1.6s ease-in-out infinite}
+.hc-landing .lift{transition:transform .25s ease,box-shadow .25s ease}
+.hc-landing .lift:hover{transform:translateY(-4px);box-shadow:0 2px 4px rgba(22,26,43,.05),0 22px 48px rgba(22,26,43,.10)}
+.hc-landing .btn{transition:transform .15s ease,background-color .2s ease}
+.hc-landing .btn:hover{transform:translateY(-1px)}
+.hc-landing .navlinks{display:flex;gap:30px}
+@media (max-width:860px){.hc-landing .navlinks{display:none}}
+.hc-landing .hero-bg{background-image:radial-gradient(rgba(22,26,43,.07) 1px,transparent 1px);background-size:22px 22px;-webkit-mask-image:radial-gradient(ellipse 70% 60% at 60% 40%,#000 30%,transparent 75%);mask-image:radial-gradient(ellipse 70% 60% at 60% 40%,#000 30%,transparent 75%)}
+
+/* staged reveal (9s loop) */
+@keyframes lp-s1{0%,4%{opacity:0;transform:translateY(8px)}8%,92%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes lp-s2{0%,18%{opacity:0;transform:translateY(8px)}22%,92%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes lp-s3{0%,32%{opacity:0;transform:translateY(8px)}36%,92%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes lp-s4{0%,46%{opacity:0;transform:translateY(8px)}50%,92%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes lp-s5{0%,60%{opacity:0;transform:translateY(8px)}64%,92%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes lp-s6{0%,74%{opacity:0;transform:translateY(8px)}78%,92%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+.hc-landing .st1{animation:lp-s1 9s ease-out infinite}.hc-landing .st2{animation:lp-s2 9s ease-out infinite}.hc-landing .st3{animation:lp-s3 9s ease-out infinite}.hc-landing .st4{animation:lp-s4 9s ease-out infinite}.hc-landing .st5{animation:lp-s5 9s ease-out infinite}.hc-landing .st6{animation:lp-s6 9s ease-out infinite}
+.hc-landing .ov{position:absolute;inset:0}
+
+/* ---------- line-art agent scene (black & white) ---------- */
+.hc-landing .scene text{font-family:Inter,Arial,sans-serif}
+.hc-landing .br{fill:#FFFFFF;stroke:#161A2B;stroke-width:2.2;stroke-linejoin:round}
+.hc-landing .fold{fill:none;stroke:#161A2B;stroke-width:1.5;stroke-linecap:round;stroke-dasharray:1.5 4}
+.hc-landing .ew{fill:#FFFFFF;stroke:#161A2B;stroke-width:1.6}
+.hc-landing .pu{fill:#161A2B}
+.hc-landing .brow,.hc-landing .mline{fill:none;stroke:#161A2B;stroke-width:2;stroke-linecap:round}
+.hc-landing .limb{fill:none;stroke:#161A2B;stroke-width:2.2;stroke-linecap:round}
+.hc-landing .foot{fill:#161A2B}
+.hc-landing .sweat{fill:#FFFFFF;stroke:#161A2B;stroke-width:1.3}
+.hc-landing .paper{fill:#FFFFFF;stroke:#161A2B;stroke-width:1.6}
+.hc-landing .wl{fill:none;stroke:#161A2B;stroke-width:1.6;stroke-linecap:round;stroke-dasharray:40;stroke-dashoffset:40}
+.hc-landing .pb{fill:#FFFFFF;stroke:#161A2B;stroke-width:1.3}.hc-landing .pg{fill:#161A2B}.hc-landing .pe{fill:#161A2B}.hc-landing .hand{fill:#FFFFFF;stroke:#161A2B;stroke-width:1.5}
+.hc-landing .glass{fill:none;stroke:#161A2B;stroke-width:2.2}
+.hc-landing .cig{fill:#FFFFFF;stroke:#161A2B;stroke-width:1.1}.hc-landing .cigf{fill:#161A2B}.hc-landing .ember{fill:#161A2B}
+.hc-landing .smk{fill:none;stroke:#161A2B;stroke-width:1.1;stroke-dasharray:1.5 2.5}
+.hc-landing .dt{font-size:7px;font-weight:800;fill:#161A2B;letter-spacing:.04em}
+.hc-landing .dl{fill:none;stroke:#161A2B;stroke-width:1.2;stroke-linecap:round;stroke-dasharray:1.5 3}
+.hc-landing .rbar{fill:#161A2B}
+.hc-landing .suit{fill:#161A2B}
+.hc-landing .shirt{fill:#FFFFFF;stroke:#161A2B;stroke-width:1.2}.hc-landing .tie{fill:#161A2B}
+.hc-landing .lapel{fill:none;stroke:#FFFFFF;stroke-width:1.3}
+.hc-landing .pants{fill:none;stroke:#161A2B;stroke-width:4;stroke-linecap:round}
+.hc-landing .sleeve{fill:none;stroke:#161A2B;stroke-width:5;stroke-linecap:round}
+.hc-landing .bubble{fill:#FFFFFF;stroke:#161A2B;stroke-width:1.6;stroke-linejoin:round}
+.hc-landing .say{font-size:11.5px;font-weight:600;fill:#161A2B}
+.hc-landing .board{fill:#FFFFFF;stroke:#161A2B;stroke-width:2.2}
+.hc-landing .btitle{font-size:10px;font-weight:800;letter-spacing:.06em;fill:#161A2B}
+.hc-landing .bitem{font-size:10.5px;font-weight:600;fill:#161A2B}
+.hc-landing .dash{fill:none;stroke:#161A2B;stroke-width:1.2;stroke-dasharray:2 4;stroke-linecap:round}
+.hc-landing .trail{fill:none;stroke:#9AA0B4;stroke-width:1.5;stroke-dasharray:2 6;stroke-linecap:round;animation:lp-dash 1.2s linear infinite}
+.hc-landing .gbr{fill:none;stroke:#161A2B;stroke-width:2;stroke-dasharray:4 5}
+.hc-landing .gclosed{fill:none;stroke:#161A2B;stroke-width:1.8;stroke-linecap:round}
+.hc-landing .gplus{fill:#161A2B}.hc-landing .gplusx{stroke:#FFFFFF;stroke-width:2.4;stroke-linecap:round;fill:none}
+.hc-landing .zz2{font-size:12px;font-weight:700;fill:#161A2B}
+.hc-landing .nm{font-size:12px;font-weight:700;fill:#161A2B;text-anchor:middle}
+.hc-landing .sg{font-size:11px;fill:#5A6075;text-anchor:middle}
+.hc-landing .desk{stroke:#161A2B;stroke-width:1.4;stroke-dasharray:2 5;stroke-linecap:round}
+/* blue variant used only on the dark custom-agent card */
+.hc-landing .ghostbr{fill:rgba(123,147,242,.08);stroke:#7B93F2;stroke-width:2;stroke-dasharray:5 5}
+.hc-landing .closed{fill:none;stroke:#9DB0F6;stroke-width:2;stroke-linecap:round}
+.hc-landing .plus{fill:#4D70EB}.hc-landing .plusx{stroke:#FFFFFF;stroke-width:2.4;stroke-linecap:round;fill:none}
+
+@keyframes lp-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.hc-landing .bob{animation:lp-bob 1.5s ease-in-out infinite}
+.hc-landing .bob2{animation:lp-bob 1.25s ease-in-out .3s infinite}
+.hc-landing .bob3{animation:lp-bob 1.8s ease-in-out .6s infinite}
+.hc-landing .bob4{animation:lp-bob 2s ease-in-out .9s infinite}
+@keyframes lp-blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.hc-landing .blink{transform-box:fill-box;transform-origin:center;animation:lp-blink 4.2s infinite}
+.hc-landing .blink2{transform-box:fill-box;transform-origin:center;animation:lp-blink 5.1s 1.3s infinite}
+@keyframes lp-scan{0%,100%{transform:translateX(-2.5px)}50%{transform:translateX(2.5px)}}
+.hc-landing .scan{animation:lp-scan 3s ease-in-out infinite}
+@keyframes lp-drip{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(16px);opacity:0}}
+.hc-landing .drip{animation:lp-drip 1.7s ease-in infinite}
+@keyframes lp-write{0%{transform:translate(0,0)}14%{transform:translate(36px,0)}16%{transform:translate(0,10px)}30%{transform:translate(36px,10px)}32%{transform:translate(0,20px)}46%{transform:translate(36px,20px)}48%{transform:translate(0,30px)}62%{transform:translate(36px,30px)}64%{transform:translate(0,40px)}78%{transform:translate(36px,40px)}88%{transform:translate(18px,-6px)}100%{transform:translate(0,0)}}
+.hc-landing .pencil{animation:lp-write 6s linear infinite}
+@keyframes lp-wl1{0%{stroke-dashoffset:40;opacity:1}14%,88%{stroke-dashoffset:0;opacity:1}96%,100%{stroke-dashoffset:0;opacity:0}}
+@keyframes lp-wl2{0%,16%{stroke-dashoffset:40;opacity:1}30%,88%{stroke-dashoffset:0;opacity:1}96%,100%{stroke-dashoffset:0;opacity:0}}
+@keyframes lp-wl3{0%,32%{stroke-dashoffset:40;opacity:1}46%,88%{stroke-dashoffset:0;opacity:1}96%,100%{stroke-dashoffset:0;opacity:0}}
+@keyframes lp-wl4{0%,48%{stroke-dashoffset:40;opacity:1}62%,88%{stroke-dashoffset:0;opacity:1}96%,100%{stroke-dashoffset:0;opacity:0}}
+@keyframes lp-wl5{0%,64%{stroke-dashoffset:40;opacity:1}78%,88%{stroke-dashoffset:0;opacity:1}96%,100%{stroke-dashoffset:0;opacity:0}}
+.hc-landing .wl1{animation:lp-wl1 6s linear infinite}.hc-landing .wl2{animation:lp-wl2 6s linear infinite}.hc-landing .wl3{animation:lp-wl3 6s linear infinite}.hc-landing .wl4{animation:lp-wl4 6s linear infinite}.hc-landing .wl5{animation:lp-wl5 6s linear infinite}
+@keyframes lp-smoke{0%{transform:translate(0,0) scale(.6);opacity:0}20%{opacity:.8}100%{transform:translate(7px,-34px) scale(1.9);opacity:0}}
+.hc-landing .smk{transform-box:fill-box;transform-origin:center;animation:lp-smoke 2.7s ease-out infinite}
+@keyframes lp-ember{0%,100%{opacity:.4}50%{opacity:1}}
+.hc-landing .ember{animation:lp-ember 1.3s ease-in-out infinite}
+@keyframes lp-docshow{0%{opacity:0;transform:translateY(6px)}5%,28%{opacity:1;transform:translateY(0)}33%,100%{opacity:0;transform:translateX(-12px)}}
+.hc-landing .doc{opacity:0;animation:lp-docshow 6s infinite}
+.hc-landing .say{opacity:0;animation:lp-docshow 9s infinite}
+@keyframes lp-rbar{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+.hc-landing .rbar{transform-box:fill-box;transform-origin:bottom;animation:lp-rbar 2.4s ease-in-out infinite}
+@keyframes lp-wag{0%,100%{transform:translate(0,0)}50%{transform:translate(-2px,-4px)}}
+.hc-landing .wag{animation:lp-wag 1.8s ease-in-out infinite}
+@keyframes lp-mark{0%,100%{transform:translate(0,0)}25%{transform:translate(4px,-3px)}50%{transform:translate(1px,2px)}75%{transform:translate(5px,1px)}}
+.hc-landing .mark{animation:lp-mark 1.4s ease-in-out infinite}
+@keyframes lp-talk{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.hc-landing .talk{transform-box:fill-box;transform-origin:center;animation:lp-talk .4s ease-in-out infinite}
+@keyframes lp-ghost{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(-6px);opacity:1}}
+.hc-landing .ghost{animation:lp-ghost 5s ease-in-out infinite}
+@keyframes lp-zz{0%{opacity:0;transform:translate(0,0)}30%{opacity:1}100%{opacity:0;transform:translate(6px,-14px)}}
+.hc-landing .zz2{animation:lp-zz 3s ease-out infinite}
+@keyframes lp-cvfly{0%{transform:translate(0,0) rotate(0deg);opacity:0}4%{opacity:1}16%{transform:translate(0,0) rotate(0deg)}30%,40%{transform:translate(48px,22px) rotate(-6deg)}58%,66%{transform:translate(250px,2px) rotate(5deg)}84%,92%{transform:translate(200px,-232px) rotate(0deg);opacity:1}97%,100%{transform:translate(200px,-232px) rotate(0deg);opacity:0}}
+.hc-landing .fly{transform-box:fill-box;transform-origin:center;animation:lp-cvfly 9s cubic-bezier(.6,0,.3,1) infinite}
+@keyframes lp-strike{0%,22%{stroke-dashoffset:120}32%,92%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.hc-landing .strike{fill:none;stroke:#161A2B;stroke-width:1.8;stroke-linecap:round;stroke-dasharray:120;stroke-dashoffset:120;animation:lp-strike 9s ease-out infinite}
+@keyframes lp-circ{0%,64%{stroke-dashoffset:260}74%,92%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.hc-landing .circ{fill:none;stroke:#161A2B;stroke-width:1.6;stroke-dasharray:260;stroke-dashoffset:260;animation:lp-circ 9s ease-out infinite}
+
+/* ---------- need panels ---------- */
+.hc-landing .kw{position:relative;display:inline-block;font-size:12px;font-weight:600;color:#5A6075;background:#F3F4F8;border:1px solid #E4E6EE;border-radius:999px;padding:5px 11px}
+.hc-landing .kw .ov{display:flex;align-items:center;justify-content:center;border-radius:999px;background:#E9ECF9;border:1px solid #9DB0F6;color:#3F5FD8;margin:-1px}
+.hc-landing .cvl{position:relative;height:8px;border-radius:999px;background:#E4E6EE;overflow:hidden}
+.hc-landing .cvl .ov{background:#4D70EB;border-radius:999px}
+@keyframes lp-blind{0%{stroke-dashoffset:220;opacity:0}10%{opacity:.85}45%{stroke-dashoffset:0}75%{opacity:.85}100%{stroke-dashoffset:0;opacity:0}}
+.hc-landing .blindl{fill:none;stroke:#E8590C;stroke-width:2;stroke-linecap:round;stroke-dasharray:220;stroke-dashoffset:220;animation:lp-blind 3.2s ease-out infinite}
+@keyframes lp-bx{0%,40%{opacity:0}48%,75%{opacity:1}100%{opacity:0}}
+.hc-landing .bx{fill:none;stroke:#C2410C;stroke-width:2.4;stroke-linecap:round;opacity:0;animation:lp-bx 3.2s infinite}
+@keyframes lp-draw{0%,6%{stroke-dashoffset:290;opacity:1}62%,92%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.hc-landing .guide{fill:none;stroke:#3F5FD8;stroke-width:3.5;stroke-linecap:round;stroke-dasharray:290;stroke-dashoffset:290;animation:lp-draw 9s ease-in-out infinite}
+.hc-landing .gtrack{fill:none;stroke:#E4E6EE;stroke-width:3.5;stroke-linecap:round;stroke-dasharray:2 7}
+.hc-landing .cp{fill:#FFFFFF;stroke:#3F5FD8;stroke-width:3}
+.hc-landing .cpl{font-size:11px;font-weight:700;fill:#161A2B;font-family:Inter,Arial,sans-serif}
+.hc-landing .cap{font-size:11px;font-weight:800;letter-spacing:.1em;font-family:Inter,Arial,sans-serif}
+.hc-landing .you{fill:#161A2B}
+
+/* ---------- how it works ---------- */
+@keyframes lp-dash{to{stroke-dashoffset:-32}}
+.hc-landing .flow{fill:none;stroke:#9DB0F6;stroke-width:2.5;stroke-linecap:round;stroke-dasharray:8 8;animation:lp-dash 1s linear infinite}
+.hc-landing .flowhead{fill:#9DB0F6}
+.hc-landing .curvy{display:block}
+.hc-landing .downarrow{display:none}
+@media (max-width:860px){.hc-landing .curvy{display:none}.hc-landing .downarrow{display:flex}}
+@keyframes lp-press7{0%,66%{transform:scale(1)}69%{transform:scale(.93)}72%,100%{transform:scale(1)}}
+.hc-landing .press7{animation:lp-press7 9s infinite}
+@keyframes lp-cursor7{0%,48%{transform:translate(80px,40px);opacity:0}54%{opacity:1}64%,72%{transform:translate(0,0);opacity:1}84%,100%{transform:translate(0,0);opacity:0}}
+.hc-landing .cursor7{animation:lp-cursor7 9s ease-in-out infinite}
+@keyframes lp-typing{0%,4%{width:0}34%,100%{width:43ch}}
+.hc-landing .type{display:inline-block;overflow:hidden;white-space:nowrap;vertical-align:bottom;width:0;animation:lp-typing 9s steps(43,end) infinite}
+@keyframes lp-caret{50%{opacity:0}}
+.hc-landing .caret{display:inline-block;width:2px;height:1.15em;background:#3F5FD8;vertical-align:middle;margin-left:1px;animation:lp-caret .8s steps(1) infinite}
+@keyframes lp-on3{0%,34%{background:#FFFFFF;color:#5A6075;border-color:#E4E6EE}38%,92%{background:#E9ECF9;color:#3F5FD8;border-color:#9DB0F6}100%{background:#FFFFFF;color:#5A6075;border-color:#E4E6EE}}
+@keyframes lp-on4{0%,40%{background:#FFFFFF;color:#5A6075;border-color:#E4E6EE}44%,92%{background:#E9ECF9;color:#3F5FD8;border-color:#9DB0F6}100%{background:#FFFFFF;color:#5A6075;border-color:#E4E6EE}}
+.hc-landing .tool{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;border:1px solid #E4E6EE;border-radius:10px;padding:7px 10px;background:#FFFFFF;color:#5A6075}
+.hc-landing .on3{animation:lp-on3 9s infinite}.hc-landing .on4{animation:lp-on4 9s infinite}
+@keyframes lp-newrow{0%,46%{background:#FFFFFF}50%,70%{background:#EEF1FD}80%,100%{background:#FFFFFF}}
+.hc-landing .newrow{animation:lp-newrow 9s infinite}
+
+/* jake mini */
+.hc-landing .jk{font-family:"Times New Roman",Times,Georgia,serif;color:#111}
+.hc-landing .jk .h{font-size:7.4px;font-variant:small-caps;letter-spacing:.05em;border-bottom:.8px solid #111;margin-top:7px;padding-bottom:1px}
+.hc-landing .jk .r{display:flex;justify-content:space-between;gap:6px;font-size:5.8px;line-height:1.35}
+.hc-landing .jk .i{font-style:italic}
+.hc-landing .jk ul{margin:1px 0 0;padding-left:9px;font-size:5.3px;line-height:1.4}
+
+@media (prefers-reduced-motion:reduce){.hc-landing *,.hc-landing *::before,.hc-landing *::after{animation:none !important;transition:none !important}.hc-landing .wl,.hc-landing .guide,.hc-landing .blindl,.hc-landing .strike,.hc-landing .circ{stroke-dashoffset:0 !important}.hc-landing .type{width:43ch}}
