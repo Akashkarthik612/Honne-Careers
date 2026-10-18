@@ -21,9 +21,37 @@ The product promise drives the design: **nothing invented**. Every skill, employ
 
 ## Repository state
 
-- `frontend/` — the only code so far: React 19 + Vite UI prototype of the P1 screens. All data is mocked.
-- No backend yet. The plan is to reuse the Honne IQ backend stack and conventions (assumed FastAPI, Postgres + pgvector, Gemini, Render, GitHub Actions), but whether Honne Careers lives in the Honne IQ repo is open (Q1). Don't scaffold a backend without settling that.
+- `frontend/` — React 19 + Vite UI prototype of the P1 screens. Data is still mocked; not yet wired to the backend.
+- `backend/` — Python 3.12 + FastAPI, P1 feature 1 (Day_1.md). Lives in this repo (Q1 settled 18 Oct 2026).
+- `supabase/migrations/` — schema, RLS (enabled + forced on every table), grants, storage policies. Never edit a migration once applied; add a new one.
+- `render.yaml` — Render Blueprint: free Static Site (frontend) + one paid Docker web service (FastAPI + Tectonic LaTeX). No Vercel.
 - `project_sources/` — source material (founder's handwritten notes). Not code.
+
+## Stack (decided 18 Oct 2026)
+
+Render (static frontend + Docker API with LaTeX in the same image) · Supabase (Postgres with RLS, Auth with Google + GitHub, Storage) · Gemini now, via a provider adapter (OpenAI/Claude later = one new adapter + env change) · GitHub Actions. LangGraph is planned for P3/P4 multi-agent work, which is why the backend stays Python.
+
+## Backend commands
+
+Run from `backend/`:
+
+```
+python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"   # bin/ on Linux/macOS
+cp .env.example .env                 # fill in; see backend/README.md
+uvicorn app.main:app --reload --port 8000
+pytest -q                            # DB tests need DATABASE_URL_TEST (superuser of a throwaway Postgres)
+ruff check app tests docker && bandit -q -r app -c pyproject.toml && pip-audit --skip-editable
+```
+
+## Backend architecture
+
+`api → services → (repositories, agents, truth, render, ingest, storage, policy) → domain`; `app/container.py` is the composition root (tests build it with fakes). Rules that are easy to break:
+- **Tenancy is enforced twice.** Every DB call goes through `UnitOfWork` (`app/db`), which does `SET LOCAL ROLE authenticated` + JWT claims so RLS applies; repositories also filter by `user_id`. The login role `honne_backend` owns nothing. Another user's id → 404, never 403.
+- **Client input shapes (`*In`) carry ids + text only.** `EditStamper` stamps `origin`/`locked` server-side (B5). Never accept origin/locked from a client.
+- **The model never writes LaTeX or structural fields.** Agents return JSON; `TruthChecker` checks AI output against `FactSet` (item-scoped numbers, skills, dates, names); `ResumeMerger` drops edits to locked bullets and keeps originals for violations.
+- **Agents are config** (`backend/agents/*.yaml` + `backend/prompts/`). `AgentRunner` owns retries, untrusted-data wrapping and the `agent_runs` record. Add an agent by adding files, not code.
+- **No transaction is held across an LLM call, compile or storage call.** Services: short UoW → slow call → short UoW with optimistic concurrency.
+- Never log CV/JD text; `tests/integration/test_logging_privacy.py` enforces it.
 
 ## Git branching
 
@@ -39,7 +67,7 @@ Run from `frontend/`:
 
 ```
 npm install
-npm run dev       # Vite dev server; /api is proxied to http://localhost:8000
+npm run dev       # Vite dev server; /api is proxied to http://localhost:8000 (the backend)
 npm run lint      # ESLint (react-hooks + react-refresh rules)
 npm run build     # production build to dist/
 npm run preview

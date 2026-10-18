@@ -1,0 +1,59 @@
+# Honne Careers API
+
+FastAPI + Tectonic (LaTeX) in one Docker image, on Render. Supabase for Postgres (RLS), Auth and Storage. Design: [Day_1.md](../Day_1.md). Rules: [CLAUDE.md](../CLAUDE.md).
+
+## One-time Supabase setup
+
+1. **Region**: pick one near India (Mumbai `ap-south-1` or Singapore), matching Render's Singapore region.
+2. **JWT signing keys**: Project Settings → JWT → switch to **asymmetric signing keys** (ES256/RS256). The API rejects HS256 tokens on purpose; with legacy secrets, every request fails with `auth_unavailable`.
+3. **Auth providers**: enable Google and GitHub only (A1). Disable email/password and anonymous sign-ins.
+4. **Migrations**: apply `supabase/migrations/*.sql` in order (`supabase db push`, or paste them into the SQL editor).
+5. **Backend role password** (never in a migration):
+   ```sql
+   alter role honne_backend password '<long random>';
+   ```
+6. **Connection string**: use the **session pooler** (IPv4; Render has no IPv6 route to the direct host), with user `honne_backend.<project-ref>`.
+7. **Exposed schemas**: leave `app` out of the Data API's exposed schemas (the default).
+
+## Local development
+
+```
+python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
+PDF builds need `tectonic` on `PATH` (or `TECTONIC_BIN`). The first compile downloads LaTeX packages; after that it works offline.
+
+## Tests
+
+```
+pytest -q
+```
+- Unit and golden tests always run.
+- DB tests (RLS, API) need `DATABASE_URL_TEST` = superuser URL of a throwaway Postgres 16. Each run creates and drops its own database. Without it they're skipped locally and **fail** in CI. With no Docker, `pip install pgserver` gives an embedded Postgres.
+- The real LaTeX test runs when `tectonic` is installed; CI also compiles inside the image with networking off.
+
+## Deploy
+
+`render.yaml` at the repo root is a Render Blueprint. Fill the `honne-careers-api-secrets` env group in the dashboard. `main` auto-deploys; `/health` is the health check. Check `tectonic_peak_rss_mb` in the CI docker job: Starter has 512 MB, Standard 2 GB.
+
+## API (Day_1 B8)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/health` | No auth |
+| GET / DELETE | `/me` | DELETE = account + all data (AUTH-3) |
+| GET | `/templates` | `[jake]` |
+| GET / PUT | `/profile` | PUT with `expected_version` (omit to create) |
+| POST | `/uploads`, `/uploads/latex` | → pre-fill for the wizard |
+| GET / POST | `/resumes` | Dashboard / create |
+| GET / PATCH / DELETE | `/resumes/{id}` | PATCH = autosave one section, 409 if stale |
+| POST | `/resumes/{id}/duplicate` | |
+| PUT | `/resumes/{id}/jd` | 1–1,000 words |
+| POST | `/resumes/{id}/tailor` | 202; poll `GET /resumes/{id}` until `status` is `ready`/`failed` |
+| POST | `/resumes/{id}/bullets/{bid}/tailor` · `/keep` · `/revert` | |
+| POST | `/resumes/{id}/pdf` | Build or reuse → 5-minute signed URL |
+| POST | `/resumes/{id}/analysis` | Cached per content + JD |
+| POST | `/resumes/{id}/save-to-profile` | |
+
+Errors: `{"error": {"code", "message", "correlation_id", "details?"}}`. Send `X-Correlation-Id` to trace a request across logs.

@@ -1,0 +1,74 @@
+# Render Blueprint (plan v4): free static frontend + one paid Docker API with LaTeX inside.
+# Secrets are never in this file: set them in the "honne-careers-api-secrets" env group.
+# Region: Singapore is Render's closest to India; put the Supabase project in a nearby
+# region (ap-south-1 Mumbai or ap-southeast-1 Singapore) to keep DB latency low.
+
+envVarGroups:
+  - name: honne-careers-api-secrets
+    envVars:
+      - key: DATABASE_URL          # Supabase session pooler (IPv4), user honne_backend
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY   # used only to delete an account (AUTH-3)
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+services:
+  - type: web
+    name: honne-careers-api
+    runtime: docker
+    plan: starter            # 512 MB; move to standard (2 GB) if LaTeX peak memory needs it
+    region: singapore
+    branch: main             # production deploys only from main (CLAUDE.md branching)
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - fromGroup: honne-careers-api-secrets
+      - key: ENV
+        value: prod
+      - key: CORS_ORIGINS    # the static site's domains only; add the .com once bought
+        value: https://honne-careers.onrender.com
+      - key: LLM_STRONG
+        value: gemini:gemini-2.5-pro
+      - key: LLM_LIGHT
+        value: gemini:gemini-2.5-flash
+      - key: BETA_FREE_TAILORING
+        value: "true"
+
+  - type: web
+    name: honne-careers
+    runtime: static
+    branch: main
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://honne-careers-api.onrender.com
+    routes:
+      - type: rewrite        # SPA: let react-router handle every path
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=63072000; includeSubDomains
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; connect-src 'self' https://honne-careers-api.onrender.com https://*.supabase.co; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
