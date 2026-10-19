@@ -37,7 +37,8 @@ COPY --from=tectonic /usr/local/bin/tectonic /usr/local/bin/tectonic
 ENV PATH=/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    TECTONIC_CACHE_DIR=/opt/tectonic-cache
+    TECTONIC_CACHE_DIR=/opt/tectonic-cache \
+    XDG_CACHE_HOME=/opt/tectonic-xdg
 WORKDIR /srv
 COPY app ./app
 COPY agents ./agents
@@ -45,10 +46,12 @@ COPY prompts ./prompts
 COPY docker ./docker
 
 # Warm the cache by compiling the real Jake template once (needs network at build only).
-# Read-only for the runtime user: the app can't modify its own TeX packages.
-RUN mkdir -p "$TECTONIC_CACHE_DIR" \
+# Packages land in TECTONIC_CACHE_DIR, the compiled format in XDG_CACHE_HOME/Tectonic/formats.
+# Read-only for the runtime user: the app can't modify its own TeX packages or format.
+RUN mkdir -p "$TECTONIC_CACHE_DIR" "$XDG_CACHE_HOME" \
  && python docker/warm_cache.py \
- && chmod -R a+rX,go-w "$TECTONIC_CACHE_DIR"
+ && test -n "$(ls "$XDG_CACHE_HOME"/Tectonic/formats/*.fmt)" \
+ && chmod -R a+rX,go-w "$TECTONIC_CACHE_DIR" "$XDG_CACHE_HOME"
 
 USER app
 EXPOSE 8000

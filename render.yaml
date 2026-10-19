@@ -27,17 +27,19 @@ services:
     rootDir: backend
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    autoDeploy: true
+    autoDeployTrigger: checksPass   # a push to main deploys once its GitHub CI checks are green
     envVars:
       - fromGroup: honne-careers-api-secrets
       - key: ENV
         value: prod
+      - key: PORT            # the image's uvicorn listens on 8000 (Dockerfile); Render's default is 10000
+        value: "8000"
       - key: CORS_ORIGINS    # the static site's domains only; add the .com once bought
         value: https://honne-careers.onrender.com
       - key: LLM_STRONG
-        value: gemini:gemini-2.5-pro
+        value: gemini:gemini-3.8-flash
       - key: LLM_LIGHT
-        value: gemini:gemini-2.5-flash
+        value: gemini:gemini-3.8-flash
       - key: BETA_FREE_TAILORING
         value: "true"
 
@@ -48,6 +50,7 @@ services:
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
+    autoDeployTrigger: checksPass   # a push to main deploys once its GitHub CI checks are green
     pullRequestPreviewsEnabled: false
     envVars:                 # read at build time; all browser-visible, so no secrets here
       - key: VITE_API_BASE_URL
