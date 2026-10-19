@@ -6,21 +6,46 @@ checks one page, and reports Tectonic's peak memory (decides Render Starter vs S
 import asyncio
 import os
 import resource
+import subprocess  # noqa: S404
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core.errors import RenderFailed  # noqa: E402
 from app.render.compiler import CompileQueue, TectonicCompiler  # noqa: E402
 from app.render.inspector import PdfInspector  # noqa: E402
 from app.render.latex import LatexRenderer  # noqa: E402
 from docker.warm_cache import CV  # noqa: E402
 
 
+def diagnose(tex: str) -> None:
+    """The production compiler logs no stderr (it can quote CV text). This is the fixed
+    fixture CV, so rerun Tectonic directly, without the rlimits, and surface its output as a
+    GitHub annotation (readable without log access)."""
+    work = Path(tempfile.mkdtemp(prefix="smoke-"))
+    (work / "resume.tex").write_text(tex, encoding="utf-8")
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(work),
+           "TECTONIC_CACHE_DIR": os.environ.get("TECTONIC_CACHE_DIR", "")}
+    proc = subprocess.run(  # noqa: S603 - fixed argv, fixture input
+        ["tectonic",  # noqa: S607 - on PATH in the image, as in TectonicCompiler "--untrusted", "--only-cached", "--chatter", "minimal",
+         "--outdir", str(work), str(work / "resume.tex")],
+        cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+        timeout=120, check=False)
+    out = (proc.stdout + proc.stderr)[-3000:].replace("%", "%25").replace("\n", "%0A")
+    print(f"::error title=tectonic without rlimits: exit {proc.returncode}::{out}")
+
+
 async def main() -> None:
     compiler = TectonicCompiler("tectonic", 60, 1536, CompileQueue(1, 0, 60),
                                 os.environ.get("TECTONIC_CACHE_DIR"))
-    pdf = await compiler.compile(LatexRenderer().render(CV))
+    tex = LatexRenderer().render(CV)
+    try:
+        pdf = await compiler.compile(tex)
+    except RenderFailed as exc:
+        diagnose(tex)
+        sys.exit(f"offline compile failed: {exc!r}")
     pages = PdfInspector().page_count(pdf)
     peak_mb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024
     print(f"offline compile OK: pages={pages} bytes={len(pdf)} tectonic_peak_rss_mb={peak_mb:.0f}")
