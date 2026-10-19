@@ -72,7 +72,7 @@ One agent per AI task, no orchestration (Day_1 A2 #2). Each is a YAML config plu
 - **Edit a prompt:** change the Markdown file; it is sent verbatim as the system prompt. Keep the JSON fields it describes in line with the schemas in `app/domain/tailoring.py` / `analysis.py`, or replies fail validation (`llm_output_invalid`).
 - **Version a prompt:** add `v2.md`, point the YAML's `instructions` at it and bump `version`; every run records the agent version in `agent_runs`.
 - **Don't** add prompt-injection boilerplate (`AgentRunner` already wraps JD/CV text as untrusted data) or rely on the prompt for truthfulness (TRUTH-2 is checked in Python).
-- Tiers map to models through `LLM_STRONG` / `LLM_LIGHT` (`render.yaml`, `.env`): Gemini 2.5 Pro / Flash today. Per-agent `temperature`, `max_output_tokens`, `timeout_s`, `max_retries` live in the YAML.
+- Tiers map to models through `LLM_STRONG` / `LLM_LIGHT` (`render.yaml`, `.env`): Gemini 3.8 Flash (strong) / 3.5 Flash-Lite (light) today. Per-agent `temperature`, `max_output_tokens`, `timeout_s`, `max_retries` live in the YAML.
 - CI never calls a model: tests script replies with `FakeProvider`, so real-model output quality (parsing, tailoring) is checked by hand on the deployed app.
 
 ## Git branching

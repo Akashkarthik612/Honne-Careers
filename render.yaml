@@ -40,7 +40,7 @@ services:
       - key: LLM_STRONG
         value: gemini:gemini-3.8-flash
       - key: LLM_LIGHT
-        value: gemini:gemini-3.8-flash
+        value: gemini:gemini-3.5-flash-lite
       - key: BETA_FREE_TAILORING
         value: "true"
       # Free plan has 0.1 CPU: give LaTeX compiles and upload parsing more time than the
