@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Bot, Database, FileText, LogOut, Plus, Settings, User } from 'lucide-react';
 import { HonneTile, Wordmark } from '@/components/HonneMark';
+import useSignOut from '@/hooks/useSignOut';
 import { useAppStore } from '@/state/appStore';
+import { useAuth } from '@/state/auth';
 
 // Collapsible app sidebar (design: Sidebar.dc.html). Open 248px / collapsed 76px, remembered per browser.
 // Below 760px it stays a 76px rail and opens as an overlay.
@@ -35,7 +37,9 @@ function PanelIcon({ open }) {
 
 export default function Sidebar() {
   const { pathname } = useLocation();
-  const { settings, profile, resetDraft } = useAppStore();
+  const { resetDraft } = useAppStore();
+  const { user } = useAuth();
+  const signOut = useSignOut();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW).matches);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -79,7 +83,7 @@ export default function Sidebar() {
       {open && <><span style={{ flex: 1 }}>{label}</span><span className="hc-soon">SOON</span></>}
     </span>
   );
-  const initials = settings.name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+  const initials = user.name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
 
   return (
     <div style={{ flex: 'none', minHeight: 1, transition: 'width .22s ease', width: narrow ? 76 : width }}>
@@ -134,19 +138,21 @@ export default function Sidebar() {
             </div>
           )}
           {navItem('/settings', 'settings', 'Settings', Settings)}
-          <div title={`${settings.name} · ${profile.personal.email}`} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 52, marginTop: 4, ...(open ? { padding: '0 8px' } : { justifyContent: 'center' }) }}>
-            <span style={{ flex: 'none', width: 32, height: 32, borderRadius: 99, background: 'var(--hc-ink)', color: '#FFFFFF', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+          <div title={`${user.name} · ${user.email}`} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 52, marginTop: 4, ...(open ? { padding: '0 8px' } : { justifyContent: 'center' }) }}>
+            {user.avatarUrl
+              ? <img src={user.avatarUrl} alt="" width={32} height={32} referrerPolicy="no-referrer" style={{ flex: 'none', borderRadius: 99, objectFit: 'cover' }} />
+              : <span style={{ flex: 'none', width: 32, height: 32, borderRadius: 99, background: 'var(--hc-ink)', color: '#FFFFFF', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>}
             {open && (
               <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{settings.name}</span>
-                <span style={{ fontSize: 12, color: 'var(--hc-ink-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profile.personal.email}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</span>
+                <span style={{ fontSize: 12, color: 'var(--hc-ink-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</span>
               </span>
             )}
           </div>
-          {/* AUTH-1 isn't wired: signing out just returns to the sign-in screen. */}
-          <Link to="/login" title="Sign out" aria-label="Sign out" style={muted}>
-            <LogOut size={20} strokeWidth={2} aria-hidden="true" style={{ flex: 'none' }} />{open && <span>Sign out</span>}
-          </Link>
+          <button type="button" onClick={signOut.signOut} disabled={signOut.busy} title={signOut.error ?? 'Sign out'} aria-label="Sign out" style={{ ...muted, border: 0, background: 'none', fontFamily: 'inherit', cursor: signOut.busy ? 'progress' : 'pointer', width: '100%' }}>
+            <LogOut size={20} strokeWidth={2} aria-hidden="true" style={{ flex: 'none' }} />{open && <span>{signOut.busy ? 'Signing out…' : 'Sign out'}</span>}
+          </button>
+          {signOut.error && open && <span role="alert" style={{ fontSize: 12.5, color: 'var(--hc-warm)', padding: '0 12px' }}>{signOut.error}</span>}
         </div>
       </aside>
     </div>

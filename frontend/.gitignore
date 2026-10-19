@@ -20,9 +20,6 @@ dist-smoke
 .env.*
 !.env.example
 
-# Vercel CLI
-.vercel
-
 # Playwright
 /test-results/
 /playwright-report/

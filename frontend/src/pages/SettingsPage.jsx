@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Check, CreditCard, LogOut } from 'lucide-react';
 import { GitHubIcon, GoogleIcon } from '@/components/BrandIcons';
 import { templateName } from '@/data/templates';
+import useSignOut from '@/hooks/useSignOut';
+import { deleteMe } from '@/services/apiClient';
+import { signOut as forgetSession } from '@/services/authService';
 import { useAppStore } from '@/state/appStore';
+import { useAuth } from '@/state/auth';
 
 // Settings (design: Settings.dc.html): account, subscription & billing, preferences, data & privacy.
 // Billing is out of scope until after user testing, so that section only states the free beta plan;
@@ -30,8 +34,12 @@ function Switch({ id, label, help, on, onFlip }) {
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { settings, setSettings, profile, resumes, deleteAccount } = useAppStore();
+  const { user } = useAuth();
+  const signOut = useSignOut();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const initials = settings.name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const initials = user.name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
 
   // AUTH-3 / data export: profile and resumes as JSON. PDFs join the export once PDF-2 builds them. TODO(PDF-2)
   function downloadData() {
@@ -42,6 +50,23 @@ export default function SettingsPage() {
     a.download = 'honne-careers-data.json';
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // AUTH-3: the server deletes files, the sign-in and every row first; only then is local state cleared.
+  // The Supabase user is gone by then, so signing out only forgets the session in this browser.
+  async function removeAccount() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteMe();
+    } catch (e) {
+      setDeleteError(e.correlationId ? `${e.message} (Ref: ${e.correlationId})` : e.message);
+      setDeleting(false);
+      return;
+    }
+    deleteAccount();
+    await forgetSession({ scope: 'local' });
+    navigate('/', { replace: true });
   }
 
   return (
@@ -59,14 +84,16 @@ export default function SettingsPage() {
         <section id="st-account" className="hc-card hc-sec" aria-labelledby="h-acc">
           <h2 id="h-acc" className="hc-disp" style={h2}>Account</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-            <span style={{ width: 52, height: 52, borderRadius: 99, background: 'var(--hc-ink)', color: '#FFFFFF', fontSize: 17, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
-            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{settings.name || 'No name yet'}</div><div style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Member since Oct 2026</div></div>
+            {user.avatarUrl
+              ? <img src={user.avatarUrl} alt="" width={52} height={52} referrerPolicy="no-referrer" style={{ borderRadius: 99, objectFit: 'cover' }} />
+              : <span style={{ width: 52, height: 52, borderRadius: 99, background: 'var(--hc-ink)', color: '#FFFFFF', fontSize: 17, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>}
+            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{user.name}</div><div style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Member since Oct 2026</div></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <div className="hc-f"><label className="hc-flabel" htmlFor="st-name">Display name</label><input id="st-name" className="hc-in" type="text" value={settings.name} onChange={(e) => setSettings({ name: e.target.value })} /></div>
             <div className="hc-f">
               <label className="hc-flabel" htmlFor="st-email">Email</label>
-              <input id="st-email" className="hc-in" type="email" value={profile.personal.email} readOnly aria-describedby="st-email-help" />
+              <input id="st-email" className="hc-in" type="email" value={user.email} readOnly aria-describedby="st-email-help" />
               <span id="st-email-help" style={{ fontSize: 12, color: 'var(--hc-ink-muted)' }}>Comes from your Google account.</span>
             </div>
           </div>
@@ -74,12 +101,12 @@ export default function SettingsPage() {
             <div className="hc-lbl" style={{ marginBottom: 6 }}>Sign-in methods</div>
             <div className="hc-row">
               <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, fontWeight: 600 }}><GoogleIcon size={20} />Google</span>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--hc-success)', background: '#E8F5EC', borderRadius: 999, padding: '5px 10px' }}>Connected</span>
+              {user.provider === 'google' && <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--hc-success)', background: '#E8F5EC', borderRadius: 999, padding: '5px 10px' }}>Connected</span>}
             </div>
             <div className="hc-row">
               <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, fontWeight: 600 }}><GitHubIcon size={20} />GitHub</span>
-              {/* AUTH-1: linking a second provider needs the auth backend. */}
-              <span style={{ ...offBtn, minHeight: 40 }} aria-disabled="true" title="Available once sign-in is live">Connect</span>
+              {/* AUTH-1: GitHub comes after the beta; Google is the only sign-in for now. */}
+              <span className="hc-soon" title="GitHub sign-in is coming soon">COMING SOON</span>
             </div>
           </div>
         </section>
@@ -150,7 +177,10 @@ export default function SettingsPage() {
 
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '4px 2px' }}>
           <span style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>Changes save automatically.</span>
-          <Link className="hc-btn-s" to="/login"><LogOut size={16} aria-hidden="true" />Sign out</Link>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {signOut.error && <span role="alert" style={{ fontSize: 13, color: 'var(--hc-warm)' }}>{signOut.error}</span>}
+            <button type="button" className="hc-btn-s" onClick={signOut.signOut} disabled={signOut.busy}><LogOut size={16} aria-hidden="true" />{signOut.busy ? 'Signing out…' : 'Sign out'}</button>
+          </span>
         </div>
       </div>
 
@@ -159,9 +189,10 @@ export default function SettingsPage() {
           <div role="alertdialog" aria-modal="true" aria-labelledby="delacc-title" className="hc-rise" style={{ width: '100%', maxWidth: 420, background: '#FFFFFF', borderRadius: 20, padding: 24, boxShadow: '0 30px 80px rgba(14,18,38,.3)' }}>
             <h2 id="delacc-title" className="hc-disp" style={{ margin: 0, fontSize: 21, fontWeight: 800 }}>Delete your account?</h2>
             <p style={{ margin: '10px 0 0', fontSize: 15, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>Your profile, all resumes and your sign-in will be removed. This can’t be undone.</p>
+            {deleteError && <p role="alert" style={{ margin: '12px 0 0', fontSize: 14, lineHeight: 1.5, color: 'var(--hc-warm)' }}>{deleteError}</p>}
             <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 }}>
-              <button type="button" className="hc-btn-s" onClick={() => setConfirmDelete(false)} autoFocus>Cancel</button>
-              <button type="button" onClick={() => { deleteAccount(); navigate('/'); }} style={{ minHeight: 44, padding: '0 18px', borderRadius: 999, border: 0, background: 'var(--hc-warm)', color: '#FFFFFF', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Delete account</button>
+              <button type="button" className="hc-btn-s" onClick={() => { setConfirmDelete(false); setDeleteError(null); }} disabled={deleting} autoFocus>Cancel</button>
+              <button type="button" onClick={removeAccount} disabled={deleting} aria-busy={deleting} style={{ minHeight: 44, padding: '0 18px', borderRadius: 999, border: 0, background: 'var(--hc-warm)', color: '#FFFFFF', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: deleting ? 'progress' : 'pointer', opacity: deleting ? 0.7 : 1 }}>{deleting ? 'Deleting…' : 'Delete account'}</button>
             </div>
           </div>
         </div>

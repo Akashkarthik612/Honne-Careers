@@ -49,9 +49,13 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     pullRequestPreviewsEnabled: false
-    envVars:
+    envVars:                 # read at build time; all browser-visible, so no secrets here
       - key: VITE_API_BASE_URL
         value: https://honne-careers-api.onrender.com
+      - key: VITE_SUPABASE_URL       # https://<project-ref>.supabase.co
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY  # anon/publishable key, never the service-role key
+        sync: false
     routes:
       - type: rewrite        # SPA: let react-router handle every path
         source: /*

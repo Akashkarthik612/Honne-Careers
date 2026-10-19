@@ -16,7 +16,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      // Backend routes have no /api prefix: /api/me → http://localhost:8000/me (see src/services/apiConfig.js).
+      '/api': { target: 'http://localhost:8000', rewrite: (p) => p.replace(/^\/api/, '') },
     },
   },
 })

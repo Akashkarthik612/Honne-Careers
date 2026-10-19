@@ -1,7 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from './components/AppShell';
+import RequireAuth from './components/RequireAuth';
 import LandingPage from './pages/landing/LandingPage';
 import SignInPage from './pages/SignInPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import ResumesPage from './pages/ResumesPage';
 import TemplatePage from './pages/new/TemplatePage';
 import ModePage from './pages/new/ModePage';
@@ -12,13 +14,14 @@ import CvReadyPage from './pages/cv/CvReadyPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 
-// Auth is not wired yet (backend P1, AUTH-1), so the app routes are open.
+// Landing, sign-in and the OAuth callback are public; every app screen needs a signed-in user (AUTH-1).
 export default function App() {
   return (
     <Routes>
       <Route path="/"      element={<LandingPage />} />
       <Route path="/login" element={<SignInPage />} />
-      <Route element={<AppShell />}>
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route element={<RequireAuth><AppShell /></RequireAuth>}>
         <Route path="/resumes"      element={<ResumesPage />} />
         <Route path="/new/template" element={<TemplatePage />} />
         <Route path="/new/mode"     element={<ModePage />} />

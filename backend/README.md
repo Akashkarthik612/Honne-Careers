@@ -4,9 +4,10 @@ FastAPI + Tectonic (LaTeX) in one Docker image, on Render. Supabase for Postgres
 
 ## One-time Supabase setup
 
-1. **Region**: pick one near India (Mumbai `ap-south-1` or Singapore), matching Render's Singapore region.
+1. **Region**: Singapore (`ap-southeast-1`), the same region as the Render API. Render has no Mumbai region, and the API makes several DB round trips per request, so the DB must sit next to it.
 2. **JWT signing keys**: Project Settings → JWT → switch to **asymmetric signing keys** (ES256/RS256). The API rejects HS256 tokens on purpose; with legacy secrets, every request fails with `auth_unavailable`.
-3. **Auth providers**: enable Google and GitHub only (A1). Disable email/password and anonymous sign-ins.
+3. **Auth providers** (beta: Google only; GitHub comes later): Authentication → Sign In / Providers → enable **Google** with a Google Cloud OAuth client (Web application; authorised redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`). Disable Email and anonymous sign-ins.
+   **URL configuration**: Site URL `https://honne-careers.onrender.com`; redirect URLs `https://honne-careers.onrender.com/auth/callback` and `http://localhost:5173/auth/callback`. A redirect not on this list silently lands on the Site URL instead.
 4. **Migrations**: apply `supabase/migrations/*.sql` in order (`supabase db push`, or paste them into the SQL editor).
 5. **Backend role password** (never in a migration):
    ```sql

@@ -82,6 +82,9 @@ a:hover { color: var(--hc-brand-hover); }
 /* sign in */
 .hc-sso { position: relative; width: 100%; min-height: 56px; border-radius: 14px; border: 1px solid var(--hc-hairline); background: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 600; color: var(--hc-ink); text-decoration: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color .2s ease, background-color .2s ease; }
 .hc-sso:hover { border-color: var(--hc-brand-soft); background: #F7F8FD; color: var(--hc-ink); }
+.hc-sso:disabled { cursor: progress; opacity: .7; }
+.hc-sso[aria-disabled="true"] { cursor: default; color: var(--hc-ink-muted); background: var(--hc-app-ground); }
+.hc-sso[aria-disabled="true"]:hover { border-color: var(--hc-hairline); }
 .hc-grid-bg { background-image: radial-gradient(rgba(22,26,43,.07) 1px, transparent 1px); background-size: 22px 22px; -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 25%, transparent 75%); mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 25%, transparent 75%); }
 
 /* resumes dashboard */
