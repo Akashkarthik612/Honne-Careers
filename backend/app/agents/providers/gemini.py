@@ -11,6 +11,20 @@ from app.domain.agents import LlmResult
 
 _TRANSIENT_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
+# Gemini rejects (400 INVALID_ARGUMENT) schemas that are too complex for constrained decoding;
+# list-size caps on nested arrays (cv_parser, cv_tailor) push them over. The caps stay enforced:
+# AgentRunner validates every reply against the full Pydantic model -> llm_output_invalid.
+_UNSENT_KEYWORDS = frozenset({"maxItems", "minItems"})
+
+
+def gemini_schema(schema: Any) -> Any:
+    """Copy of `schema` without the keywords Gemini can't take; the input is not modified."""
+    if isinstance(schema, dict):
+        return {k: gemini_schema(v) for k, v in schema.items() if k not in _UNSENT_KEYWORDS}
+    if isinstance(schema, list):
+        return [gemini_schema(v) for v in schema]
+    return schema
+
 
 class GeminiProvider:
     name = "gemini"
@@ -29,7 +43,7 @@ class GeminiProvider:
             temperature=temperature,
             max_output_tokens=max_output_tokens,
             response_mime_type="application/json",
-            response_json_schema=schema,
+            response_json_schema=gemini_schema(schema),
         )
         try:
             response = await self._client.aio.models.generate_content(
