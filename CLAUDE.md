@@ -58,6 +58,23 @@ Tests: `tests/unit`, `tests/golden` (truth-check cases), `tests/contract` (front
 - **No transaction is held across an LLM call, compile or storage call.** Services: short UoW → slow call → short UoW with optimistic concurrency.
 - Never log CV/JD text; `tests/integration/test_logging_privacy.py` enforces it.
 
+## AI agents and system prompts
+
+One agent per AI task, no orchestration (Day_1 A2 #2). Each is a YAML config plus a Markdown system prompt; the model returns JSON only, validated against the agent's schema, then checked by `TruthChecker` where it writes CV text.
+
+| Agent | Used by | Tier | Config | System prompt |
+|---|---|---|---|---|
+| `cv_tailor` | "Tailor my CV" job (`POST /resumes/{id}/tailor`) | strong | `backend/agents/cv_tailor.yaml` | `backend/prompts/cv_tailor/v1.md` (adapted `cv-jd-tailoring` skill, B4) |
+| `bullet_tailor` | Wizard "Tailor to JD" on one bullet | strong | `backend/agents/bullet_tailor.yaml` | `backend/prompts/bullet_tailor/v1.md` |
+| `cv_parser` | CV upload / LaTeX paste → pre-fill | light | `backend/agents/cv_parser.yaml` | `backend/prompts/cv_parser/v1.md` |
+| `cv_analyst` | "Start analysis" (judgments + evidence; Python computes the %) | light | `backend/agents/cv_analyst.yaml` | `backend/prompts/cv_analyst/v1.md` |
+
+- **Edit a prompt:** change the Markdown file; it is sent verbatim as the system prompt. Keep the JSON fields it describes in line with the schemas in `app/domain/tailoring.py` / `analysis.py`, or replies fail validation (`llm_output_invalid`).
+- **Version a prompt:** add `v2.md`, point the YAML's `instructions` at it and bump `version`; every run records the agent version in `agent_runs`.
+- **Don't** add prompt-injection boilerplate (`AgentRunner` already wraps JD/CV text as untrusted data) or rely on the prompt for truthfulness (TRUTH-2 is checked in Python).
+- Tiers map to models through `LLM_STRONG` / `LLM_LIGHT` (`render.yaml`, `.env`): Gemini 2.5 Pro / Flash today. Per-agent `temperature`, `max_output_tokens`, `timeout_s`, `max_retries` live in the YAML.
+- CI never calls a model: tests script replies with `FakeProvider`, so real-model output quality (parsing, tailoring) is checked by hand on the deployed app.
+
 ## Git branching
 
 - `main` — production. Only receives merges from `test`; never commit to it directly.
@@ -135,6 +152,6 @@ Backend additions for this (migration `20261019000001`): `resumes.job_step`, `us
 
 ## Deploy
 
-Both run on Render from `main` via `render.yaml` (Blueprint): the API as a Docker web service (`rootDir: backend`, Singapore, `/health` check, secrets in the `honne-careers-api-secrets` env group) and the frontend as a free Static Site (`rootDir: frontend`, SPA rewrite, CSP and security headers). Not deployed yet: it needs a Supabase project plus the Render secrets (Day_1.md C1 #10).
+Both run on Render from `main` via `render.yaml` (Blueprint): the API as a Docker web service (`rootDir: backend`, Singapore, `/health` check, secrets in the `honne-careers-api-secrets` env group) and the frontend as a free Static Site (`rootDir: frontend`, SPA rewrite, CSP and security headers). Status (19 Oct 2026): Supabase project and migrations done; `main` holds the wired app and the Render Blueprint is the next step. Apply every file in `supabase/migrations/` to Supabase before the API deploy (the API reads `resumes.job_step` and `user_settings`). After the first deploy: add the static site URL to the API's `CORS_ORIGINS` and `<site>/auth/callback` to Supabase Auth's redirect allowlist; the backend `docker` CI job's `tectonic_peak_rss_mb` decides Starter vs Standard.
 
 The frontend reads the API URL from `VITE_API_BASE_URL` (set in `render.yaml`; see `frontend/.env.example`) through `apiUrl()` in `src/services/apiConfig.js`, which throws in a production build if it's unset. Keep the static site's domain in the API's `CORS_ORIGINS` (never `*`; config rejects it). The CSP `connect-src` must list the API and `*.supabase.co`. The static site also needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (`sync: false` in `render.yaml`, set in the dashboard).
