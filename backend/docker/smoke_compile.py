@@ -28,10 +28,10 @@ def diagnose(tex: str) -> None:
     (work / "resume.tex").write_text(tex, encoding="utf-8")
     env = {"PATH": os.environ.get("PATH", ""), "HOME": str(work),
            "TECTONIC_CACHE_DIR": os.environ.get("TECTONIC_CACHE_DIR", "")}
-    cache = Path(env["TECTONIC_CACHE_DIR"] or "/nonexistent")
-    out = f"uid={os.getuid()} cache={cache}\n"
-    for sub in ("formats", ""):
-        d = cache / sub
+    xdg = os.environ.get("XDG_CACHE_HOME", "/nonexistent")
+    env["XDG_CACHE_HOME"] = xdg
+    out = f"uid={os.getuid()}\n"
+    for d in (Path(xdg) / "Tectonic" / "formats", Path(env["TECTONIC_CACHE_DIR"] or "/none")):
         listing = (", ".join(f"{p.name}:{p.stat().st_size}:{oct(p.stat().st_mode)}"
                              for p in sorted(d.iterdir()))[:1500] if d.is_dir() else "missing")
         out += f"[{d}] {listing}\n"

@@ -78,6 +78,11 @@ class TectonicCompiler:
             env = {"PATH": os.environ.get("PATH", ""), "HOME": str(workdir)}
             if self._cache_dir:
                 env["TECTONIC_CACHE_DIR"] = self._cache_dir
+            # Tectonic keeps compiled formats under $XDG_CACHE_HOME (else $HOME/.cache), not
+            # TECTONIC_CACHE_DIR. The image bakes them there; without it every compile
+            # regenerates the format, which exceeds the RLIMIT_FSIZE cap below.
+            if xdg := os.environ.get("XDG_CACHE_HOME"):
+                env["XDG_CACHE_HOME"] = xdg
             # A worker thread + subprocess.run works on every OS/event loop; the queue
             # already bounds concurrency, and run(timeout=) kills the child on expiry.
             try:
