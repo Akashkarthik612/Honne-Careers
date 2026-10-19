@@ -1,24 +1,31 @@
-import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useState } from 'react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles } from 'lucide-react';
 import CvDoc from '@/components/CvDoc';
 import SkillChips from '@/components/SkillChips';
+import { ErrorBanner, PageLoading } from '@/components/Status';
+import { BULLET_TAILOR_CONCURRENCY } from '@/config/limits';
 import {
-  SKILL_GROUPS, blankBullet, blankEducation, blankProject, blankRole, docToCv, docToProfile,
-  ensureEntries, hasProfile, missingSkills, pruneDoc, settleDoc, toDoc,
+  WIZARD_ORDER, bulletToDoc, mergePrefill, openSuggestions, prefillToDoc, sectionPatch, toResume, validateDoc,
+} from '@/data/cvAdapter';
+import {
+  SKILL_GROUPS, blankBullet, blankEducation, blankProject, blankRole, docToCv, ensureEntries, settleDoc,
 } from '@/data/cvModel';
-import { SAMPLE_JD_SKILLS, SAMPLE_PROFILE } from '@/data/sampleCv';
 import { templateName } from '@/data/templates';
-import { TailorUnavailableError, TruthCheckError, tailorBullet } from '@/services/mockApi';
+import useResource from '@/hooks/useResource';
+import { getProfile, getResume, patchResume, saveResumeToProfile, settleBullet, tailorBullet } from '@/services/api';
+import { ApiError, errorText } from '@/services/apiClient';
 import { useAppStore } from '@/state/appStore';
 import BulletEditor from './BulletEditor';
 
 // "Your details" wizard (design: Wizard.dc.html, WizardEdit.dc.html). Five steps with a live preview.
-// In JD mode each bullet can be tailored to the JD and kept or reverted (TAIL-4, TRUTH-3).
-// `?resume=<id>` continues an existing resume; `?step=<key>` opens a step directly.
-// Moving between steps saves a draft resume; "Preview" marks it ready and saves the facts to the profile.
+// `?resume=<id>` (required; created on the Mode or JD page), `?step=<key>` opens a step directly.
+// Leaving a step autosaves that section (PATCH /resumes/{id}, expected_version → 409 if another tab saved).
+// In a tailored resume each bullet can be tailored to the JD and kept or reverted (TAIL-4, B5, B6).
+// "Preview" saves every section, marks the wizard done, and — for a first-time user — saves the facts as
+// their profile (B6 save to profile; the server keeps facts, never AI wording).
 
-const ORDER = ['personal', 'experience', 'projects', 'education', 'skills'];
+const ORDER = WIZARD_ORDER;
 const LABELS = { personal: 'Personal', experience: 'Experience', projects: 'Projects', education: 'Education', skills: 'Skills' };
 const TITLES = { personal: 'Personal details', experience: 'Experience', projects: 'Projects', education: 'Education', skills: 'Skills' };
 const SUBS = {
@@ -30,135 +37,206 @@ const SUBS = {
 };
 const SCRATCH_SUBS = { ...SUBS, experience: 'Your real work, in your own words.' };
 
-const PERSONAL_FIELDS = [['name', 'Full name'], ['city', 'City, country'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['linkedin', 'LinkedIn'], ['github', 'GitHub or portfolio']];
+const PERSONAL_FIELDS = [['name', 'Full name'], ['city', 'City, country'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['linkedin', 'LinkedIn', 'url', 'https://linkedin.com/in/…'], ['github', 'GitHub or portfolio', 'url', 'https://github.com/…']];
 const ROLE_FIELDS = [['role', 'Role'], ['company', 'Company'], ['start', 'Start'], ['end', 'End'], ['location', 'Location']];
 const EDU_FIELDS = [['school', 'School'], ['degree', 'Degree'], ['years', 'Years'], ['city', 'City']];
 
 const DOC_KEY = { experience: 'roles', projects: 'projects' };
+const TAILORABLE = new Set(['plain', 'kept']); // "Tailor all" leaves the user's own wording alone (B5)
 
-function initialState({ resume, draft, profile, stepParam }) {
-  const fromUpload = !resume && draft.upload && !hasProfile(profile); // TODO(PROF-2): parsed upload replaces the sample
-  const doc = ensureEntries(settleDoc(resume ? resume.doc : toDoc(fromUpload ? SAMPLE_PROFILE : profile)));
-  const mode = resume ? resume.mode : draft.mode;
-  const jd = resume ? resume.jd : draft.jd;
-  const tailoring = mode === 'jd' && Boolean(jd);
-  return {
-    doc, mode, jd, tailoring,
-    meta: resume ? { role: resume.role, company: resume.company, title: resume.title, template: resume.template } : { role: draft.role, company: draft.company, template: draft.template },
-    suggestions: tailoring ? missingSkills(doc.skills, SAMPLE_JD_SKILLS) : [],
-    addedSkills: resume?.addedSkills ?? [],
-    step: ORDER.includes(stepParam) ? stepParam : 'personal',
-  };
-}
-
-function Field({ id, label, value, onChange, type = 'text', placeholder }) {
+function Field({ id, label, value, onChange, type = 'text', placeholder, error }) {
   return (
     <div className="hc-f">
       <label className="hc-flabel" htmlFor={id}>{label}</label>
-      <input id={id} className="hc-in" type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      <input id={id} className="hc-in" type={type} value={value} placeholder={placeholder} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-err` : undefined} onChange={(e) => onChange(e.target.value)} />
+      {error && <span id={`${id}-err`} style={{ fontSize: 12.5, color: 'var(--hc-warm)', fontWeight: 600 }}>{error}</span>}
     </div>
   );
 }
 
 const entryBox = { border: '1px solid var(--hc-hairline)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 };
 
-export default function WizardPage() {
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const store = useAppStore();
-  const existing = store.resumes.find((r) => r.id === params.get('resume')) ?? null;
+// Per-bullet failures shown inline. Anything that isn't an API error is a bug: re-thrown, not hidden.
+function bulletError(e) {
+  if (!(e instanceof ApiError)) throw e;
+  if (e.code === 'truth_violation') return { rules: e.details?.rules ?? [] };
+  if (e.code === 'llm_unavailable' || e.code === 'llm_output_invalid') return 'ai';
+  return { message: errorText(e) };
+}
 
-  const [init] = useState(() => initialState({ resume: existing, draft: store.draft, profile: store.profile, stepParam: params.get('step') }));
-  const [doc, setDoc] = useState(init.doc);
-  const [step, setStep] = useState(init.step);
-  const [suggestions, setSuggestions] = useState(init.suggestions);
-  const [addedSkills, setAddedSkills] = useState(init.addedSkills);
-  const [resumeId, setResumeId] = useState(existing?.id ?? null);
+async function runLimited(items, limit, fn) {
+  let next = 0;
+  const worker = async () => { while (next < items.length) { const item = items[next]; next += 1; await fn(item); } };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+export default function WizardPage() {
+  const [params] = useSearchParams();
+  const resumeId = params.get('resume');
+  const load = useCallback(() => getResume(resumeId).then(toResume), [resumeId]);
+  const resource = useResource(load);
+
+  if (!resumeId) return <Navigate to="/resumes" replace />;
+  const wrap = (children) => <main style={{ maxWidth: 1440, margin: '0 auto', padding: '20px 20px 72px' }}>{children}</main>;
+  if (resource.loading) return wrap(<PageLoading label="Loading your resume…" />);
+  if (resource.error) return wrap(<ErrorBanner error={resource.error} action={{ label: 'Retry', onClick: resource.reload }} />);
+  if (resource.data.state === 'tailoring') return <Navigate to={`/tailoring/${resumeId}`} replace />;
+  // Remount on reload (after a 409) so the form starts from the server's copy.
+  return <WizardForm key={resource.data.rowVersion} resume={resource.data} stepParam={params.get('step')} onReload={resource.reload} />;
+}
+
+function WizardForm({ resume, stepParam, onReload }) {
+  const navigate = useNavigate();
+  const { draft, setDraft } = useAppStore();
+  const [doc, setDoc] = useState(() => {
+    const upload = draft.upload?.resumeId === resume.id ? draft.upload : null;
+    return ensureEntries(settleDoc(upload ? mergePrefill(resume.doc, prefillToDoc(upload.prefill)) : resume.doc));
+  });
+  const [step, setStep] = useState(ORDER.includes(stepParam) ? stepParam : 'personal');
+  const [rowVersion, setRowVersion] = useState(resume.rowVersion);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [note, setNote] = useState(null);
   const [tab, setTab] = useState('edit');
   const [jdOpen, setJdOpen] = useState(false);
 
-  const { tailoring, mode, jd, meta } = init;
+  const tailoring = resume.mode === 'tailored' && Boolean(resume.jd);
+  const editing = resume.wizardStep === 'done';
+  const meta = { role: resume.jd?.role ?? '', company: resume.jd?.company ?? '', template: resume.template };
+  const suggestions = tailoring ? openSuggestions(resume.missingSkills, doc.skills) : [];
   const idx = ORDER.indexOf(step);
   const subs = tailoring ? SUBS : SCRATCH_SUBS;
+  const anyBusy = [...doc.roles, ...doc.projects].some((e) => e.bullets.some((b) => b.status === 'busy'));
+  const locked = saving || anyBusy;
 
-  // ── doc updates ────────────────────────────────────────────────────────
-  const setPersonal = (key, value) => setDoc((d) => ({ ...d, personal: { ...d.personal, [key]: value } }));
-  const patchEntry = (key, id, patch) => setDoc((d) => ({ ...d, [key]: d[key].map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
-  const addEntry = (key, entry) => setDoc((d) => ({ ...d, [key]: [...d[key], entry] }));
+  // ── doc updates (local until the step is saved) ─────────────────────────
+  const edit = (fn) => { setDoc(fn); setDirty(true); setSaved(false); };
+  const setPersonal = (key, value) => edit((d) => ({ ...d, personal: { ...d.personal, [key]: value } }));
+  const patchEntry = (key, id, patch) => edit((d) => ({ ...d, [key]: d[key].map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
+  const addEntry = (key, entry) => edit((d) => ({ ...d, [key]: [...d[key], entry] }));
+  // Server-driven bullet changes (busy, tailor/settle results) don't make the step dirty.
   const patchBullet = (key, entryId, bulletId, patch) => setDoc((d) => ({
     ...d, [key]: d[key].map((e) => (e.id !== entryId ? e : { ...e, bullets: e.bullets.map((b) => (b.id === bulletId ? { ...b, ...patch } : b)) })),
   }));
-  const addBullet = (key, entryId) => setDoc((d) => ({ ...d, [key]: d[key].map((e) => (e.id === entryId ? { ...e, bullets: [...e.bullets, blankBullet()] } : e)) }));
-  const removeBullet = (key, entryId, bulletId) => setDoc((d) => ({ ...d, [key]: d[key].map((e) => (e.id === entryId ? { ...e, bullets: e.bullets.filter((b) => b.id !== bulletId) } : e)) }));
-  const setSkills = (group, values) => setDoc((d) => ({ ...d, skills: { ...d.skills, [group]: values } }));
+  const editBullet = (key, entryId, bulletId, patch) => { patchBullet(key, entryId, bulletId, patch); setDirty(true); setSaved(false); };
+  const addBullet = (key, entryId) => edit((d) => ({ ...d, [key]: d[key].map((e) => (e.id === entryId ? { ...e, bullets: [...e.bullets, blankBullet()] } : e)) }));
+  const removeBullet = (key, entryId, bulletId) => edit((d) => ({ ...d, [key]: d[key].map((e) => (e.id === entryId ? { ...e, bullets: e.bullets.filter((b) => b.id !== bulletId) } : e)) }));
+  const setSkills = (group, values) => edit((d) => ({ ...d, skills: { ...d.skills, [group]: values } }));
 
-  // TAIL-4: tailor one bullet. Only the two known failures are shown inline; anything else is re-thrown.
-  async function tailor(section, entryId, b, retry = false) {
-    const key = DOC_KEY[section];
-    const before = b.status;
-    patchBullet(key, entryId, b.id, { status: 'busy', prev: before, err: null });
+  // ── saving ──────────────────────────────────────────────────────────────
+  // PATCHes the given sections in order (versions chain). Returns the new row_version, or null after
+  // showing why it didn't save (field errors or the API's message). No retry: the user acts.
+  async function saveSections(sections, finalStep = null) {
+    const errors = validateDoc(doc, sections);
+    setFieldErrors(errors);
+    const firstBad = sections.find((s) => Object.keys(validateDoc(doc, [s])).length);
+    if (firstBad) { setStep(firstBad); return null; }
+    setSaving(true);
+    setSaveError(null);
     try {
-      const res = await tailorBullet({ bulletId: b.id, text: b.text, section, retry });
-      patchBullet(key, entryId, b.id, { status: 'review', original: b.text, tailored: res.text });
+      let version = rowVersion;
+      for (const [i, section] of sections.entries()) {
+        const last = i === sections.length - 1;
+        const res = await patchResume(resume.id, sectionPatch(doc, section, version, last ? finalStep : null));
+        version = res.row_version;
+        setRowVersion(version);
+      }
+      setDirty(false);
+      setSaved(true);
+      return version;
     } catch (e) {
-      if (e instanceof TailorUnavailableError) patchBullet(key, entryId, b.id, { status: before, err: 'ai' });
-      else if (e instanceof TruthCheckError) patchBullet(key, entryId, b.id, { status: before, err: { violations: e.violations } });
-      else { patchBullet(key, entryId, b.id, { status: before }); throw e; }
+      if (!(e instanceof ApiError)) throw e;
+      setSaveError(e);
+      return null;
+    } finally {
+      setSaving(false);
     }
   }
 
-  function tailorAll() {
-    doc.roles.forEach((r) => r.bullets.forEach((b) => {
-      if ((b.status === 'plain' || b.status === 'kept') && b.text.trim()) tailor('experience', r.id, b);
-    }));
+  async function goStep(next) {
+    if (locked || next === step) return;
+    // Keeps the dashboard's "Continue" on the step the user reached; a finished resume stays finished.
+    const version = await saveSections([step], editing ? null : next);
+    if (version === null) return;
+    setStep(next);
+    window.scrollTo({ top: 0 });
+  }
+
+  async function finish() {
+    if (locked) return;
+    const version = await saveSections(ORDER, 'done');
+    if (version === null) return;
+    try {
+      // First-time user: this resume's facts become their profile (expected_version null = create).
+      if ((await getProfile()) === null) await saveResumeToProfile(resume.id, null);
+    } catch (e) {
+      if (!(e instanceof ApiError)) throw e;
+      setSaveError(e);
+      return;
+    }
+    if (draft.upload?.resumeId === resume.id) setDraft({ upload: null });
+    navigate(`/cv/${resume.id}`);
+  }
+
+  // ── tailoring (TAIL-4) ──────────────────────────────────────────────────
+  // The server tailors the stored bullet, so unsaved edits in this step are saved first.
+  async function tailor(section, entryId, b, { saveFirst = true } = {}) {
+    if (saveFirst && dirty && (await saveSections([section])) === null) return;
+    const key = DOC_KEY[section];
+    patchBullet(key, entryId, b.id, { status: 'busy', prev: b.status, err: null });
+    try {
+      const res = await tailorBullet(resume.id, b.id);
+      setRowVersion((v) => Math.max(v, res.row_version));
+      patchBullet(key, entryId, b.id, bulletToDoc(res.bullet));
+    } catch (e) {
+      patchBullet(key, entryId, b.id, { status: b.status, err: bulletError(e) });
+    }
+  }
+
+  async function tailorAll() {
+    if (dirty && (await saveSections(['experience'])) === null) return;
+    const queue = doc.roles.flatMap((r) => r.bullets.filter((b) => TAILORABLE.has(b.status) && b.text.trim()).map((b) => [r.id, b]));
+    if (!queue.length) {
+      setNote('Every bullet here is in your own words, so we left them alone. Tap “Tailor to JD” on any bullet to rewrite it.');
+      return;
+    }
+    setNote(null);
+    await runLimited(queue, BULLET_TAILOR_CONCURRENCY, ([entryId, b]) => tailor('experience', entryId, b, { saveFirst: false }));
+  }
+
+  async function settle(section, entryId, b, action) {
+    const key = DOC_KEY[section];
+    try {
+      const res = await settleBullet(resume.id, b.id, action, rowVersion);
+      setRowVersion(res.row_version);
+      patchBullet(key, entryId, b.id, bulletToDoc(res.bullet));
+    } catch (e) {
+      patchBullet(key, entryId, b.id, { err: bulletError(e) });
+    }
   }
 
   function addSuggestion(skill) {
-    setSuggestions((s) => s.filter((x) => x !== skill));
-    setAddedSkills((a) => [...a, skill]);
     setSkills('tools', [...doc.skills.tools, skill]);
   }
 
-  // ── saving ─────────────────────────────────────────────────────────────
-  const resumePayload = (d) => ({
-    role: meta.role, company: meta.company, title: meta.title || (mode === 'scratch' ? 'General CV' : undefined),
-    mode, jd, template: meta.template, doc: d, addedSkills,
-  });
-
-  function goStep(next) {
-    setStep(next);
-    window.scrollTo({ top: 0 });
-    const d = settleDoc(doc);
-    const stepNo = ORDER.indexOf(next) + 1;
-    const current = store.resumes.find((r) => r.id === resumeId);
-    if (current) store.updateResume(resumeId, current.status === 'ready' ? { doc: d, addedSkills } : { doc: d, addedSkills, step: stepNo });
-    else setResumeId(store.addResume({ ...resumePayload(d), status: 'draft', step: stepNo }));
-  }
-
-  function finish() {
-    const d = pruneDoc(settleDoc(doc));
-    store.saveProfile(docToProfile(d));
-    const payload = { ...resumePayload(d), status: 'ready' };
-    let id = resumeId;
-    if (store.resumes.some((r) => r.id === id)) store.updateResume(id, payload);
-    else id = store.addResume(payload);
-    navigate(`/cv/${id}`);
-  }
-
-  const backHref = existing ? (existing.status === 'ready' ? `/cv/${existing.id}` : '/resumes') : (mode === 'scratch' ? '/new/mode' : '/new/jd');
+  const backHref = editing ? `/cv/${resume.id}` : '/resumes';
   const tabStyle = (on) => ({ minHeight: 40, padding: '0 18px', borderRadius: 999, border: 0, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer', ...(on ? { background: '#FFFFFF', color: 'var(--hc-ink)', boxShadow: '0 1px 3px rgba(22,26,43,.12)' } : { background: 'transparent', color: 'var(--hc-ink-muted)' }) });
+  const stale = saveError?.code === 'stale_version';
 
   const bulletList = (section, entry) => (
     <>
       {entry.bullets.map((b, i) => (
         <BulletEditor
-          key={b.id} bullet={b} label={`Bullet ${i + 1}`} canTailor={tailoring}
-          onEdit={(text) => patchBullet(DOC_KEY[section], entry.id, b.id, { text, source: text, status: 'edited', err: null })}
+          key={b.id} bullet={b} label={`Bullet ${i + 1}`} canTailor={tailoring} disabled={saving}
+          onEdit={(text) => editBullet(DOC_KEY[section], entry.id, b.id, { text, source: text, status: 'edited', err: null })}
           onTailor={() => tailor(section, entry.id, b)}
-          onRetry={() => tailor(section, entry.id, b, true)}
+          onRetry={() => tailor(section, entry.id, b)}
           onDismiss={() => patchBullet(DOC_KEY[section], entry.id, b.id, { err: null })}
-          onKeep={() => patchBullet(DOC_KEY[section], entry.id, b.id, { text: b.tailored, status: 'kept' })}
-          onRevert={() => patchBullet(DOC_KEY[section], entry.id, b.id, { text: b.original, status: b.prev || 'plain' })}
+          onKeep={() => settle(section, entry.id, b, 'keep')}
+          onRevert={() => settle(section, entry.id, b, 'revert')}
           onRemove={() => removeBullet(DOC_KEY[section], entry.id, b.id)}
         />
       ))}
@@ -170,16 +248,14 @@ export default function WizardPage() {
     <main style={{ maxWidth: 1440, margin: '0 auto', padding: '20px 20px 72px' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <div className="hc-lbl">{existing ? 'EDITING' : 'NEW RESUME'} · {templateName(meta.template).toUpperCase()}</div>
+          <div className="hc-lbl">{editing ? 'EDITING' : 'NEW RESUME'} · {templateName(meta.template).toUpperCase()}</div>
           <h1 className="hc-disp" style={{ margin: '4px 0 0', fontSize: 'clamp(24px,2.6vw,32px)', lineHeight: 1.1, fontWeight: 800, letterSpacing: '-0.03em' }}>
             Your <span className="hc-serif" style={{ color: 'var(--hc-brand)', fontSize: '1.1em' }}>details</span>
           </h1>
         </div>
-        {resumeId && (
-          <div role="status" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--hc-success)', fontWeight: 600 }}>
-            <Check size={14} strokeWidth={2.6} aria-hidden="true" />Saved
-          </div>
-        )}
+        <div role="status" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: saving ? 'var(--hc-ink-muted)' : dirty ? '#B45309' : 'var(--hc-success)' }}>
+          {saving ? 'Saving…' : dirty ? 'Unsaved changes — saved when you move on' : (saved || editing) && <><Check size={14} strokeWidth={2.6} aria-hidden="true" />Saved</>}
+        </div>
       </div>
 
       <nav aria-label="Steps" style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 6, background: '#FFFFFF', border: '1px solid var(--hc-hairline)', borderRadius: 999, padding: 5, width: 'fit-content', maxWidth: '100%' }}>
@@ -188,7 +264,7 @@ export default function WizardPage() {
           const cur = i === idx;
           return (
             <button
-              key={k} type="button" onClick={() => goStep(k)} aria-current={cur ? 'step' : undefined}
+              key={k} type="button" onClick={() => goStep(k)} disabled={locked} aria-current={cur ? 'step' : undefined}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 40, padding: '0 14px 0 6px', borderRadius: 999, border: 0, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', ...(cur ? { background: 'var(--hc-brand-tint)', color: 'var(--hc-brand-hover)' } : { background: 'transparent', color: done ? 'var(--hc-ink)' : 'var(--hc-ink-muted)' }) }}
             >
               <span className="hc-mono" style={{ width: 24, height: 24, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, ...(done ? { background: 'var(--hc-brand)', color: '#FFFFFF' } : cur ? { background: '#FFFFFF', color: 'var(--hc-brand)', border: '2px solid var(--hc-brand)' } : { background: '#FFFFFF', color: 'var(--hc-ink-muted)', border: '2px solid var(--hc-hairline)' }) }}>
@@ -207,6 +283,7 @@ export default function WizardPage() {
 
       <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
         <div className={tab === 'preview' ? 'hc-mhide' : undefined} style={{ flex: '1 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <ErrorBanner error={saveError} style={{ marginTop: 0 }} action={stale ? { label: 'Reload', onClick: onReload } : { label: 'Dismiss', onClick: () => setSaveError(null) }} />
           {tailoring && (
             <div style={{ background: '#FFFFFF', border: '1px solid #C9D3F7', borderRadius: 16 }}>
               <button type="button" onClick={() => setJdOpen((o) => !o)} aria-expanded={jdOpen} style={{ width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', border: 0, background: 'transparent', fontFamily: 'inherit', fontSize: 14, color: 'var(--hc-ink)', cursor: 'pointer', textAlign: 'left' }}>
@@ -214,7 +291,7 @@ export default function WizardPage() {
                 <span style={{ flex: 1, minWidth: 0 }}><span style={{ color: 'var(--hc-ink-muted)' }}>Tailoring to:</span> <strong>{[meta.role, meta.company].filter(Boolean).join(' · ') || 'your job description'}</strong></span>
                 <ChevronDown size={16} aria-hidden="true" style={{ flex: 'none', transition: 'transform .2s ease', transform: `rotate(${jdOpen ? 180 : 0}deg)` }} />
               </button>
-              {jdOpen && <div className="hc-rise" style={{ margin: '0 16px 16px', padding: '14px 16px', background: 'var(--hc-ground)', border: '1px solid var(--hc-hairline)', borderRadius: 12, fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-line', maxHeight: 240, overflow: 'auto' }}>{jd}</div>}
+              {jdOpen && <div className="hc-rise" style={{ margin: '0 16px 16px', padding: '14px 16px', background: 'var(--hc-ground)', border: '1px solid var(--hc-hairline)', borderRadius: 12, fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-line', maxHeight: 240, overflow: 'auto' }}>{resume.jd.text}</div>}
             </div>
           )}
 
@@ -224,7 +301,7 @@ export default function WizardPage() {
 
             {step === 'personal' && (
               <div key="personal" className="hc-g2 hc-rise" style={{ marginTop: 18 }}>
-                {PERSONAL_FIELDS.map(([k, label, type]) => <Field key={k} id={`p-${k}`} label={label} type={type} value={doc.personal[k]} onChange={(v) => setPersonal(k, v)} />)}
+                {PERSONAL_FIELDS.map(([k, label, type, placeholder]) => <Field key={k} id={`p-${k}`} label={label} type={type} placeholder={placeholder} value={doc.personal[k]} error={fieldErrors[`personal.${k}`]} onChange={(v) => setPersonal(k, v)} />)}
               </div>
             )}
 
@@ -233,15 +310,16 @@ export default function WizardPage() {
                 {tailoring && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#F7F8FD', border: '1px solid var(--hc-hairline)', borderRadius: 14, padding: '10px 12px 10px 14px' }}>
                     <span style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Tailor every bullet you haven’t edited by hand.</span>
-                    <button type="button" className="hc-btn-sm" onClick={tailorAll} style={{ border: 0, background: 'var(--hc-brand)', color: '#FFFFFF', minHeight: 40, padding: '0 14px' }}>
+                    <button type="button" className="hc-btn-sm" onClick={tailorAll} disabled={locked} style={{ border: 0, background: 'var(--hc-brand)', color: '#FFFFFF', minHeight: 40, padding: '0 14px' }}>
                       <Sparkles size={14} aria-hidden="true" />Tailor all bullets
                     </button>
                   </div>
                 )}
+                {note && <div role="status" style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>{note}</div>}
                 {doc.roles.map((r) => (
                   <div key={r.id} style={entryBox}>
                     <div className="hc-g2">
-                      {ROLE_FIELDS.map(([k, label]) => <Field key={k} id={`${r.id}-${k}`} label={label} value={r[k]} onChange={(v) => patchEntry('roles', r.id, { [k]: v })} />)}
+                      {ROLE_FIELDS.map(([k, label]) => <Field key={k} id={`${r.id}-${k}`} label={label} value={r[k]} error={fieldErrors[`${r.id}.${k}`]} onChange={(v) => patchEntry('roles', r.id, { [k]: v })} />)}
                     </div>
                     <div className="hc-flabel" style={{ marginTop: 2 }}>What you did</div>
                     {bulletList('experience', r)}
@@ -256,7 +334,7 @@ export default function WizardPage() {
                 {doc.projects.map((p) => (
                   <div key={p.id} style={entryBox}>
                     <div className="hc-g2">
-                      <Field id={`${p.id}-name`} label="Project name" value={p.name} placeholder="e.g. Rate limiter" onChange={(v) => patchEntry('projects', p.id, { name: v })} />
+                      <Field id={`${p.id}-name`} label="Project name" value={p.name} placeholder="e.g. Rate limiter" error={fieldErrors[`${p.id}.name`]} onChange={(v) => patchEntry('projects', p.id, { name: v })} />
                       <Field id={`${p.id}-tech`} label="Tech used" value={p.tech} placeholder="e.g. Go, Redis" onChange={(v) => patchEntry('projects', p.id, { tech: v })} />
                     </div>
                     <div className="hc-flabel">What it does, and any result</div>
@@ -271,7 +349,7 @@ export default function WizardPage() {
               <div key="education" className="hc-rise" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {doc.education.map((e) => (
                   <div key={e.id} className="hc-g2" style={{ border: '1px solid var(--hc-hairline)', borderRadius: 16, padding: 16 }}>
-                    {EDU_FIELDS.map(([k, label]) => <Field key={k} id={`${e.id}-${k}`} label={label} value={e[k]} onChange={(v) => patchEntry('education', e.id, { [k]: v })} />)}
+                    {EDU_FIELDS.map(([k, label]) => <Field key={k} id={`${e.id}-${k}`} label={label} value={e[k]} error={fieldErrors[`${e.id}.${k}`]} onChange={(v) => patchEntry('education', e.id, { [k]: v })} />)}
                   </div>
                 ))}
                 <div><button type="button" className="hc-add" onClick={() => addEntry('education', blankEducation())}>+ Add education</button></div>
@@ -281,10 +359,10 @@ export default function WizardPage() {
             {step === 'skills' && (
               <div key="skills" className="hc-rise" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {SKILL_GROUPS.map(([k, label]) => <SkillChips key={k} id={`sk-${k}`} label={label} values={doc.skills[k]} onChange={(v) => setSkills(k, v)} />)}
-                {tailoring && (init.suggestions.length > 0) && (
+                {tailoring && resume.missingSkills.length > 0 && (
                   // TAIL-6: JD skills the profile lacks are offered, never added automatically.
                   <div style={{ background: '#F7F8FD', border: '1px solid #C9D3F7', borderRadius: 14, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 14, lineHeight: 1.5 }}><strong>The JD also mentions: {init.suggestions.join(', ')}.</strong> <span style={{ color: 'var(--hc-ink-muted)' }}>Add only skills you really have.</span></div>
+                    <div style={{ fontSize: 14, lineHeight: 1.5 }}><strong>The JD also mentions: {resume.missingSkills.join(', ')}.</strong> <span style={{ color: 'var(--hc-ink-muted)' }}>Add only skills you really have.</span></div>
                     <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {suggestions.map((s) => (
                         <button key={s} type="button" onClick={() => addSuggestion(s)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 36, padding: '0 12px', borderRadius: 999, border: '1px dashed var(--hc-brand)', background: '#FFFFFF', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: 'var(--hc-brand-hover)', cursor: 'pointer' }}>+ {s}</button>
@@ -300,10 +378,10 @@ export default function WizardPage() {
             <div style={{ marginTop: 22, paddingTop: 16, borderTop: '1px solid var(--hc-hairline)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               {idx === 0
                 ? <Link className="hc-btn-s" to={backHref}><ArrowLeft size={15} aria-hidden="true" />Back</Link>
-                : <button type="button" className="hc-btn-s" onClick={() => goStep(ORDER[idx - 1])}><ArrowLeft size={15} aria-hidden="true" />Back</button>}
+                : <button type="button" className="hc-btn-s" onClick={() => goStep(ORDER[idx - 1])} disabled={locked}><ArrowLeft size={15} aria-hidden="true" />Back</button>}
               {idx < ORDER.length - 1
-                ? <button type="button" className="hc-btn-p" onClick={() => goStep(ORDER[idx + 1])}>Next: {LABELS[ORDER[idx + 1]]}<ArrowRight size={15} aria-hidden="true" /></button>
-                : <button type="button" className="hc-btn-p" onClick={finish}>Preview<ArrowRight size={15} aria-hidden="true" /></button>}
+                ? <button type="button" className="hc-btn-p" onClick={() => goStep(ORDER[idx + 1])} disabled={locked} aria-busy={saving}>{saving ? 'Saving…' : <>Next: {LABELS[ORDER[idx + 1]]}<ArrowRight size={15} aria-hidden="true" /></>}</button>
+                : <button type="button" className="hc-btn-p" onClick={finish} disabled={locked} aria-busy={saving}>{saving ? 'Saving…' : <>Preview<ArrowRight size={15} aria-hidden="true" /></>}</button>}
             </div>
           </section>
         </div>

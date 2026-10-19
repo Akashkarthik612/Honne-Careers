@@ -1,0 +1,25 @@
+{
+  "expected_version": 7,
+  "change": {
+    "section": "skills",
+    "value": {
+      "languages": [
+        "Java",
+        "Python",
+        "SQL"
+      ],
+      "frameworks": [
+        "Spring Boot",
+        "Kafka Streams",
+        "JUnit"
+      ],
+      "tools": [
+        "AWS",
+        "Docker",
+        "Git",
+        "Grafana"
+      ]
+    }
+  },
+  "wizard_step": "done"
+}

@@ -27,7 +27,7 @@ export default function App() {
         <Route path="/new/mode"     element={<ModePage />} />
         <Route path="/new/jd"       element={<JdPage />} />
         <Route path="/new/details"  element={<WizardPage />} />
-        <Route path="/tailoring"    element={<TailoringPage />} />
+        <Route path="/tailoring/:id" element={<TailoringPage />} />
         <Route path="/cv/:id"       element={<CvReadyPage />} />
         <Route path="/profile"      element={<ProfilePage />} />
         <Route path="/settings"     element={<SettingsPage />} />

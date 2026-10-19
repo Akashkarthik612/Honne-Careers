@@ -1,14 +1,20 @@
-import { useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
-import { AlertCircle, Check, ChevronDown, Download, Maximize2, PenLine, X } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { AlertCircle, Check, ChevronDown, Download, ExternalLink, Maximize2, PenLine, X } from 'lucide-react';
 import CvDoc from '@/components/CvDoc';
-import { docChanges, docToCv, docToProfile } from '@/data/cvModel';
+import { ErrorBanner, PageLoading } from '@/components/Status';
+import { bulletToDoc, toResume } from '@/data/cvAdapter';
+import { SKILL_GROUPS, docChanges, docToCv } from '@/data/cvModel';
 import { templateName } from '@/data/templates';
-import { PdfBuildError, buildPdf } from '@/services/mockApi';
-import { resumeTitle, useAppStore } from '@/state/appStore';
+import useResource from '@/hooks/useResource';
+import { buildPdf, getProfile, getResume, getSettings, saveResumeToProfile, settleBullet, startTailor } from '@/services/api';
+import { errorText } from '@/services/apiClient';
 import AnalysisSection from './AnalysisSection';
 
 // "Your CV is ready" (design: Preview.dc.html): download, what changed, full screen, analysis.
+// Download = POST /resumes/{id}/pdf (LaTeX, reused when the content is unchanged) → a short-lived signed
+// URL. "Also save to my profile" = POST save-to-profile, which keeps the user's facts and never the AI
+// wording (TRUTH-1). Proposed AI bullets can be kept or reverted here (B6).
 
 function WhiteSpinner() {
   return (
@@ -22,32 +28,84 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export default function CvReadyPage() {
   const { id } = useParams();
-  const { resumes, settings, saveProfile } = useAppStore();
-  const resume = resumes.find((r) => r.id === id);
+  const load = useCallback(async () => {
+    const [resume, settings] = await Promise.all([getResume(id), getSettings()]);
+    return { resume: toResume(resume), settings };
+  }, [id]);
+  const res = useResource(load);
 
-  const [dl, setDl] = useState('idle'); // idle | busy | done | fail
+  const wrap = (children) => <main style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px 80px' }}>{children}</main>;
+  if (res.loading) return wrap(<PageLoading label="Loading your CV…" />);
+  if (res.error) return wrap(<ErrorBanner error={res.error} action={{ label: 'Retry', onClick: res.reload }} />);
+  const { resume, settings } = res.data;
+  if (resume.state === 'tailoring') return <Navigate to={`/tailoring/${id}`} replace />;
+  if (resume.state === 'draft') return <Navigate to={`/new/details?resume=${id}&step=${resume.wizardStep}`} replace />;
+  return <CvReady key={resume.rowVersion} initial={resume} askSave={settings.ask_before_save} />;
+}
+
+function replaceBullet(doc, bullet) {
+  const swap = (entries) => entries.map((e) => ({ ...e, bullets: e.bullets.map((b) => (b.id === bullet.id ? bullet : b)) }));
+  return { ...doc, roles: swap(doc.roles), projects: swap(doc.projects) };
+}
+
+function CvReady({ initial, askSave }) {
+  const navigate = useNavigate();
+  const [resume, setResume] = useState(initial);
+  const [dl, setDl] = useState({ phase: 'idle' }); // idle | busy | done {url, pages} | fail {error}
   const [saveToProfile, setSaveToProfile] = useState(true);
+  const [profileError, setProfileError] = useState(null);
+  const [settleError, setSettleError] = useState(null);
+  const [retryError, setRetryError] = useState(null);
   const [changesOpen, setChangesOpen] = useState(true);
   const [full, setFull] = useState(false);
 
-  if (!resume) return <Navigate to="/resumes" replace />;
-
   const cv = docToCv(resume.doc);
   const changes = docChanges(resume.doc);
-  const added = resume.addedSkills ?? [];
-  const meta = [resumeTitle(resume), templateName(resume.template)].join(' · ');
+  const pending = changes.filter((c) => c.status === 'review').length;
+  const have = new Set(SKILL_GROUPS.flatMap(([k]) => resume.doc.skills[k]).map((s) => s.toLowerCase()));
+  const added = resume.missingSkills.filter((s) => have.has(s.toLowerCase())); // taken from the JD suggestions
+  const meta = [resume.title, templateName(resume.template)].join(' · ');
 
-  // SAVE-1: build the PDF and save the application record. With "Ask before saving" off in Settings,
-  // edits always go to the profile.
+  // PDF-2, then (unless the user unticked it) save to profile. Each step reports its own failure: a
+  // profile save that fails doesn't hide a PDF that was built.
   async function download() {
-    setDl('busy');
+    setDl({ phase: 'busy' });
+    setProfileError(null);
+    let pdf;
     try {
-      await buildPdf({ resumeId: resume.id });
-      if (!settings.askSave || saveToProfile) saveProfile(docToProfile(resume.doc));
-      setDl('done');
+      pdf = await buildPdf(resume.id);
     } catch (e) {
-      if (!(e instanceof PdfBuildError)) throw e;
-      setDl('fail');
+      setDl({ phase: 'fail', error: e });
+      return;
+    }
+    setDl({ phase: 'done', url: pdf.url, pages: pdf.page_count });
+    window.open(pdf.url, '_blank', 'noopener');
+    if (askSave && !saveToProfile) return;
+    try {
+      const profile = await getProfile();
+      await saveResumeToProfile(resume.id, profile ? profile.row_version : null);
+    } catch (e) {
+      setProfileError(e);
+    }
+  }
+
+  async function settle(bulletId, action) {
+    setSettleError(null);
+    try {
+      const r = await settleBullet(resume.id, bulletId, action, resume.rowVersion);
+      setResume((cur) => ({ ...cur, rowVersion: r.row_version, doc: replaceBullet(cur.doc, bulletToDoc(r.bullet)) }));
+    } catch (e) {
+      setSettleError(e);
+    }
+  }
+
+  async function retryTailor() {
+    setRetryError(null);
+    try {
+      await startTailor(resume.id, 'all');
+      navigate(`/tailoring/${resume.id}`);
+    } catch (e) {
+      setRetryError(e);
     }
   }
 
@@ -66,11 +124,11 @@ export default function CvReadyPage() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' }}>
               <Link className="hc-btn-s" to={`/new/details?resume=${resume.id}&step=experience`} style={{ minHeight: 46, padding: '0 18px', fontSize: 14.5 }}><PenLine size={16} aria-hidden="true" />Edit</Link>
-              {(dl === 'idle' || dl === 'fail') && <button type="button" className="hc-btn-p" onClick={download}><Download size={16} aria-hidden="true" />Download PDF</button>}
-              {dl === 'busy' && <span role="status" className="hc-btn-p" style={{ background: 'var(--hc-brand-hover)', cursor: 'progress' }}><WhiteSpinner />Building your PDF…</span>}
-              {dl === 'done' && <button type="button" className="hc-btn-p" onClick={download} style={{ background: 'var(--hc-success)', boxShadow: 'none' }}><Check size={16} strokeWidth={2.6} aria-hidden="true" />Downloaded</button>}
+              {(dl.phase === 'idle' || dl.phase === 'fail') && <button type="button" className="hc-btn-p" onClick={download}><Download size={16} aria-hidden="true" />Download PDF</button>}
+              {dl.phase === 'busy' && <span role="status" className="hc-btn-p" style={{ background: 'var(--hc-brand-hover)', cursor: 'progress' }}><WhiteSpinner />Building your PDF…</span>}
+              {dl.phase === 'done' && <a className="hc-btn-p" href={dl.url} target="_blank" rel="noopener noreferrer" style={{ background: 'var(--hc-success)', boxShadow: 'none' }}><Check size={16} strokeWidth={2.6} aria-hidden="true" />Open PDF<ExternalLink size={14} aria-hidden="true" /></a>}
             </div>
-            {settings.askSave && (
+            {askSave && dl.phase !== 'done' && (
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13.5, cursor: 'pointer', minHeight: 32 }}>
                 <input type="checkbox" checked={saveToProfile} onChange={(e) => setSaveToProfile(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--hc-brand)', margin: 0 }} />
                 Also save these changes to my profile
@@ -79,10 +137,16 @@ export default function CvReadyPage() {
           </div>
         </div>
 
-        {dl === 'fail' && (
+        {resume.state === 'failed' && (
+          <ErrorBanner error="The last tailoring didn’t finish, so this CV is as it was before." action={{ label: 'Tailor again', onClick: retryTailor }} />
+        )}
+        <ErrorBanner error={retryError} />
+        {dl.phase === 'done' && dl.pages > 1 && <ErrorBanner error={`Your CV runs to ${dl.pages} pages. Recruiters prefer one; trim a few bullets if you can.`} />}
+        {profileError && <ErrorBanner error={`Your PDF is ready, but saving to your profile failed: ${errorText(profileError)}`} />}
+        {dl.phase === 'fail' && (
           <div role="alert" className="hc-rise hc-err" style={{ marginTop: 14, borderRadius: 14, padding: '12px 14px', fontSize: 14 }}>
             <AlertCircle size={16} color="var(--hc-warm)" aria-hidden="true" />
-            <span style={{ flex: '1 1 240px' }}><strong>Couldn’t build the PDF.</strong> Your edits are saved.</span>
+            <span style={{ flex: '1 1 240px' }}><strong>{errorText(dl.error)}</strong></span>
             <button type="button" onClick={download} style={{ minHeight: 40, padding: '0 14px', borderRadius: 999, border: '1px solid var(--hc-warm)', background: '#FFFFFF', color: '#9A3412', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>Try again</button>
           </div>
         )}
@@ -105,11 +169,19 @@ export default function CvReadyPage() {
             </button>
             {changesOpen && (
               <div className="hc-rise" style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {pending > 0 && <p style={{ margin: 0, fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>{plural(pending, 'rewritten bullet')} waiting for you. They’re in your CV until you revert them.</p>}
+                <ErrorBanner error={settleError} style={{ marginTop: 0 }} />
                 {changes.map((c) => (
                   <div key={c.id} style={{ border: '1px solid var(--hc-hairline)', borderRadius: 14, padding: 14 }}>
                     <div className="hc-lbl" style={{ marginBottom: 8 }}>{c.where}</div>
                     <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--hc-ink-muted)', textDecoration: 'line-through', textDecorationColor: 'var(--hc-ink-faint)' }}>{c.before}</div>
                     <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.55, background: '#EEF1FD', borderRadius: 10, padding: '8px 10px' }}>{c.after}</div>
+                    {c.status === 'review' && (
+                      <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                        <button type="button" className="hc-btn-sm" onClick={() => settle(c.id, 'keep')} style={{ border: 0, background: 'var(--hc-brand)', color: '#FFFFFF' }}><Check size={13} strokeWidth={3} aria-hidden="true" />Keep</button>
+                        <button type="button" className="hc-btn-sm" onClick={() => settle(c.id, 'revert')} style={{ border: '1px solid var(--hc-hairline)', background: '#FFFFFF', color: 'var(--hc-ink)' }}>Revert</button>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {added.length > 0 && (
@@ -124,7 +196,7 @@ export default function CvReadyPage() {
           </section>
         )}
 
-        {resume.jd && <AnalysisSection />}
+        {resume.jd && <AnalysisSection resumeId={resume.id} />}
       </main>
 
       {full && (

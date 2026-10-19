@@ -1,0 +1,26 @@
+{
+  "expected_version": 7,
+  "change": {
+    "section": "projects",
+    "value": [
+      {
+        "id": "ll",
+        "name": "Ledger-lite",
+        "tech": [
+          "Java",
+          "Spring Boot",
+          "PostgreSQL",
+          "Docker"
+        ],
+        "date": "2023",
+        "bullets": [
+          {
+            "id": "ll1",
+            "text": "Built a double-entry ledger that sustained 1,000 TPS in load tests, measured with k6"
+          }
+        ]
+      }
+    ]
+  },
+  "wizard_step": null
+}

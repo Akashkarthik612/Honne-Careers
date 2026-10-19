@@ -17,7 +17,7 @@ from app.db.session import SET_CLAIMS_SQL, SET_ROLE_SQL, claims_json
 pytestmark = pytest.mark.db
 
 TABLES = ["user_accounts", "personal_profiles", "cv_uploads", "job_descriptions",
-          "agent_runs", "resumes", "cv_analyses", "usage_events"]
+          "agent_runs", "resumes", "cv_analyses", "usage_events", "user_settings"]
 H = hashlib.sha256(b"x").hexdigest()
 
 
@@ -52,6 +52,7 @@ def a_rows(database: str, users: tuple[uuid.UUID, uuid.UUID]) -> dict[str, uuid.
                   " keyword_score, experience_score, narrative_score, details, agent_run_id)"
                   " values (%s, %s, %s, %s, 1, 1, 1, '{}', %s)", (a, res, H, H, run))
         c.execute("insert into app.usage_events (user_id, action) values (%s, 'pdf')", (a,))
+        c.execute("insert into app.user_settings (user_id) values (%s)", (a,))
         c.execute("insert into storage.objects (bucket_id, name) values ('cv-files', %s)",
                   (f"{a}/resumes/{res}/{H}.pdf",))
     return {"upload": up, "jd": jd, "run": run, "resume": res}

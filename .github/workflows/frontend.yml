@@ -1,0 +1,42 @@
+name: frontend
+
+on:
+  pull_request:
+    paths: ["frontend/**", "contracts/**", ".github/workflows/frontend.yml"]
+  push:
+    branches: [test, main]
+    paths: ["frontend/**", "contracts/**", ".github/workflows/frontend.yml"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      # Adapter, API client and polling, plus the request/response contracts shared with the backend
+      # (/contracts). No real API, Supabase or Gemini: fetch and the Supabase client are stubbed.
+      - name: Tests
+        run: npm test
+      - name: Dependency vulnerabilities
+        run: npm audit --audit-level=high --omit=dev
+      - name: Production build
+        env:
+          # Build-time values only; the build must succeed without real secrets.
+          VITE_API_BASE_URL: https://api.example.invalid
+          VITE_SUPABASE_URL: https://project.supabase.invalid
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
+        run: npm run build

@@ -1,0 +1,168 @@
+{
+  "id": "11111111-1111-4111-8111-111111111111",
+  "title": "SDE-2 Backend · Freshworks",
+  "template": "jake",
+  "mode": "tailored",
+  "status": "draft",
+  "wizard_step": "experience",
+  "company": "Freshworks",
+  "role": "SDE-2 Backend",
+  "updated_at": "2026-10-19T09:30:00+00:00",
+  "content": {
+    "header": {
+      "name": "Arjun Mehta",
+      "location": "Chennai, India",
+      "email": "arjun.mehta@mail.com",
+      "phone": "",
+      "links": []
+    },
+    "experience": [
+      {
+        "id": "nw",
+        "role": "Software Engineer",
+        "company": "Northwind Fintech",
+        "location": "Bengaluru, India",
+        "start": "Jul 2021",
+        "end": "Present",
+        "bullets": [
+          {
+            "id": "nw1",
+            "text": "Reduced p95 payment-event latency by 38% with Kafka Streams in Java on AWS",
+            "origin": "ai",
+            "locked": false,
+            "original_text": "Cut payment-event latency by 38% (p95) by moving the ledger service to Kafka Streams in Java on AWS",
+            "original_origin": "profile",
+            "tailor_state": "proposed"
+          },
+          {
+            "id": "nw2",
+            "text": "Owned settlement end to end at 2M events/day with zero data loss",
+            "origin": "ai",
+            "locked": false,
+            "original_text": "Owned the settlement pipeline end to end, scaling it to 2M events/day with zero data loss through idempotent consumers and replay tooling",
+            "original_origin": "profile",
+            "tailor_state": "kept"
+          },
+          {
+            "id": "nw3",
+            "text": "Mentored 2 interns to their first production launch, both shipping in under 8 weeks",
+            "origin": "user",
+            "locked": true,
+            "original_text": null,
+            "original_origin": null,
+            "tailor_state": "none"
+          }
+        ]
+      },
+      {
+        "id": "bl",
+        "role": "Associate Software Engineer",
+        "company": "Brightline Systems",
+        "location": "Chennai, India",
+        "start": "Aug 2020",
+        "end": "Jun 2021",
+        "bullets": [
+          {
+            "id": "bl1",
+            "text": "Reduced on-call pages by 30% by adding alerting and runbooks across 6 Java services",
+            "origin": "profile",
+            "locked": false,
+            "original_text": null,
+            "original_origin": null,
+            "tailor_state": "none"
+          },
+          {
+            "id": "bl2",
+            "text": "Wrote SQL migrations for a 40M-row orders table with no downtime",
+            "origin": "profile",
+            "locked": false,
+            "original_text": null,
+            "original_origin": null,
+            "tailor_state": "none"
+          }
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "id": "ll",
+        "name": "Ledger-lite",
+        "tech": [
+          "Java",
+          "Spring Boot",
+          "PostgreSQL",
+          "Docker"
+        ],
+        "date": "2023",
+        "bullets": [
+          {
+            "id": "ll1",
+            "text": "Built a double-entry ledger that sustained 1,000 TPS in load tests, measured with k6",
+            "origin": "profile",
+            "locked": false,
+            "original_text": null,
+            "original_origin": null,
+            "tailor_state": "none"
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "id": "au",
+        "school": "Anna University",
+        "degree": "B.E. in Computer Science and Engineering",
+        "years": "2016 – 2020",
+        "location": "Chennai, India"
+      }
+    ],
+    "skills": {
+      "languages": [
+        {
+          "name": "Java",
+          "origin": "profile"
+        },
+        {
+          "name": "Python",
+          "origin": "profile"
+        },
+        {
+          "name": "SQL",
+          "origin": "profile"
+        }
+      ],
+      "frameworks": [
+        {
+          "name": "Spring Boot",
+          "origin": "profile"
+        },
+        {
+          "name": "Kafka Streams",
+          "origin": "profile"
+        },
+        {
+          "name": "JUnit",
+          "origin": "profile"
+        }
+      ],
+      "tools": [
+        {
+          "name": "AWS",
+          "origin": "profile"
+        },
+        {
+          "name": "Docker",
+          "origin": "profile"
+        },
+        {
+          "name": "Git",
+          "origin": "profile"
+        },
+        {
+          "name": "Grafana",
+          "origin": "profile"
+        }
+      ]
+    }
+  }
+}

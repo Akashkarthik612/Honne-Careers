@@ -3,6 +3,8 @@ from dataclasses import asdict
 from fastapi import APIRouter, Response
 
 from app.api.deps import Deps, User
+from app.api.schemas import SaveSettings, settings_view
+from app.domain.records import SettingsRow
 
 router = APIRouter(tags=["account"])
 
@@ -24,3 +26,15 @@ async def delete_me(user: User, c: Deps) -> Response:
     """AUTH-3: removes storage files, then the auth user; every row cascades."""
     await c.accounts.delete(user)
     return Response(status_code=204)
+
+
+@router.get("/settings")
+async def get_settings(user: User, c: Deps) -> dict[str, object]:
+    return settings_view(await c.user_settings.get(user))
+
+
+@router.put("/settings")
+async def save_settings(body: SaveSettings, user: User, c: Deps) -> dict[str, object]:
+    row = SettingsRow(display_name=body.display_name, ask_before_save=body.ask_before_save,
+                      product_emails=body.product_emails)
+    return settings_view(await c.user_settings.save(user, row))

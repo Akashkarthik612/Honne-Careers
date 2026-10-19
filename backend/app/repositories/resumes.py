@@ -7,17 +7,21 @@ from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
 from app.domain.cv import CvContent
-from app.domain.records import ResumeMode, ResumeRow, ResumeSummary
+from app.domain.records import JobStep, ResumeMode, ResumeRow, ResumeSummary
 
 # Constant column list interpolated into SQL (S608/B608 suppressed); values are bound params.
 _COLUMNS = """id, title, template, mode, jd_id, content, missing_skills, tailor_report,
-              wizard_step, status,
+              wizard_step, status, job_step,
               job_started_at, row_version, content_hash, pdf_path, pdf_content_hash,
               page_count, error_code, updated_at"""
 
 
 def _row(row: dict[str, Any]) -> ResumeRow:
     return ResumeRow(**{**row, "content": CvContent.model_validate(row["content"])})
+
+
+def _summary(row: dict[str, Any]) -> ResumeSummary:
+    return ResumeSummary(**{**row, "content": CvContent.model_validate(row["content"])})
 
 
 def _json(content: CvContent) -> Jsonb:
@@ -29,10 +33,11 @@ class ResumeRepository:
         self._conn = conn
 
     async def list_summaries(self, user_id: UUID) -> list[ResumeSummary]:
-        """Dashboard: summary columns only (no content), one query with the JD join."""
+        """Dashboard: summary columns + content (thumbnails), one query with the JD join.
+        Space O(resumes x content), capped at 200 rows x 256 KB by the table checks."""
         cur = await self._conn.execute(
             """select r.id, r.title, r.template, r.mode, r.status, r.wizard_step,
-                      j.company, j.role, r.updated_at
+                      j.company, j.role, r.updated_at, r.content
                  from app.resumes r
                  left join app.job_descriptions j
                    on j.user_id = r.user_id and j.id = r.jd_id
@@ -40,7 +45,7 @@ class ResumeRepository:
                 order by r.updated_at desc
                 limit 200""",
             (user_id,))
-        return [ResumeSummary(**row) for row in await cur.fetchall()]
+        return [_summary(row) for row in await cur.fetchall()]
 
     async def get(self, user_id: UUID, resume_id: UUID, *, for_update: bool = False
                   ) -> ResumeRow | None:
@@ -103,7 +108,8 @@ class ResumeRepository:
         Returns the row_version the job started from, or None if a live job exists."""
         cur = await self._conn.execute(
             """update app.resumes
-                  set status = 'tailoring', job_started_at = now(), error_code = null
+                  set status = 'tailoring', job_step = 'reading', job_started_at = now(),
+                      error_code = null
                 where user_id = %s and id = %s
                   and (status <> 'tailoring'
                        or job_started_at < now() - make_interval(secs => %s))
@@ -119,7 +125,8 @@ class ResumeRepository:
         cur = await self._conn.execute(
             """update app.resumes
                   set content = %s, content_hash = %s, missing_skills = %s, tailor_report = %s,
-                      status = 'ready', job_started_at = null, error_code = null,
+                      status = 'ready', job_step = null, job_started_at = null,
+                      error_code = null,
                       row_version = row_version + 1
                 where user_id = %s and id = %s and status = 'tailoring'
                   and row_version = %s
@@ -132,16 +139,26 @@ class ResumeRepository:
     async def fail_tailoring(self, user_id: UUID, resume_id: UUID, error_code: str) -> bool:
         cur = await self._conn.execute(
             """update app.resumes
-                  set status = 'failed', job_started_at = null, error_code = %s
+                  set status = 'failed', job_step = null, job_started_at = null,
+                      error_code = %s
                 where user_id = %s and id = %s and status = 'tailoring'""",
             (error_code, user_id, resume_id))
+        return cur.rowcount == 1
+
+    async def set_job_step(self, user_id: UUID, resume_id: UUID, step: JobStep) -> bool:
+        """TAIL-3 progress. Only while the job is live; False = job gone (failed/deleted)."""
+        cur = await self._conn.execute(
+            """update app.resumes set job_step = %s
+                where user_id = %s and id = %s and status = 'tailoring'""",
+            (step, user_id, resume_id))
         return cur.rowcount == 1
 
     async def mark_stale(self, user_id: UUID, resume_id: UUID, timeout_s: int) -> bool:
         """B9: a job past its timeout (Render sleep/restart) becomes failed/stale_job."""
         cur = await self._conn.execute(
             """update app.resumes
-                  set status = 'failed', job_started_at = null, error_code = 'stale_job'
+                  set status = 'failed', job_step = null, job_started_at = null,
+                      error_code = 'stale_job'
                 where user_id = %s and id = %s and status = 'tailoring'
                   and job_started_at < now() - make_interval(secs => %s)""",
             (user_id, resume_id, timeout_s))

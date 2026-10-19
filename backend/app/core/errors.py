@@ -56,6 +56,12 @@ class TruthViolation(AppError):
     message = "We couldn't tailor this without adding things you didn't write."
 
 
+class FactMissing(AppError):
+    # An AI-worded bullet whose original fact text is gone (TRUTH-1). Never guess it.
+    status_code, code = 409, "fact_missing"
+    message = "We lost the original wording of a bullet. Edit it to continue."
+
+
 class LlmUnavailable(AppError):
     status_code, code, message = 503, "llm_unavailable", "Couldn't reach the AI, try again."
 

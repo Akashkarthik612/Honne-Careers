@@ -1,0 +1,23 @@
+{
+  "expected_version": 7,
+  "change": {
+    "section": "personal",
+    "value": {
+      "name": "Arjun Mehta",
+      "location": "Chennai, India",
+      "email": "arjun.mehta@mail.com",
+      "phone": "",
+      "links": [
+        {
+          "label": "LinkedIn",
+          "url": "https://linkedin.com/in/arjun"
+        },
+        {
+          "label": "GitHub",
+          "url": "https://github.com/arjun"
+        }
+      ]
+    }
+  },
+  "wizard_step": null
+}

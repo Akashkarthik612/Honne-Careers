@@ -3,10 +3,28 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Copy, Download, MoreHorizontal, Plus, Trash2, User } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import { CvThumb } from '@/components/CvDoc';
-import { docToCv, profileSections } from '@/data/cvModel';
-import { resumeTitle, useAppStore } from '@/state/appStore';
+import { ErrorBanner, PageLoading } from '@/components/Status';
+import { contentToProfile, timeAgo, toSummary } from '@/data/cvAdapter';
+import { docToCv, emptyProfile, profileSections } from '@/data/cvModel';
+import useResource from '@/hooks/useResource';
+import { deleteResume, duplicateResume, getProfile, listResumes } from '@/services/api';
+import { useAppStore } from '@/state/appStore';
 
 // "Your resumes" dashboard (design: Dashboard.dc.html, DashboardEmpty.dc.html).
+// GET /resumes (with content, for the thumbnails) + GET /profile for the completeness bar.
+
+const STATE_CHIP = {
+  ready: [{ background: '#E8F5EC', color: 'var(--hc-success)' }, () => 'Ready'],
+  draft: [{ background: '#FFF4EE', color: '#B45309' }, (r) => `Draft · step ${r.stepNo} of 5`],
+  tailoring: [{ background: 'var(--hc-brand-tint)', color: 'var(--hc-brand-hover)' }, () => 'Tailoring…'],
+  failed: [{ background: '#FFF4EE', color: 'var(--hc-warm)' }, () => 'Tailoring didn’t finish'],
+};
+
+function openPath(r) {
+  if (r.state === 'tailoring') return `/tailoring/${r.id}`;
+  if (r.state === 'draft') return `/new/details?resume=${r.id}&step=${r.wizardStep}`;
+  return `/cv/${r.id}`;
+}
 
 function EmptyArt() {
   const ink = { fill: '#FFFFFF', stroke: '#161A2B' };
@@ -36,9 +54,10 @@ function NewResumeButton({ style }) {
 
 function ResumeCard({ resume, menuOpen, onToggleMenu, onDuplicate, onDelete }) {
   const navigate = useNavigate();
-  const title = resumeTitle(resume);
-  const ready = resume.status === 'ready';
-  const jd = resume.mode === 'jd';
+  const title = resume.title;
+  const ready = resume.state === 'ready';
+  const jd = resume.mode === 'tailored';
+  const [chipStyle, chipText] = STATE_CHIP[resume.state];
 
   return (
     <article className="hc-card hc-rcard" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
@@ -55,12 +74,12 @@ function ResumeCard({ resume, menuOpen, onToggleMenu, onDuplicate, onDelete }) {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           <span className="hc-chip" style={jd ? { background: 'var(--hc-brand-tint)', color: 'var(--hc-brand-hover)' } : { background: '#F3F4F8', color: 'var(--hc-ink)' }}>{jd ? 'Tailored to JD' : 'From scratch'}</span>
-          <span className="hc-chip" style={ready ? { background: '#E8F5EC', color: 'var(--hc-success)' } : { background: '#FFF4EE', color: '#B45309' }}>{ready ? 'Ready' : `Draft · step ${resume.step} of 5`}</span>
+          <span className="hc-chip" style={chipStyle}>{chipText(resume)}</span>
         </div>
-        <div style={{ fontSize: 12.5, color: 'var(--hc-ink-muted)' }}>{resume.updated}</div>
+        <div style={{ fontSize: 12.5, color: 'var(--hc-ink-muted)' }}>{timeAgo(resume.updatedAt)}</div>
         <div style={{ marginTop: 'auto', paddingTop: 4, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <Link className="hc-btn-p" to={ready ? `/cv/${resume.id}` : `/new/details?resume=${resume.id}&step=experience`} style={{ minHeight: 44, padding: '0 18px', fontSize: 14, flex: '1 1 auto' }}>
-            {ready ? 'Open' : 'Continue'}
+          <Link className="hc-btn-p" to={openPath(resume)} style={{ minHeight: 44, padding: '0 18px', fontSize: 14, flex: '1 1 auto' }}>
+            {resume.state === 'draft' ? 'Continue' : 'Open'}
           </Link>
           {ready && (
             // The PDF is built on the ready screen (SAVE-1); this shortcut opens it there.
@@ -80,10 +99,37 @@ function ResumeCard({ resume, menuOpen, onToggleMenu, onDuplicate, onDelete }) {
   );
 }
 
+async function loadDashboard() {
+  const [list, profile] = await Promise.all([listResumes(), getProfile()]);
+  return { resumes: list.map(toSummary), profile: profile ? contentToProfile(profile.content) : emptyProfile() };
+}
+
 export default function ResumesPage() {
-  const { resumes, profile, duplicateResume, deleteResume, resetDraft } = useAppStore();
+  const { resetDraft } = useAppStore();
+  const res = useResource(loadDashboard);
   const [menu, setMenu] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState(null);
+
+  if (res.loading) return <main className="hc-wrap" style={{ paddingTop: 28 }}><PageLoading label="Loading your resumes…" /></main>;
+  if (res.error) return <main className="hc-wrap" style={{ paddingTop: 28 }}><ErrorBanner error={res.error} action={{ label: 'Retry', onClick: res.reload }} /></main>;
+  const { resumes, profile } = res.data;
+
+  async function act(fn) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await fn();
+      res.reload();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const duplicate = (id) => act(() => duplicateResume(id));
+  const remove = (id) => act(() => deleteResume(id));
 
   const done = profileSections(profile).filter((s) => s.complete).length;
   const cta = done === 5 ? 'View profile' : done === 0 ? 'Set up profile' : 'Complete profile';
@@ -113,6 +159,8 @@ export default function ResumesPage() {
           <Link to="/profile" className="hc-btn-s">{cta}</Link>
         </div>
 
+        <ErrorBanner error={actionError} action={{ label: 'Dismiss', onClick: () => setActionError(null) }} />
+
         {resumes.length === 0 ? (
           <div className="hc-card hc-rise" style={{ marginTop: 20, padding: 'clamp(32px,6vw,64px) 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14 }}>
             <EmptyArt />
@@ -126,7 +174,7 @@ export default function ResumesPage() {
               <ResumeCard
                 key={r.id} resume={r} menuOpen={menu === r.id}
                 onToggleMenu={() => setMenu((m) => (m === r.id ? null : r.id))}
-                onDuplicate={() => { duplicateResume(r.id); setMenu(null); }}
+                onDuplicate={() => { duplicate(r.id); setMenu(null); }}
                 onDelete={() => { setConfirmId(r.id); setMenu(null); }}
               />
             ))}
@@ -148,10 +196,10 @@ export default function ResumesPage() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(14,18,38,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div role="alertdialog" aria-modal="true" aria-labelledby="del-title" className="hc-rise" style={{ width: '100%', maxWidth: 420, background: '#FFFFFF', borderRadius: 20, padding: 24, boxShadow: '0 30px 80px rgba(14,18,38,.3)' }}>
             <h2 id="del-title" className="hc-disp" style={{ margin: 0, fontSize: 21, fontWeight: 800 }}>Delete this resume?</h2>
-            <p style={{ margin: '10px 0 0', fontSize: 15, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>“{resumeTitle(target)}” will be removed. Your profile stays as it is. This can’t be undone.</p>
+            <p style={{ margin: '10px 0 0', fontSize: 15, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>“{target.title}” will be removed, with its PDFs. Your profile stays as it is. This can’t be undone.</p>
             <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 }}>
               <button type="button" className="hc-btn-s" onClick={() => setConfirmId(null)} autoFocus>Cancel</button>
-              <button type="button" onClick={() => { deleteResume(target.id); setConfirmId(null); }} style={{ minHeight: 44, padding: '0 18px', borderRadius: 999, border: 0, background: 'var(--hc-warm)', color: '#FFFFFF', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Delete resume</button>
+              <button type="button" disabled={busy} onClick={async () => { await remove(target.id); setConfirmId(null); }} style={{ minHeight: 44, padding: '0 18px', borderRadius: 999, border: 0, background: 'var(--hc-warm)', color: '#FFFFFF', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Delete resume</button>
             </div>
           </div>
         </div>

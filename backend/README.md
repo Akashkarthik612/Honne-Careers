@@ -44,17 +44,18 @@ pytest -q
 |---|---|---|
 | GET | `/health` | No auth |
 | GET / DELETE | `/me` | DELETE = account + all data (AUTH-3) |
+| GET / PUT | `/settings` | Display name, ask-before-save, product emails; no row = defaults |
 | GET | `/templates` | `[jake]` |
 | GET / PUT | `/profile` | PUT with `expected_version` (omit to create) |
 | POST | `/uploads`, `/uploads/latex` | → pre-fill for the wizard |
 | GET / POST | `/resumes` | Dashboard / create |
 | GET / PATCH / DELETE | `/resumes/{id}` | PATCH = autosave one section, 409 if stale |
 | POST | `/resumes/{id}/duplicate` | |
-| PUT | `/resumes/{id}/jd` | 1–1,000 words |
-| POST | `/resumes/{id}/tailor` | 202; poll `GET /resumes/{id}` until `status` is `ready`/`failed` |
+| PUT | `/resumes/{id}/jd` | 1–1,000 words; optional `company`/`role` = the user's correction (SAVE-2) |
+| POST | `/resumes/{id}/tailor` | 202; poll `GET /resumes/{id}` until `status` is `ready`/`failed`; `job_step` = reading → rewriting → checking (TAIL-3) |
 | POST | `/resumes/{id}/bullets/{bid}/tailor` · `/keep` · `/revert` | |
 | POST | `/resumes/{id}/pdf` | Build or reuse → 5-minute signed URL |
 | POST | `/resumes/{id}/analysis` | Cached per content + JD |
-| POST | `/resumes/{id}/save-to-profile` | |
+| POST | `/resumes/{id}/save-to-profile` | Copies the facts: AI-worded bullets go back to their original text (TRUTH-1) |
 
 Errors: `{"error": {"code", "message", "correlation_id", "details?"}}`. Send `X-Correlation-Id` to trace a request across logs.

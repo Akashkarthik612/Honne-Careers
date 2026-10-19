@@ -22,7 +22,7 @@ from app.core.logging import get_logger
 from app.db.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from app.domain.auth import AuthUser
 from app.domain.cv import Bullet, CvContent, ExperienceItem, Origin, ProjectItem
-from app.domain.records import JdRow, ResumeRow
+from app.domain.records import JdRow, JobStep, ResumeRow
 from app.domain.tailoring import (
     BulletTailorInput,
     BulletTailorOutput,
@@ -36,6 +36,7 @@ from app.domain.truth import FactSet
 from app.policy.entitlements import Entitlements
 from app.policy.quota import QuotaGuard
 from app.truth.checker import TruthChecker
+from app.truth.copying import fact_text
 from app.truth.facts import FactSetBuilder
 from app.truth.merger import ResumeMerger, keep, propose, replace_bullet, revert
 from app.truth.text import norm_skill
@@ -106,11 +107,11 @@ class BulletTailorService:
 
         title, context = _title_context(item)
         siblings = [b.text for b in item.bullets if b.id != bullet_id and b.origin is not Origin.AI]
-        source_text = bullet.original_text if bullet.tailor_state == "proposed" else bullet.text
+        source_text = fact_text(bullet)  # re-tailor from the fact, never from AI wording
         run = await self._runner.run(
             "bullet_tailor",
             BulletTailorInput(jd_text=ctx.jd.text, item_title=title, item_context=context,
-                              item_facts=siblings, bullet_text=source_text or bullet.text),
+                              item_facts=siblings, bullet_text=source_text),
             BulletTailorOutput, user_id=user.id, entity_id=resume_id)
 
         path = f"{_kind(ctx.resume.content, item.id)}[{item.id}].bullets[{bullet_id}]"
@@ -208,9 +209,11 @@ class TailorService:
 
     async def _run(self, user: AuthUser, resume_id: UUID, started_version: int, scope: str
                    ) -> None:
-        async with self._uow(user.id) as uow:
+        async with self._uow(user.id) as uow:  # job_step 'reading' was set by start()
             ctx = await load_context(uow, user, resume_id)
         content = ctx.resume.content
+        if not await self._step(user, resume_id, "rewriting"):
+            return
         payload = TailorInput(
             jd_text=ctx.jd.text, scope=scope,  # type: ignore[arg-type]
             items=[ItemView(id=i.id, kind="experience" if isinstance(i, ExperienceItem)
@@ -225,6 +228,8 @@ class TailorService:
         run = await self._runner.run("cv_tailor", payload, TailorOutput, user_id=user.id,
                                      entity_id=resume_id)
         output = run.output
+        if not await self._step(user, resume_id, "checking"):
+            return
         missing = [s for s in output.missing_skills if norm_skill(s) not in ctx.facts.skills]
 
         report = TruthChecker(ctx.facts).check_tailor(content, output, missing, scope)
@@ -246,6 +251,15 @@ class TailorService:
             return
         log.info("tailor_job_finished", resume_id=resume_id, changed=merged.changed,
                  kept_original=merged.kept_original, row_version=version)
+
+    async def _step(self, user: AuthUser, resume_id: UUID, step: JobStep) -> bool:
+        """TAIL-3 progress. False = the job is no longer live (timed out as stale, or the
+        resume was deleted): stop here rather than spend an LLM call on a dead job."""
+        async with self._uow(user.id) as uow:
+            live = await uow.resumes.set_job_step(user.id, resume_id, step)
+        if not live:
+            log.warning("tailor_job_gone", resume_id=resume_id, step=step)
+        return live
 
     async def _fail(self, user: AuthUser, resume_id: UUID, code: str) -> None:
         async with self._uow(user.id) as uow:

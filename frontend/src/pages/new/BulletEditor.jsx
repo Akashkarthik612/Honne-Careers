@@ -1,19 +1,25 @@
 import { Check, PenLine, Sparkles, X } from 'lucide-react';
 
 // One CV bullet in the wizard. States (bullet.status): plain | edited | kept → editable textarea;
-// busy → tailoring skeleton; review → tailored text with Keep / Revert. `bullet.err` is null,
-// 'ai' (TailorUnavailableError) or { violations } (TruthCheckError, TRUTH-3: the text stays unchanged).
+// busy → tailoring skeleton; review → tailored text with Keep / Revert (the proposal is stored on the
+// server until then). `bullet.err` is null, 'ai' (llm_unavailable: Retry), { rules } (truth_violation,
+// TRUTH-3: the bullet stays unchanged) or { message } (any other API error, shown as the API wrote it).
 
-const KIND = { metric: 'a metric', tool: 'a tool', employer: 'an employer', date: 'a date' };
+// The backend's TruthChecker rules (app/domain/truth.py), in plain words. It never returns the text itself.
+const RULE = {
+  unknown_number: 'a number', unknown_skill: 'a skill', unknown_date: 'a date',
+  unknown_name: 'a name (employer, product…)', missing_skill_used: 'a JD skill you don’t have',
+};
 
-function describe(violations) {
-  const parts = violations.map((v) => `${KIND[v.kind] ?? v.kind} (“${v.value}”)`);
+function describe(rules) {
+  const parts = [...new Set(rules.map((r) => RULE[r] ?? 'a new fact'))];
+  if (!parts.length) return 'new facts';
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
 }
 
 const alert = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, background: '#FFF4EE', color: '#9A3412', borderRadius: 10, padding: '10px 12px', fontSize: 13, lineHeight: 1.5 };
 
-export default function BulletEditor({ bullet, label, canTailor, onEdit, onTailor, onRetry, onDismiss, onKeep, onRevert, onRemove }) {
+export default function BulletEditor({ bullet, label, canTailor, disabled, onEdit, onTailor, onRetry, onDismiss, onKeep, onRevert, onRemove }) {
   const { status, err } = bullet;
   const editable = status === 'plain' || status === 'edited' || status === 'kept';
   const review = status === 'review';
@@ -31,7 +37,7 @@ export default function BulletEditor({ bullet, label, canTailor, onEdit, onTailo
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {canTailor && (
-                <button type="button" className="hc-btn-sm" onClick={onTailor} disabled={!bullet.text.trim()} style={{ border: '1px solid #C9D3F7', background: '#F7F8FD', color: 'var(--hc-brand-hover)' }}>
+                <button type="button" className="hc-btn-sm" onClick={onTailor} disabled={disabled || !bullet.text.trim()} style={{ border: '1px solid #C9D3F7', background: '#F7F8FD', color: 'var(--hc-brand-hover)' }}>
                   <Sparkles size={13} aria-hidden="true" />Tailor to JD
                 </button>
               )}
@@ -46,9 +52,15 @@ export default function BulletEditor({ bullet, label, canTailor, onEdit, onTailo
               <button type="button" className="hc-btn-sm" onClick={onRetry} style={{ border: '1px solid var(--hc-warm)', background: '#FFFFFF', color: '#9A3412' }}>Retry</button>
             </div>
           )}
-          {err && err !== 'ai' && (
+          {err?.message && (
             <div role="alert" style={alert}>
-              <span style={{ flex: '1 1 220px' }}><strong>We couldn’t tailor this without adding things you didn’t write:</strong> {describe(err.violations)}. Your bullet is unchanged.</span>
+              <span style={{ flex: '1 1 220px' }}>{err.message}</span>
+              <button type="button" className="hc-btn-sm" onClick={onDismiss} style={{ border: '1px solid var(--hc-hairline)', background: '#FFFFFF', color: 'var(--hc-ink)' }}>Dismiss</button>
+            </div>
+          )}
+          {err?.rules && (
+            <div role="alert" style={alert}>
+              <span style={{ flex: '1 1 220px' }}><strong>We couldn’t tailor this without adding things you didn’t write:</strong> {describe(err.rules)}. Your bullet is unchanged.</span>
               <button type="button" className="hc-btn-sm" onClick={onDismiss} style={{ border: '1px solid var(--hc-hairline)', background: '#FFFFFF', color: 'var(--hc-ink)' }}>Dismiss</button>
             </div>
           )}
@@ -67,9 +79,10 @@ export default function BulletEditor({ bullet, label, canTailor, onEdit, onTailo
           <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--hc-ink-muted)', textDecoration: 'line-through', textDecorationColor: 'var(--hc-ink-faint)' }}>{bullet.original}</div>
           <div style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--hc-ink)', background: '#EEF1FD', border: '1px solid #C9D3F7', borderRadius: 10, padding: '10px 12px' }}>{bullet.tailored}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-            <button type="button" className="hc-btn-sm" onClick={onKeep} style={{ border: 0, background: 'var(--hc-brand)', color: '#FFFFFF' }}><Check size={13} strokeWidth={3} aria-hidden="true" />Keep</button>
-            <button type="button" className="hc-btn-sm" onClick={onRevert} style={{ border: '1px solid var(--hc-hairline)', background: '#FFFFFF', color: 'var(--hc-ink)' }}>Revert</button>
+            <button type="button" className="hc-btn-sm" onClick={onKeep} disabled={disabled} style={{ border: 0, background: 'var(--hc-brand)', color: '#FFFFFF' }}><Check size={13} strokeWidth={3} aria-hidden="true" />Keep</button>
+            <button type="button" className="hc-btn-sm" onClick={onRevert} disabled={disabled} style={{ border: '1px solid var(--hc-hairline)', background: '#FFFFFF', color: 'var(--hc-ink)' }}>Revert</button>
           </div>
+          {err?.message && <div role="alert" style={alert}>{err.message}</div>}
           <div style={{ fontSize: 12, color: 'var(--hc-ink-muted)' }}>Accomplished X, measured by Y, by doing Z — only using what you wrote.</div>
         </div>
       )}

@@ -100,15 +100,22 @@ class ResumeService:
             await uow.resumes.delete(user.id, resume_id)
         log.info("resume_deleted", resume_id=resume_id, storage_objects=removed)
 
-    async def set_jd(self, user: AuthUser, resume_id: UUID, text: str) -> JdRow:
+    async def set_jd(self, user: AuthUser, resume_id: UUID, text: str,
+                     company: str | None = None, role: str | None = None) -> JdRow:
+        """company/role from the client are the user's correction (SAVE-2) and replace what
+        the heuristic or an earlier paste stored; omitted ones keep the stored/detected value."""
         text = text.strip()
         words = len(text.split())
         if not 1 <= words <= JD_MAX_WORDS:
             raise InvalidInput(f"Paste a job description of 1 to {JD_MAX_WORDS} words.",
                                reason="jd_length", word_count=words)
-        company, role = _detect_company_role(text)
+        detected_company, detected_role = _detect_company_role(text)
         async with self._uow(user.id) as uow:
-            jd = await uow.jds.upsert(user.id, text, words, text_hash(text), company, role)
+            jd = await uow.jds.upsert(user.id, text, words, text_hash(text),
+                                      company or detected_company, role or detected_role)
+            if (company and company != jd.company) or (role and role != jd.role):
+                jd = await uow.jds.set_meta(user.id, jd.id, company or jd.company,
+                                            role or jd.role)
             if not await uow.resumes.set_jd(user.id, resume_id, jd.id):
                 if await uow.resumes.get(user.id, resume_id) is None:
                     raise NotFound(reason="resume")

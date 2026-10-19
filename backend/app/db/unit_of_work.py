@@ -23,6 +23,7 @@ from app.repositories.misc import (
 )
 from app.repositories.profiles import ProfileRepository
 from app.repositories.resumes import ResumeRepository
+from app.repositories.settings import SettingsRepository
 
 
 class UnitOfWork:
@@ -35,6 +36,7 @@ class UnitOfWork:
         self.analyses = AnalysisRepository(conn)
         self.agent_runs = AgentRunRepository(conn)
         self.usage = UsageRepository(conn)
+        self.settings = SettingsRepository(conn)
 
 
 class UnitOfWorkFactory(Protocol):

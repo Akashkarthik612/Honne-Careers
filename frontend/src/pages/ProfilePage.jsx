@@ -3,25 +3,30 @@ import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import SkillChips from '@/components/SkillChips';
-import { SKILL_GROUPS, blankEducation, blankProject, blankRole, newId, profileSections } from '@/data/cvModel';
-import { useAppStore } from '@/state/appStore';
+import { ErrorBanner, PageLoading } from '@/components/Status';
+import { contentToProfile, profileToContentIn, timeAgo, validateDoc } from '@/data/cvAdapter';
+import { SKILL_GROUPS, blankEducation, blankProject, blankRole, emptyProfile, newId, profileSections, toDoc } from '@/data/cvModel';
+import useResource from '@/hooks/useResource';
+import { getProfile, saveProfile } from '@/services/api';
+import { ApiError } from '@/services/apiClient';
 
 // "Your profile" (design: Profile.dc.html). The user's own facts (PROF-1); every new resume starts here.
-// Rough notes are fine (PROF-6); every section takes more than one entry (PROF-7). Saving replaces the
-// stored profile; until the profile API exists it lives in the session store.
+// Rough notes are fine (PROF-6); every section takes more than one entry (PROF-7).
+// GET /profile (404 = no profile yet) and PUT /profile with expected_version (409 = changed elsewhere).
 
-const PERSONAL_FIELDS = [['name', 'Full name'], ['city', 'City, country'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['linkedin', 'LinkedIn'], ['github', 'GitHub or portfolio']];
+const PERSONAL_FIELDS = [['name', 'Full name'], ['city', 'City, country'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['linkedin', 'LinkedIn', 'url'], ['github', 'GitHub or portfolio', 'url']];
 const ROLE_FIELDS = [['role', 'Role'], ['company', 'Company'], ['start', 'Start'], ['end', 'End'], ['location', 'Location']];
 const EDU_FIELDS = [['school', 'School'], ['degree', 'Degree'], ['years', 'Years'], ['city', 'City']];
 const SECTION_IDS = { personal: 'pf-personal', experience: 'pf-exp', projects: 'pf-proj', education: 'pf-edu', skills: 'pf-skills' };
 
 const entryBox = { border: '1px solid var(--hc-hairline)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 };
 
-function Field({ id, label, value, onChange, type = 'text' }) {
+function Field({ id, label, value, onChange, type = 'text', error }) {
   return (
     <div className="hc-f">
       <label className="hc-flabel" htmlFor={id}>{label}</label>
-      <input id={id} className="hc-in" type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+      <input id={id} className="hc-in" type={type} value={value} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-err` : undefined} onChange={(e) => onChange(e.target.value)} />
+      {error && <span id={`${id}-err`} style={{ fontSize: 12.5, color: 'var(--hc-warm)', fontWeight: 600 }}>{error}</span>}
     </div>
   );
 }
@@ -58,17 +63,34 @@ function Bullets({ entry, label, hint, onChange }) {
   );
 }
 
+async function loadProfile() {
+  const p = await getProfile();
+  return p ? { profile: contentToProfile(p.content), version: p.row_version, updatedAt: p.updated_at } : { profile: emptyProfile(), version: null, updatedAt: null };
+}
+
 export default function ProfilePage() {
-  const { profile: saved, profileSavedAt, saveProfile } = useAppStore();
-  const [profile, setProfile] = useState(saved);
+  const res = useResource(loadProfile);
+  const wrap = (children) => <main style={{ maxWidth: 880, margin: '0 auto', padding: '28px 20px 120px' }}>{children}</main>;
+  if (res.loading) return wrap(<PageLoading label="Loading your profile…" />);
+  if (res.error) return wrap(<ErrorBanner error={res.error} action={{ label: 'Retry', onClick: res.reload }} />);
+  return <ProfileForm key={res.data.version ?? 'new'} initial={res.data} onReload={res.reload} />;
+}
+
+function ProfileForm({ initial, onReload }) {
+  const [profile, setProfile] = useState(initial.profile);
+  const [version, setVersion] = useState(initial.version);
   const [dirty, setDirty] = useState(false);
-  const [openRole, setOpenRole] = useState(saved.roles[0]?.id ?? null);
+  const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [openRole, setOpenRole] = useState(initial.profile.roles[0]?.id ?? null);
 
   const sections = profileSections(profile);
   const bySection = Object.fromEntries(sections.map((s) => [s.key, s]));
   const done = sections.filter((s) => s.complete).length;
 
-  const update = (fn) => { setProfile(fn); setDirty(true); };
+  const update = (fn) => { setProfile(fn); setDirty(true); setJustSaved(false); };
   const setPersonal = (k, v) => update((p) => ({ ...p, personal: { ...p.personal, [k]: v } }));
   const patch = (key, id, change) => update((p) => ({ ...p, [key]: p[key].map((e) => (e.id === id ? { ...e, ...change } : e)) }));
   const add = (key, entry) => update((p) => ({ ...p, [key]: [...p[key], entry] }));
@@ -79,14 +101,34 @@ export default function ProfilePage() {
     setOpenRole(role.id);
   }
 
-  function save() {
-    saveProfile(profile);
-    setDirty(false);
+  async function save() {
+    const found = validateDoc(toDoc(profile));
+    setErrors(found);
+    const badRole = profile.roles.find((r) => found[`${r.id}.company`] || found[`${r.id}.start`]);
+    if (badRole) setOpenRole(badRole.id);
+    if (Object.keys(found).length) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const r = await saveProfile(profileToContentIn(profile), version);
+      setVersion(r.row_version);
+      setDirty(false);
+      setJustSaved(true);
+    } catch (e) {
+      if (!(e instanceof ApiError)) throw e;
+      setSaveError(e);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const status = dirty
-    ? { text: 'You have unsaved changes.', color: '#B45309' }
-    : { text: profileSavedAt || 'Not saved yet.', color: profileSavedAt?.startsWith('Saved') ? 'var(--hc-success)' : 'var(--hc-ink-muted)' };
+  const stale = saveError?.code === 'stale_version';
+  const invalid = Object.keys(errors).length > 0;
+  const status = saving ? { text: 'Saving…', color: 'var(--hc-ink-muted)' }
+    : invalid ? { text: 'Fix the highlighted fields to save.', color: 'var(--hc-warm)' }
+      : dirty ? { text: 'You have unsaved changes.', color: '#B45309' }
+        : justSaved ? { text: 'Saved ✓ — new resumes will use this.', color: 'var(--hc-success)' }
+          : { text: initial.updatedAt ? timeAgo(initial.updatedAt) : 'Not saved yet.', color: 'var(--hc-ink-muted)' };
 
   return (
     <>
@@ -103,11 +145,13 @@ export default function ProfilePage() {
           {sections.map((s) => <a key={s.key} className="hc-jump" href={`#${SECTION_IDS[s.key]}`}>{s.label}</a>)}
         </nav>
 
+        <ErrorBanner error={saveError} action={stale ? { label: 'Reload', onClick: onReload } : { label: 'Dismiss', onClick: () => setSaveError(null) }} />
+
         <form onSubmit={(e) => { e.preventDefault(); save(); }} style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <section id="pf-personal" className="hc-card hc-sec" aria-labelledby="h-personal">
             <SectionHead num={1} id="h-personal" title="Personal details" section={bySection.personal} />
             <div className="hc-g2">
-              {PERSONAL_FIELDS.map(([k, label, type]) => <Field key={k} id={`pf-${k}`} label={label} type={type} value={profile.personal[k]} onChange={(v) => setPersonal(k, v)} />)}
+              {PERSONAL_FIELDS.map(([k, label, type]) => <Field key={k} id={`pf-${k}`} label={label} type={type} value={profile.personal[k]} error={errors[`personal.${k}`]} onChange={(v) => setPersonal(k, v)} />)}
             </div>
           </section>
 
@@ -117,7 +161,7 @@ export default function ProfilePage() {
               {profile.roles.map((r) => (openRole === r.id ? (
                 <div key={r.id} style={entryBox}>
                   <div className="hc-g2">
-                    {ROLE_FIELDS.map(([k, label]) => <Field key={k} id={`${r.id}-${k}`} label={label} value={r[k]} onChange={(v) => patch('roles', r.id, { [k]: v })} />)}
+                    {ROLE_FIELDS.map(([k, label]) => <Field key={k} id={`${r.id}-${k}`} label={label} value={r[k]} error={errors[`${r.id}.${k}`]} onChange={(v) => patch('roles', r.id, { [k]: v })} />)}
                   </div>
                   <Bullets entry={r} label="What you did" hint="— in your own words. Resumes tailor from these." onChange={(c) => patch('roles', r.id, c)} />
                 </div>
@@ -140,7 +184,7 @@ export default function ProfilePage() {
               {profile.projects.map((p) => (
                 <div key={p.id} style={entryBox}>
                   <div className="hc-g2">
-                    <Field id={`${p.id}-name`} label="Project name" value={p.name} onChange={(v) => patch('projects', p.id, { name: v })} />
+                    <Field id={`${p.id}-name`} label="Project name" value={p.name} error={errors[`${p.id}.name`]} onChange={(v) => patch('projects', p.id, { name: v })} />
                     <Field id={`${p.id}-tech`} label="Tech used" value={p.tech} onChange={(v) => patch('projects', p.id, { tech: v })} />
                   </div>
                   <Bullets entry={p} label="What it does, and any result" onChange={(c) => patch('projects', p.id, c)} />
@@ -155,7 +199,7 @@ export default function ProfilePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {profile.education.map((e) => (
                 <div key={e.id} className="hc-g2" style={{ border: '1px solid var(--hc-hairline)', borderRadius: 16, padding: 16 }}>
-                  {EDU_FIELDS.map(([k, label]) => <Field key={k} id={`${e.id}-${k}`} label={label} value={e[k]} onChange={(v) => patch('education', e.id, { [k]: v })} />)}
+                  {EDU_FIELDS.map(([k, label]) => <Field key={k} id={`${e.id}-${k}`} label={label} value={e[k]} error={errors[`${e.id}.${k}`]} onChange={(v) => patch('education', e.id, { [k]: v })} />)}
                 </div>
               ))}
             </div>
@@ -178,7 +222,7 @@ export default function ProfilePage() {
           <span role="status" style={{ fontSize: 13.5, fontWeight: 600, color: status.color }}>{status.text}</span>
           <div style={{ display: 'flex', gap: 10 }}>
             <Link className="hc-btn-s" to="/resumes">Back to resumes</Link>
-            <button type="button" className="hc-btn-p is-lg" onClick={save}>Save profile</button>
+            <button type="button" className="hc-btn-p is-lg" onClick={save} disabled={saving} aria-busy={saving}>{saving ? 'Saving…' : 'Save profile'}</button>
           </div>
         </div>
       </div>

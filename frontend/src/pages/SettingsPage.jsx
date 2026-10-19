@@ -2,14 +2,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, CreditCard, LogOut } from 'lucide-react';
 import { GitHubIcon, GoogleIcon } from '@/components/BrandIcons';
+import { ErrorBanner, PageLoading } from '@/components/Status';
 import { templateName } from '@/data/templates';
+import useResource from '@/hooks/useResource';
 import useSignOut from '@/hooks/useSignOut';
-import { deleteMe } from '@/services/apiClient';
+import { deleteMe, getProfile, getSettings, listResumes, saveSettings } from '@/services/api';
+import { ApiError, errorText } from '@/services/apiClient';
 import { signOut as forgetSession } from '@/services/authService';
-import { useAppStore } from '@/state/appStore';
 import { useAuth } from '@/state/auth';
 
 // Settings (design: Settings.dc.html): account, subscription & billing, preferences, data & privacy.
+// Preferences live in GET/PUT /settings and save as they change (no row yet = the defaults).
 // Billing is out of scope until after user testing, so that section only states the free beta plan;
 // nothing on it takes payment details.
 
@@ -32,18 +35,58 @@ function Switch({ id, label, help, on, onFlip }) {
 }
 
 export default function SettingsPage() {
+  const res = useResource(getSettings);
+  const wrap = (children) => <main style={{ maxWidth: 880, margin: '0 auto', padding: '28px 20px 80px' }}>{children}</main>;
+  if (res.loading) return wrap(<PageLoading label="Loading your settings…" />);
+  if (res.error) return wrap(<ErrorBanner error={res.error} action={{ label: 'Retry', onClick: res.reload }} />);
+  return <SettingsForm initial={res.data} />;
+}
+
+function SettingsForm({ initial }) {
   const navigate = useNavigate();
-  const { settings, setSettings, profile, resumes, deleteAccount } = useAppStore();
   const { user } = useAuth();
   const signOut = useSignOut();
+  const [settings, setSettingsState] = useState(initial);
+  const [nameInput, setNameInput] = useState(initial.display_name ?? '');
+  const [prefError, setPrefError] = useState(null);
+  const [exportError, setExportError] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
-  const initials = user.name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+  const shownName = settings.display_name || user.name;
+  const initials = shownName.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
 
-  // AUTH-3 / data export: profile and resumes as JSON. PDFs join the export once PDF-2 builds them. TODO(PDF-2)
-  function downloadData() {
-    const blob = new Blob([JSON.stringify({ profile, resumes }, null, 2)], { type: 'application/json' });
+  // Saves the whole row (last write wins). On failure the switch shows the stored value again.
+  async function setSettings(patch) {
+    const next = { ...settings, ...patch };
+    setSettingsState(next);
+    setPrefError(null);
+    try {
+      setSettingsState(await saveSettings(next));
+    } catch (e) {
+      if (!(e instanceof ApiError)) throw e;
+      setSettingsState(settings);
+      setPrefError(e);
+    }
+  }
+
+  function saveName() {
+    const name = nameInput.trim() || null; // empty = use the Google account name
+    if (name !== settings.display_name) setSettings({ display_name: name });
+  }
+
+  // AUTH-3 / data export: the saved profile and every resume (with content), as the API returns them.
+  async function downloadData() {
+    setExportError(null);
+    let data;
+    try {
+      const [profile, resumes] = await Promise.all([getProfile(), listResumes()]);
+      data = { exported_at: new Date().toISOString(), profile, resumes, settings };
+    } catch (e) {
+      setExportError(e);
+      return;
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -60,11 +103,10 @@ export default function SettingsPage() {
     try {
       await deleteMe();
     } catch (e) {
-      setDeleteError(e.correlationId ? `${e.message} (Ref: ${e.correlationId})` : e.message);
+      setDeleteError(errorText(e));
       setDeleting(false);
       return;
     }
-    deleteAccount();
     await forgetSession({ scope: 'local' });
     navigate('/', { replace: true });
   }
@@ -87,10 +129,10 @@ export default function SettingsPage() {
             {user.avatarUrl
               ? <img src={user.avatarUrl} alt="" width={52} height={52} referrerPolicy="no-referrer" style={{ borderRadius: 99, objectFit: 'cover' }} />
               : <span style={{ width: 52, height: 52, borderRadius: 99, background: 'var(--hc-ink)', color: '#FFFFFF', fontSize: 17, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>}
-            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{user.name}</div><div style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Member since Oct 2026</div></div>
+            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{shownName}</div><div style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Member since Oct 2026</div></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-            <div className="hc-f"><label className="hc-flabel" htmlFor="st-name">Display name</label><input id="st-name" className="hc-in" type="text" value={settings.name} onChange={(e) => setSettings({ name: e.target.value })} /></div>
+            <div className="hc-f"><label className="hc-flabel" htmlFor="st-name">Display name</label><input id="st-name" className="hc-in" type="text" maxLength={120} value={nameInput} placeholder={user.name} onChange={(e) => setNameInput(e.target.value)} onBlur={saveName} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} /></div>
             <div className="hc-f">
               <label className="hc-flabel" htmlFor="st-email">Email</label>
               <input id="st-email" className="hc-in" type="email" value={user.email} readOnly aria-describedby="st-email-help" />
@@ -159,16 +201,18 @@ export default function SettingsPage() {
             <div><div style={{ fontSize: 14.5, fontWeight: 600 }}>Default template</div><div style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>Used for new resumes.</div></div>
             <span style={{ fontSize: 14, fontWeight: 600, border: '1px solid var(--hc-hairline)', borderRadius: 999, padding: '0 14px', minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>{templateName('jake')}</span>
           </div>
-          <Switch id="tg-save" label="Ask before saving resume edits to my profile" help="Shows the “Also save to my profile” checkbox on Preview." on={settings.askSave} onFlip={() => setSettings({ askSave: !settings.askSave })} />
-          <Switch id="tg-email" label="Product update emails" help="At most one a month. Never shared." on={settings.emails} onFlip={() => setSettings({ emails: !settings.emails })} />
+          <Switch id="tg-save" label="Ask before saving resume edits to my profile" help="Shows the “Also save to my profile” checkbox on Preview." on={settings.ask_before_save} onFlip={() => setSettings({ ask_before_save: !settings.ask_before_save })} />
+          <Switch id="tg-email" label="Product update emails" help="At most one a month. Never shared." on={settings.product_emails} onFlip={() => setSettings({ product_emails: !settings.product_emails })} />
+          <ErrorBanner error={prefError} />
         </section>
 
         <section id="st-data" className="hc-card hc-sec" aria-labelledby="h-data">
           <h2 id="h-data" className="hc-disp" style={{ ...h2, marginBottom: 6 }}>Data &amp; privacy</h2>
           <div className="hc-row">
-            <div><div style={{ fontSize: 14.5, fontWeight: 600 }}>Download your data</div><div style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>Your profile and all resumes, as JSON.</div></div>
+            <div><div style={{ fontSize: 14.5, fontWeight: 600 }}>Download your data</div><div style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>Your profile, all resumes and settings, as JSON.</div></div>
             <button type="button" className="hc-btn-s" onClick={downloadData}>Download</button>
           </div>
+          <ErrorBanner error={exportError} />
           <div className="hc-row">
             <div><div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--hc-warm)' }}>Delete account</div><div style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>Removes your profile, resumes and sign-in. This can’t be undone.</div></div>
             <button type="button" className="hc-btn-s" onClick={() => setConfirmDelete(true)} style={{ color: 'var(--hc-warm)', borderColor: '#F3C7B3' }}>Delete account</button>

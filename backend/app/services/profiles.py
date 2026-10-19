@@ -7,7 +7,7 @@ from app.db.unit_of_work import UnitOfWorkFactory
 from app.domain.auth import AuthUser
 from app.domain.cv import CvContent, CvContentIn, Origin
 from app.domain.records import ProfileRow
-from app.truth.copying import as_origin
+from app.truth.copying import as_origin, facts_only
 from app.truth.stamper import EditStamper
 
 log = get_logger(__name__)
@@ -37,8 +37,9 @@ class ProfileService:
 
     async def replace_with(self, user: AuthUser, content: CvContent,
                            expected_version: int | None) -> int:
-        """Save to profile (B6): the resume's content becomes the user's own facts."""
-        adopted = as_origin(content, Origin.USER)
+        """Save to profile (B6): the resume's facts become the user's own. AI wording is
+        replaced by the fact it came from (TRUTH-1); user edits are kept as typed."""
+        adopted = as_origin(facts_only(content), Origin.USER)
         async with self._uow(user.id) as uow:
             version = await self._write(uow, user, adopted, expected_version)
         log.info("profile_replaced_from_resume", row_version=version)

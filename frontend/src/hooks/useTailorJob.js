@@ -1,39 +1,54 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { TAILOR_POLL_MAX, TAILOR_POLL_MS } from '@/config/limits';
+import { toResume } from '@/data/cvAdapter';
+import { getResume } from '@/services/api';
 
-// The four reported steps of a tailoring job (TAIL-3). The last one is the truth check (TRUTH-2).
+// The tailor job's reported steps (TAIL-3), in the order the backend sets resumes.job_step.
+// Reading the JD and matching happen inside one AI call with the rewrite, so they share a step.
 export const TAILOR_STEPS = [
-  'Reading the job description',
-  'Matching your experience',
-  'Rewriting your bullets',
-  'Checking nothing was invented',
+  ['reading', 'Reading the job description'],
+  ['rewriting', 'Matching and rewriting your bullets'],
+  ['checking', 'Checking nothing was invented'],
 ];
 
-const STEP_MS = 1300;
+const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
-// Simulated job: starts on mount, advances one step every STEP_MS, then calls onDone once per run.
-// `step` runs 0…TAILOR_STEPS.length; at the end, `done` is true. Replace the interval with
-// polling/streaming of the backend job once the tailoring API exists.
-export default function useTailorJob(onDone) {
-  const [step, setStep] = useState(0);
+// Polls until the job leaves 'tailoring' or maxPolls run out. Pure (fetch and sleep injected) so it is
+// tested without React. Returns { outcome: 'ready' | 'failed' | 'timeout', resume }.
+// A failed request throws (ApiError): there is no silent retry.
+export async function pollTailorJob({ fetchResume, onUpdate, isCancelled, intervalMs = TAILOR_POLL_MS, maxPolls = TAILOR_POLL_MAX, sleep = wait }) {
+  let resume = null;
+  for (let n = 0; n < maxPolls; n += 1) {
+    if (isCancelled()) return { outcome: 'cancelled', resume };
+    resume = await fetchResume();
+    onUpdate(resume);
+    if (resume.state !== 'tailoring') return { outcome: resume.state === 'failed' ? 'failed' : 'ready', resume };
+    await sleep(intervalMs);
+  }
+  return { outcome: 'timeout', resume };
+}
+
+// Hook: { phase: 'polling' | 'ready' | 'failed' | 'timeout' | 'error', resume, step, error, restart }.
+// `step` is the index into TAILOR_STEPS (TAILOR_STEPS.length when done).
+export default function useTailorJob(resumeId) {
   const [run, setRun] = useState(0);
-  const doneRef = useRef(onDone);
-
-  useEffect(() => { doneRef.current = onDone; }, [onDone]);
+  const [state, setState] = useState({ phase: 'polling', resume: null, error: null });
 
   useEffect(() => {
-    let s = 0;
-    const timer = setInterval(() => {
-      s += 1;
-      setStep(s);
-      if (s >= TAILOR_STEPS.length) {
-        clearInterval(timer);
-        doneRef.current();
-      }
-    }, STEP_MS);
-    return () => clearInterval(timer);
-  }, [run]);
+    let cancelled = false;
+    pollTailorJob({
+      fetchResume: async () => toResume(await getResume(resumeId)),
+      onUpdate: (resume) => { if (!cancelled) setState((s) => ({ ...s, resume })); },
+      isCancelled: () => cancelled,
+    }).then(
+      ({ outcome, resume }) => { if (!cancelled && outcome !== 'cancelled') setState({ phase: outcome, resume, error: null }); },
+      (error) => { if (!cancelled) setState((s) => ({ ...s, phase: 'error', error })); },
+    );
+    return () => { cancelled = true; };
+  }, [resumeId, run]);
 
-  const restart = useCallback(() => { setStep(0); setRun((r) => r + 1); }, []);
-
-  return { step, done: step >= TAILOR_STEPS.length, restart };
+  const restart = () => { setState((s) => ({ ...s, phase: 'polling', error: null })); setRun((r) => r + 1); };
+  const at = TAILOR_STEPS.findIndex(([key]) => key === state.resume?.jobStep);
+  const step = state.phase === 'ready' ? TAILOR_STEPS.length : Math.max(0, at);
+  return { ...state, step, restart };
 }

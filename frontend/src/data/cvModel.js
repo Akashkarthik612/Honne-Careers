@@ -2,7 +2,7 @@
 //   profile — the user's own facts (PROF-1); bullets are { id, text }.
 //   doc     — a resume being built: the profile plus, per bullet, the CV wording and its review status.
 //             Bullet: { id, source, text, status } where `source` is the profile fact and `text` what the CV prints.
-//             status: plain | edited | busy | review | kept. Only `text` differs from `source` after a kept tailoring.
+//             status: plain | edited | busy | review | kept, derived from the server (cvAdapter.js).
 //   cv      — what CvDoc renders.
 // All are O(n) in the number of entries and bullets.
 
@@ -17,7 +17,7 @@ export const blankEducation = () => ({ id: newId('e'), school: '', degree: '', y
 
 export function emptyProfile() {
   return {
-    personal: { name: '', city: '', email: '', phone: '', linkedin: '', github: '' },
+    personal: { name: '', city: '', email: '', phone: '', linkedin: '', github: '', otherLinks: [] },
     roles: [], projects: [], education: [],
     skills: { lang: [], fw: [], tools: [] },
   };
@@ -25,11 +25,9 @@ export function emptyProfile() {
 
 const mapBullets = (entries, fn) => entries.map((e) => ({ ...e, bullets: e.bullets.map(fn) }));
 
-// profile → doc. `tailored` (bullet id → text) marks those bullets as already tailored and kept.
-export function toDoc(profile, tailored = {}) {
-  const bullet = (b) => (tailored[b.id]
-    ? { id: b.id, source: b.text, text: tailored[b.id], status: 'kept' }
-    : { id: b.id, source: b.text, text: b.text, status: 'plain' });
+// profile → doc: every bullet starts as the user's own fact.
+export function toDoc(profile) {
+  const bullet = (b) => ({ id: b.id, source: b.text, text: b.text, status: 'plain' });
   return {
     personal: { ...profile.personal },
     roles: mapBullets(profile.roles, bullet),
@@ -88,14 +86,10 @@ export function ensureEntries(doc) {
   };
 }
 
-// Resolves transient bullet states (busy, review → back to what was there before; errors cleared),
-// so a saved doc only holds plain | edited | kept.
+// Clears transient client state (a bullet left 'busy', inline errors). A 'review' bullet stays as it is:
+// the proposal lives on the server until Keep or Revert (B6).
 export function settleDoc(doc) {
-  const settle = (b) => {
-    if (b.status === 'review') return { ...b, text: b.original, status: b.prev || 'plain', err: null };
-    if (b.status === 'busy') return { ...b, status: b.prev || 'plain', err: null };
-    return { ...b, err: null };
-  };
+  const settle = (b) => (b.status === 'busy' ? { ...b, status: b.prev || 'plain', err: null } : { ...b, err: null });
   return { ...doc, roles: mapBullets(doc.roles, settle), projects: mapBullets(doc.projects, settle) };
 }
 
@@ -116,10 +110,10 @@ export function pruneDoc(doc) {
 export function docChanges(doc) {
   const out = [];
   doc.roles.forEach((r) => r.bullets.forEach((b, i) => {
-    if (b.text !== b.source) out.push({ id: b.id, where: `Experience · ${r.company || r.role} · bullet ${i + 1}`, before: b.source, after: b.text });
+    if (b.text !== b.source) out.push({ id: b.id, where: `Experience · ${r.company || r.role} · bullet ${i + 1}`, before: b.source, after: b.text, status: b.status });
   }));
   doc.projects.forEach((pr) => pr.bullets.forEach((b) => {
-    if (b.text !== b.source) out.push({ id: b.id, where: `Projects · ${pr.name}`, before: b.source, after: b.text });
+    if (b.text !== b.source) out.push({ id: b.id, where: `Projects · ${pr.name}`, before: b.source, after: b.text, status: b.status });
   }));
   return out;
 }
@@ -139,21 +133,13 @@ export function profileSections(profile) {
   ];
 }
 
-export const hasProfile = (profile) => profile.roles.some((r) => r.bullets.length > 0);
-
 export const countWords = (text) => text.trim().split(/\s+/).filter(Boolean).length;
 
-// SAVE-2 placeholder: the backend extracts company and role from the JD; until then, read a
-// "Role · Company · City" first line. Returns blanks when the line doesn't have that shape.
+// SAVE-2: pre-fills the Company and Role fields from a "Role · Company · City" first line, for the user to
+// check. The backend stores what the user confirms. Returns blanks when the line doesn't have that shape.
 export function guessJobMeta(jd) {
   const first = jd.trim().split('\n')[0] || '';
   const parts = first.split('·').map((s) => s.trim()).filter(Boolean);
   if (parts.length < 2) return { role: '', company: '' };
   return { role: parts[0], company: parts[1] };
-}
-
-// JD skills not already in the profile (case-insensitive substring match against every skill chip).
-export function missingSkills(skills, jdSkills) {
-  const have = SKILL_GROUPS.flatMap(([k]) => skills[k]).map((s) => s.toLowerCase());
-  return jdSkills.filter((s) => !have.some((h) => h.includes(s.toLowerCase())));
 }

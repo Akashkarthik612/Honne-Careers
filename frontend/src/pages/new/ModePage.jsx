@@ -1,17 +1,23 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, PenLine, Sparkles } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import SetupSteps from '@/components/SetupSteps';
+import { ErrorBanner } from '@/components/Status';
+import { createResume } from '@/services/api';
 import { useAppStore } from '@/state/appStore';
 
 // Step 2 of new-resume setup (design: ModeChoice.dc.html): tailor to a JD, or build from scratch.
+// "Build from scratch" creates the resume right away (POST /resumes) so the wizard can autosave each step.
 
 const pill = (bg, color) => ({ fontSize: 12, fontWeight: 700, color, background: bg, borderRadius: 999, padding: '5px 10px' });
 const iconWell = (bg) => ({ width: 52, height: 52, borderRadius: 16, background: bg, color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' });
 
-function Option({ to, onPick, icon, badges, title, blurb, points, cta, tone, highlight }) {
+function Option({ to, onPick, busy, icon, badges, title, blurb, points, cta, tone, highlight }) {
+  const Tag = to ? Link : 'button';
+  const props = to ? { to, onClick: onPick } : { type: 'button', onClick: onPick, disabled: busy, 'aria-busy': busy };
   return (
-    <Link className="hc-opt" to={to} onClick={onPick} style={highlight ? { borderColor: '#C9D3F7' } : undefined}>
+    <Tag className="hc-opt" {...props} style={{ width: '100%', fontFamily: 'inherit', fontSize: 'inherit', textAlign: 'left', cursor: busy ? 'progress' : 'pointer', ...(highlight ? { borderColor: '#C9D3F7' } : null) }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <span aria-hidden="true" style={iconWell(tone)}>{icon}</span>
         {badges && <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{badges}</span>}
@@ -28,14 +34,30 @@ function Option({ to, onPick, icon, badges, title, blurb, points, cta, tone, hig
         ))}
       </div>
       <span style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: tone }}>
-        {cta}<ArrowRight size={16} aria-hidden="true" />
+        {busy ? 'Creating your resume…' : cta}<ArrowRight size={16} aria-hidden="true" />
       </span>
-    </Link>
+    </Tag>
   );
 }
 
 export default function ModePage() {
-  const { setDraft } = useAppStore();
+  const navigate = useNavigate();
+  const { draft, setDraft } = useAppStore();
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function startScratch() {
+    setCreating(true);
+    setError(null);
+    try {
+      const resume = await createResume({ template: draft.template, mode: 'scratch', title: 'General CV' });
+      setDraft({ mode: 'scratch', jd: '', company: '', role: '' });
+      navigate(`/new/details?resume=${resume.id}`);
+    } catch (e) {
+      setError(e);
+      setCreating(false);
+    }
+  }
 
   return (
     <main className="hc-wrap">
@@ -54,7 +76,7 @@ export default function ModePage() {
           cta="Paste a job description"
         />
         <Option
-          to="/new/details" onPick={() => setDraft({ mode: 'scratch', jd: '', company: '', role: '' })} tone="#161A2B"
+          onPick={startScratch} busy={creating} tone="#161A2B"
           icon={<PenLine size={24} />}
           title="Build from scratch"
           blurb="Fill in your details step by step. Tailor later if you want."
@@ -62,6 +84,8 @@ export default function ModePage() {
           cta="Start building"
         />
       </div>
+
+      <ErrorBanner error={error} />
 
       <div style={{ marginTop: 24 }}>
         <Link className="hc-back" to="/new/template"><ArrowLeft size={16} aria-hidden="true" />Back to templates</Link>

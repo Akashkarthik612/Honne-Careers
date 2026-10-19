@@ -11,6 +11,7 @@ from app.api.schemas import (
     SaveProfile,
     SetJd,
     jd_view,
+    profile_view,
     resume_view,
     summary_view,
 )
@@ -26,9 +27,7 @@ async def templates(c: Deps) -> list[dict[str, str]]:
 
 @router.get("/profile", tags=["profile"])
 async def get_profile(user: User, c: Deps) -> dict[str, object]:
-    p = await c.profiles.get(user)
-    return {"content": p.content.model_dump(mode="json"), "row_version": p.row_version,
-            "updated_at": p.updated_at.isoformat()}
+    return profile_view(await c.profiles.get(user))
 
 
 @router.put("/profile", tags=["profile"])
@@ -74,5 +73,5 @@ async def duplicate_resume(resume_id: UUID, user: User, c: Deps) -> dict[str, ob
 
 @router.put("/resumes/{resume_id}/jd", tags=["resumes"])
 async def set_jd(resume_id: UUID, body: SetJd, user: User, c: Deps) -> dict[str, object]:
-    jd = await c.resumes.set_jd(user, resume_id, body.text)
+    jd = await c.resumes.set_jd(user, resume_id, body.text, body.company, body.role)
     return jd_view(jd) or {}

@@ -7,7 +7,7 @@ from fastapi import APIRouter, File, UploadFile
 from pydantic import StringConstraints
 
 from app.api.deps import Deps, User
-from app.api.schemas import ExpectedVersion
+from app.api.schemas import ExpectedVersion, analysis_view
 from app.core.errors import InvalidInput
 from app.domain.cv import Model
 
@@ -43,8 +43,7 @@ async def paste_latex(body: LatexPaste, user: User, c: Deps) -> dict[str, object
 @router.post("/resumes/{resume_id}/analysis", tags=["analysis"])
 async def analyse(resume_id: UUID, user: User, c: Deps) -> dict[str, object]:
     row, cached = await c.analysis.analyse(user, resume_id)
-    return {"keyword": row.keyword_score, "experience": row.experience_score,
-            "narrative": row.narrative_score, "details": row.details, "cached": cached}
+    return analysis_view(row, cached)
 
 
 @router.post("/resumes/{resume_id}/save-to-profile", tags=["profile"])

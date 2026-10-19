@@ -82,8 +82,8 @@ class Bullet(Model):
     text: BulletText
     origin: Origin
     locked: bool  # invariant: locked => AI never writes it
-    original_text: BulletText | None = None   # text before a proposed AI tailor
-    original_origin: Origin | None = None     # origin before a proposed AI tailor
+    original_text: BulletText | None = None   # the fact before AI wording (proposed or kept)
+    original_origin: Origin | None = None     # its origin before AI wording
     tailor_state: TailorState = TailorState.NONE
 
 

@@ -1,0 +1,67 @@
+{
+  "expected_version": null,
+  "content": {
+    "header": {
+      "name": "Arjun Mehta",
+      "location": "Chennai, India",
+      "email": "arjun.mehta@mail.com",
+      "phone": "",
+      "links": [
+        {
+          "label": "LinkedIn",
+          "url": "https://linkedin.com/in/arjun"
+        },
+        {
+          "label": "GitHub",
+          "url": "https://github.com/arjun"
+        }
+      ]
+    },
+    "experience": [
+      {
+        "id": "u1",
+        "role": "Software Engineer",
+        "company": "Northwind Fintech",
+        "location": "",
+        "start": "Jul 2021",
+        "end": "",
+        "bullets": [
+          {
+            "id": "u1b1",
+            "text": "Cut latency by 38% (p95)"
+          }
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "id": "u2",
+        "name": "Ledger-lite",
+        "tech": [
+          "Java",
+          "PostgreSQL"
+        ],
+        "date": "2023",
+        "bullets": []
+      }
+    ],
+    "education": [
+      {
+        "id": "u3",
+        "school": "Anna University",
+        "degree": "B.E.",
+        "years": "2016 – 2020",
+        "location": ""
+      }
+    ],
+    "skills": {
+      "languages": [
+        "Java"
+      ],
+      "frameworks": [],
+      "tools": [
+        "AWS"
+      ]
+    }
+  }
+}

@@ -18,4 +18,9 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // Vitest runs in Node (vite.config.js `test`): fixtures are read from /contracts with node:fs.
+    files: ['src/**/*.test.js', 'src/test/**/*.js'],
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+  },
 ])

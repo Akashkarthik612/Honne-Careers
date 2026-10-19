@@ -26,6 +26,16 @@ class JobDescriptionRepository:
             (user_id, text, word_count, chash, company, role))
         return JdRow(**await cur.fetchone())
 
+    async def set_meta(self, user_id: UUID, jd_id: UUID, company: str | None,
+                       role: str | None) -> JdRow:
+        """SAVE-2: the user's correction of company/role (column grant: company, role only)."""
+        cur = await self._conn.execute(
+            f"""update app.job_descriptions set company = %s, role = %s
+                 where user_id = %s and id = %s
+             returning {_COLUMNS}""",  # noqa: S608  # nosec B608
+            (company, role, user_id, jd_id))
+        return JdRow(**await cur.fetchone())
+
     async def get(self, user_id: UUID, jd_id: UUID) -> JdRow | None:
         cur = await self._conn.execute(
             f"select {_COLUMNS} from app.job_descriptions where user_id = %s and id = %s",  # noqa: S608  # nosec B608

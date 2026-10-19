@@ -1,0 +1,49 @@
+{
+  "expected_version": 7,
+  "change": {
+    "section": "experience",
+    "value": [
+      {
+        "id": "nw",
+        "role": "Software Engineer",
+        "company": "Northwind Fintech",
+        "location": "Bengaluru, India",
+        "start": "Jul 2021",
+        "end": "Present",
+        "bullets": [
+          {
+            "id": "nw1",
+            "text": "Reduced p95 payment-event latency by 38% with Kafka Streams in Java on AWS"
+          },
+          {
+            "id": "nw2",
+            "text": "Owned settlement end to end at 2M events/day with zero data loss"
+          },
+          {
+            "id": "nw3",
+            "text": "Mentored 2 interns to their first production launch, both shipping in under 8 weeks"
+          }
+        ]
+      },
+      {
+        "id": "bl",
+        "role": "Associate Software Engineer",
+        "company": "Brightline Systems",
+        "location": "Chennai, India",
+        "start": "Aug 2020",
+        "end": "Jun 2021",
+        "bullets": [
+          {
+            "id": "bl1",
+            "text": "Reduced on-call pages by 30% by adding alerting and runbooks across 6 Java services"
+          },
+          {
+            "id": "bl2",
+            "text": "Wrote SQL migrations for a 40M-row orders table with no downtime"
+          }
+        ]
+      }
+    ]
+  },
+  "wizard_step": null
+}

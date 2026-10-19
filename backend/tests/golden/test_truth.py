@@ -2,10 +2,12 @@
 
 import pytest
 
-from app.domain.cv import Origin, TailorState
+from app.core.errors import FactMissing
+from app.domain.cv import Bullet, Origin, TailorState
 from app.domain.tailoring import BulletOut, ItemOut, SkillsView, TailorOutput
 from app.domain.truth import Rule
 from app.truth.checker import TruthChecker
+from app.truth.copying import fact_text, facts_only
 from app.truth.facts import FactSetBuilder
 from app.truth.merger import ResumeMerger, keep, propose, revert
 from tests.fixtures import b, sample_cv
@@ -175,3 +177,29 @@ def test_ai_text_is_never_a_fact():
     exp = CV.experience[0].model_copy(update={"bullets": [ai]})
     facts = FactSetBuilder().build([], CV.model_copy(update={"experience": [exp]}))
     assert "77" not in facts.numbers_by_item["nw"]
+
+
+# ---------- AI wording never becomes a fact (TRUTH-1, Day 2) ----------
+
+def test_keep_retains_the_fact_and_retailor_points_at_it():
+    fact = CV.experience[0].bullets[0]
+    kept = keep(propose(fact, "Reduced p95 latency by 38% with Kafka Streams"))
+    assert (kept.tailor_state, kept.original_text) == (TailorState.KEPT, fact.text)
+    again = propose(kept, "Cut p95 latency 38% on Kafka Streams")
+    assert (again.original_text, again.original_origin) == (fact.text, Origin.PROFILE)
+
+
+def test_facts_only_restores_facts_and_keeps_user_edits():
+    nw = CV.experience[0]
+    kept = keep(propose(nw.bullets[0], "Reduced p95 latency by 38% with Kafka Streams"))
+    mine = b("nw3", "Mentored 2 interns, my words", Origin.USER, locked=True)
+    cv = CV.model_copy(update={"experience": [
+        nw.model_copy(update={"bullets": [kept, nw.bullets[1], mine]}), *CV.experience[1:]]})
+    texts = [x.text for x in facts_only(cv).experience[0].bullets]
+    assert texts == [nw.bullets[0].text, nw.bullets[1].text, "Mentored 2 interns, my words"]
+
+
+def test_ai_bullet_without_its_fact_fails_loudly():
+    orphan = Bullet(id="x1", text="AI words", origin=Origin.AI, locked=False)
+    with pytest.raises(FactMissing):
+        fact_text(orphan)

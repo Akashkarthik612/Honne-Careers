@@ -33,6 +33,7 @@ from app.services.analysis import AnalysisService
 from app.services.pdf import PdfService
 from app.services.profiles import ProfileService
 from app.services.resumes import ResumeService
+from app.services.settings import SettingsService
 from app.services.tailoring import BulletTailorService, TailorService
 from app.services.uploads import UploadService
 from app.storage.file_store import CvFileStore
@@ -60,6 +61,7 @@ class Container:
     pdf: PdfService
     uploads: UploadService
     analysis: AnalysisService
+    user_settings: SettingsService
 
     async def start(self) -> None:
         await self.db.open()
@@ -123,4 +125,5 @@ def build_container(settings: Settings, *, providers: dict[str, LlmProvider] | N
                                settings.docx_max_uncompressed_bytes, settings.parse_timeout_s),
             runner, file_store, quota),
         analysis=AnalysisService(uow, runner, ScoreCalculator(), quota),
+        user_settings=SettingsService(uow),
     )

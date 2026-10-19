@@ -2,10 +2,10 @@ name: backend
 
 on:
   pull_request:
-    paths: ["backend/**", "supabase/**", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "supabase/**", "contracts/**", ".github/workflows/backend.yml"]
   push:
     branches: [test, main]
-    paths: ["backend/**", "supabase/**", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "supabase/**", "contracts/**", ".github/workflows/backend.yml"]
 
 permissions:
   contents: read
@@ -39,7 +39,7 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: Lint
         run: ruff check app tests docker
-      - name: Tests (unit, golden, RLS, API)
+      - name: Tests (unit, golden, contract, RLS, API)
         run: pytest -q
 
   security:

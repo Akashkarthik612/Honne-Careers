@@ -1,0 +1,16 @@
+{
+  "expected_version": 7,
+  "change": {
+    "section": "education",
+    "value": [
+      {
+        "id": "au",
+        "school": "Anna University",
+        "degree": "B.E. in Computer Science and Engineering",
+        "years": "2016 – 2020",
+        "location": "Chennai, India"
+      }
+    ]
+  },
+  "wizard_step": null
+}

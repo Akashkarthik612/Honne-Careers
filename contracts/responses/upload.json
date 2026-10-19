@@ -1,0 +1,62 @@
+{
+  "upload_id": "11111111-1111-4111-8111-111111111111",
+  "filename": "CV_Arjun_2026.pdf",
+  "prefill": {
+    "header": {
+      "name": "Arjun Mehta",
+      "location": "Chennai, India",
+      "email": "arjun.mehta@mail.com",
+      "phone": "",
+      "links": [
+        "https://linkedin.com/in/arjun",
+        "github.com/arjun"
+      ]
+    },
+    "experience": [
+      {
+        "role": "Software Engineer",
+        "company": "Northwind Fintech",
+        "location": "",
+        "start": "Jul 2021",
+        "end": "",
+        "bullets": [
+          {
+            "id": "u1b1",
+            "text": "Cut latency by 38% (p95)"
+          }
+        ],
+        "id": "u1"
+      }
+    ],
+    "projects": [
+      {
+        "name": "Ledger-lite",
+        "tech": [
+          "Java",
+          "PostgreSQL"
+        ],
+        "date": "2023",
+        "bullets": [],
+        "id": "u2"
+      }
+    ],
+    "education": [
+      {
+        "school": "Anna University",
+        "degree": "B.E.",
+        "years": "2016 – 2020",
+        "location": "",
+        "id": "u3"
+      }
+    ],
+    "skills": {
+      "languages": [
+        "Java"
+      ],
+      "frameworks": [],
+      "tools": [
+        "AWS"
+      ]
+    }
+  }
+}

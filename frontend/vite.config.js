@@ -14,6 +14,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  test: {
+    // Pure modules only (adapter, API client, polling); no DOM needed.
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
   server: {
     proxy: {
       // Backend routes have no /api prefix: /api/me → http://localhost:8000/me (see src/services/apiConfig.js).

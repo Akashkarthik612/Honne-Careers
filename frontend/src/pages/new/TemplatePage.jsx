@@ -5,14 +5,18 @@ import PageTitle from '@/components/PageTitle';
 import SetupSteps from '@/components/SetupSteps';
 import { CvThumb } from '@/components/CvDoc';
 import { profileToCv } from '@/data/cvModel';
-import { SAMPLE_PROFILE } from '@/data/sampleCv';
+import { PREVIEW_PROFILE } from '@/data/templatePreview';
 import { TEMPLATES } from '@/data/templates';
+import useResource from '@/hooks/useResource';
+import { listTemplates } from '@/services/api';
+import { ErrorBanner, PageLoading } from '@/components/Status';
 import { useAppStore } from '@/state/appStore';
 import elegantTemplate from '@/assets/elegant-template.png';
 
-// Step 1 of new-resume setup (design: TemplatePicker.dc.html). Only Jake's Resume is selectable in the beta.
+// Step 1 of new-resume setup (design: TemplatePicker.dc.html). Which templates are live comes from
+// GET /templates (Jake's Resume in the beta); the others show as "Coming soon".
 
-const SAMPLE = profileToCv(SAMPLE_PROFILE);
+const SAMPLE = profileToCv(PREVIEW_PROFILE);
 const tileName = (muted) => ({ fontSize: 18, fontWeight: 700, color: muted ? 'var(--hc-ink-muted)' : 'var(--hc-ink)' });
 const well = { height: 300, overflow: 'hidden', background: '#EEF0F5', borderRadius: 12, display: 'flex', justifyContent: 'center', paddingTop: 16 };
 
@@ -59,6 +63,8 @@ function TileFoot({ name, blurb, muted, badge }) {
 export default function TemplatePage() {
   const { draft, setDraft } = useAppStore();
   const [picked, setPicked] = useState(draft.template === 'jake');
+  const templates = useResource(listTemplates);
+  const live = new Set((templates.data ?? []).map((t) => t.id));
 
   function toggle() {
     setPicked((p) => !p);
@@ -71,8 +77,11 @@ export default function TemplatePage() {
       <PageTitle before="Pick a" accent="template" style={{ marginTop: 24 }} />
       <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Every template is built for ATS. You can switch later.</p>
 
+      <ErrorBanner error={templates.error} action={{ label: 'Retry', onClick: templates.reload }} />
+      {templates.loading && <PageLoading label="Loading templates…" />}
+      {templates.data && (
       <div role="radiogroup" aria-label="Templates" style={{ marginTop: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 18 }}>
-        {TEMPLATES.map((t) => (t.available ? (
+        {TEMPLATES.map((t) => (live.has(t.id) ? (
           <button
             key={t.id} type="button" role="radio" aria-checked={picked} onClick={toggle}
             style={{
@@ -98,10 +107,11 @@ export default function TemplatePage() {
           </div>
         )))}
       </div>
+      )}
 
       <div style={{ marginTop: 28, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <Link className="hc-back" to="/resumes"><ArrowLeft size={16} aria-hidden="true" />Back to resumes</Link>
-        {picked
+        {picked && live.has('jake')
           ? <Link className="hc-btn-p is-lg" to="/new/mode">Continue with Jake’s Resume<ArrowRight size={16} aria-hidden="true" /></Link>
           : <span className="hc-btn-off" aria-disabled="true">Pick a template to continue</span>}
       </div>

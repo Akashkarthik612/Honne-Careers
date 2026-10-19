@@ -32,7 +32,8 @@ class MergeResult:
 
 def propose(bullet: Bullet, text: str) -> Bullet:
     """AI text becomes a proposal; the pre-AI text and origin are kept for Revert."""
-    first = bullet.tailor_state is TailorState.PROPOSED
+    # Already AI-worded (proposed or kept): keep pointing at the original fact (TRUTH-1).
+    first = bullet.tailor_state in (TailorState.PROPOSED, TailorState.KEPT)
     return Bullet(
         id=bullet.id, text=text, origin=Origin.AI, locked=False,
         original_text=bullet.original_text if first else bullet.text,
@@ -42,10 +43,11 @@ def propose(bullet: Bullet, text: str) -> Bullet:
 
 
 def keep(bullet: Bullet) -> Bullet:
+    """The original fact stays on the bullet: save-to-profile and re-tailoring need it, and
+    the CV page shows it under "What changed"."""
     if bullet.tailor_state is not TailorState.PROPOSED:
         return bullet
-    return bullet.model_copy(update={"tailor_state": TailorState.KEPT,
-                                     "original_text": None, "original_origin": None})
+    return bullet.model_copy(update={"tailor_state": TailorState.KEPT})
 
 
 def revert(bullet: Bullet) -> Bullet:

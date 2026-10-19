@@ -1,13 +1,23 @@
-import { useCallback, useRef, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
-import { hasProfile, toDoc } from '@/data/cvModel';
-import { SAMPLE_TAILORED } from '@/data/sampleCv';
+import { ErrorBanner } from '@/components/Status';
 import useTailorJob, { TAILOR_STEPS } from '@/hooks/useTailorJob';
-import { useAppStore } from '@/state/appStore';
+import { startTailor } from '@/services/api';
 
-// Tailoring progress for a returning user (design: Tailoring.dc.html). The job tailors every bullet of the
-// saved profile; the result is saved as a ready resume that opens on the "Your CV is ready" screen.
+// Tailoring progress (design: Tailoring.dc.html). POST /resumes/{id}/tailor started the job (202); this
+// screen polls GET /resumes/{id} and shows the step the backend reports (TAIL-3, resumes.job_step).
+// Polling is bounded (config/limits.js). On failure the resume's content is untouched; Retry starts a new
+// job. The result opens on the "Your CV is ready" screen.
+
+// What a failed job's error_code means to the user. Codes come from app/core/errors.py and B9.
+const FAILURE = {
+  truth_violation: 'We couldn’t tailor this without adding things you didn’t write. Your CV is unchanged.',
+  llm_unavailable: 'Couldn’t reach the AI. Your CV is unchanged — try again.',
+  llm_output_invalid: 'The AI sent back something we couldn’t use. Your CV is unchanged — try again.',
+  stale_job: 'Tailoring took too long and was stopped. Your CV is unchanged — try again.',
+  quota_exceeded: 'Daily limit reached, try tomorrow.',
+};
 
 function Spinner() {
   return (
@@ -37,43 +47,51 @@ function StepRow({ label, state }) {
 const SKELETON = [['46%', 14, '0 auto'], ['80%', 7, '0 auto 10px'], ['28%'], ['100%'], ['92%'], ['84%'], ['28%', 9, '10px 0 0'], ['90%'], ['76%'], ['28%', 9, '10px 0 0'], ['66%'], ['28%', 9, '10px 0 0'], ['72%']];
 
 export default function TailoringPage() {
-  const { profile, draft, addResume } = useAppStore();
-  const [resumeId, setResumeId] = useState(null);
-  const created = useRef(null);
+  const { id } = useParams();
+  const job = useTailorJob(id);
+  const [retryError, setRetryError] = useState(null);
+  const [retrying, setRetrying] = useState(false);
 
-  const onDone = useCallback(() => {
-    if (created.current) { setResumeId(created.current); return; } // Replay doesn't save a second copy.
-    const tailored = Object.fromEntries(Object.entries(SAMPLE_TAILORED).filter(([id]) => profile.roles.concat(profile.projects).some((e) => e.bullets.some((b) => b.id === id))));
-    const id = addResume({ role: draft.role, company: draft.company, mode: 'jd', status: 'ready', template: draft.template, jd: draft.jd, doc: toDoc(profile, tailored), addedSkills: [] });
-    created.current = id;
-    setResumeId(id);
-  }, [profile, draft, addResume]);
+  async function retry() {
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      await startTailor(id, 'all');
+      job.restart();
+    } catch (e) {
+      setRetryError(e);
+    } finally {
+      setRetrying(false);
+    }
+  }
 
-  const job = useTailorJob(onDone);
-
-  if (!hasProfile(profile)) return <Navigate to="/new/jd" replace />; // TAIL-2
-  const meta = [draft.role, draft.company].filter(Boolean).join(' · ');
+  const done = job.phase === 'ready';
+  const jd = job.resume?.jd;
+  const meta = [jd?.role, jd?.company].filter(Boolean).join(' · ');
+  const failure = job.phase === 'failed' ? (FAILURE[job.resume?.errorCode] ?? 'Tailoring didn’t finish. Your CV is unchanged — try again.') : null;
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 72px' }}>
       {meta && <div className="hc-lbl">{meta}</div>}
       <h1 className="hc-disp" style={{ margin: '6px 0 0', fontSize: 'clamp(28px,3.2vw,40px)', lineHeight: 1.05, fontWeight: 800, letterSpacing: '-0.035em' }}>
-        {job.done ? 'Your CV is ready.' : 'Tailoring your CV…'}
+        {done ? 'Your CV is ready.' : failure ? 'Tailoring didn’t finish.' : 'Tailoring your CV…'}
       </h1>
       <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Using your saved profile. This usually takes under a minute.</p>
 
       <div style={{ marginTop: 24, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'stretch' }}>
         <div className="hc-card" role="status" aria-live="polite" style={{ flex: '1 1 360px', minWidth: 0, padding: 22, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {TAILOR_STEPS.map((label, i) => <StepRow key={label} label={label} state={i < job.step ? 'done' : i === job.step ? 'active' : 'pending'} />)}
+          {TAILOR_STEPS.map(([key, label], i) => <StepRow key={key} label={label} state={i < job.step ? 'done' : i === job.step && job.phase === 'polling' ? 'active' : 'pending'} />)}
           <p style={{ margin: '8px 0 0', fontSize: 13, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>Every rewritten bullet is checked against what you wrote. If something can’t be tailored without inventing, we leave it as it is and tell you.</p>
-          {job.done && resumeId ? (
+          {done && (
             <div className="hc-rise" style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-              <Link className="hc-btn-p is-lg" to={`/cv/${resumeId}`}>See your CV<ArrowRight size={16} aria-hidden="true" /></Link>
-              <button type="button" className="hc-btn-t" onClick={job.restart}>Replay</button>
+              <Link className="hc-btn-p is-lg" to={`/cv/${id}`}>See your CV<ArrowRight size={16} aria-hidden="true" /></Link>
             </div>
-          ) : (
-            <Link className="hc-back" to="/new/jd" style={{ marginTop: 4 }}>Cancel</Link>
           )}
+          {failure && <ErrorBanner error={failure} action={{ label: retrying ? 'Starting…' : 'Try again', onClick: retry }} />}
+          {job.phase === 'timeout' && <ErrorBanner error="This is taking longer than usual. Your CV is safe — check again in a moment." action={{ label: 'Check again', onClick: job.restart }} />}
+          {job.phase === 'error' && <ErrorBanner error={job.error} action={{ label: 'Check again', onClick: job.restart }} />}
+          <ErrorBanner error={retryError} />
+          {!done && <Link className="hc-back" to="/resumes" style={{ marginTop: 4 }}>Back to resumes — tailoring carries on</Link>}
         </div>
 
         <div aria-hidden="true" style={{ flex: '1 1 380px', minWidth: 0, background: '#EEF0F5', borderRadius: 20, padding: 20 }}>

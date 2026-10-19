@@ -9,6 +9,7 @@ from app.domain.cv import CvContent
 from app.domain.tailoring import PrefillCv
 
 ResumeStatus = Literal["draft", "tailoring", "ready", "failed"]
+JobStep = Literal["reading", "rewriting", "checking"]  # TAIL-3, set while status = tailoring
 ResumeMode = Literal["tailored", "scratch"]
 
 
@@ -48,6 +49,7 @@ class ResumeSummary:
     company: str | None
     role: str | None
     updated_at: datetime
+    content: CvContent  # dashboard thumbnails; one query, no per-card fetch
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +64,7 @@ class ResumeRow:
     tailor_report: dict[str, object] | None
     wizard_step: str
     status: ResumeStatus
+    job_step: JobStep | None
     job_started_at: datetime | None
     row_version: int
     content_hash: str
@@ -88,3 +91,10 @@ class AnalysisRow:
     experience_score: int
     narrative_score: int
     details: dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsRow:
+    display_name: str | None  # None = use the sign-in provider's name
+    ask_before_save: bool
+    product_emails: bool

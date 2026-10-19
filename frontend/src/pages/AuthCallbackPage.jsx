@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '@/components/AuthLayout';
 import { authText } from '@/components/authStyles';
 import useSignOut from '@/hooks/useSignOut';
-import { fetchMe } from '@/services/apiClient';
+import { fetchMe } from '@/services/api';
 import { clearNext, completeSignIn, readNext } from '@/services/authService';
 
 // Google redirects here (Supabase redirect URL: <origin>/auth/callback). Two steps, each failing loudly:

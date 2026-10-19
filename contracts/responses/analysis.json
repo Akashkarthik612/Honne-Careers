@@ -1,0 +1,52 @@
+{
+  "keyword": 75,
+  "experience": 73,
+  "narrative": 80,
+  "details": {
+    "keyword": {
+      "matched": [
+        "Java",
+        "Kafka",
+        "AWS"
+      ],
+      "missing": [
+        "Kubernetes"
+      ],
+      "missing_note": "Not in your profile, so we didn't add it."
+    },
+    "experience": {
+      "requirements": [
+        {
+          "text": "Event-driven systems at scale",
+          "level": "strong",
+          "evidence": "Kafka Streams ledger at 2M events/day"
+        },
+        {
+          "text": "Mentoring and code review",
+          "level": "yes",
+          "evidence": "Mentored 2"
+        },
+        {
+          "text": "Kubernetes",
+          "level": "none",
+          "evidence": ""
+        }
+      ],
+      "cv_years": 6.2,
+      "min_years": 3
+    },
+    "narrative": {
+      "sub_scores": {
+        "relevance": 4,
+        "ordering": 4,
+        "ownership": 3,
+        "impact": 4,
+        "clarity": 5
+      },
+      "jd_story": "A backend engineer who owns high-scale event systems.",
+      "cv_story": "Cut latency with Kafka on AWS, owned settlement.",
+      "suggestion": "Open your first bullet with Owned."
+    }
+  },
+  "cached": false
+}
