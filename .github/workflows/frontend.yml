@@ -30,6 +30,10 @@ jobs:
       # Adapter, API client and polling, plus the request/response contracts shared with the backend
       # (/contracts). No real API, Supabase or Gemini: fetch and the Supabase client are stubbed.
       - name: Tests
+        env:
+          # supabaseClient.js throws at import without these (no silent fallback); placeholders only.
+          VITE_SUPABASE_URL: https://project.supabase.invalid
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
         run: npm test
       - name: Dependency vulnerabilities
         run: npm audit --audit-level=high --omit=dev
