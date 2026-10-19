@@ -21,7 +21,8 @@ services:
   - type: web
     name: honne-careers-api
     runtime: docker
-    plan: starter            # 512 MB; move to standard (2 GB) if LaTeX peak memory needs it
+    plan: free               # beta: 512 MB, 0.1 CPU, sleeps after 15 min idle (~1 min cold start)
+                             # Move to starter (always on) when users arrive; standard (2 GB) if LaTeX memory needs it.
     region: singapore
     branch: main             # production deploys only from main (CLAUDE.md branching)
     rootDir: backend
@@ -42,6 +43,14 @@ services:
         value: gemini:gemini-3.8-flash
       - key: BETA_FREE_TAILORING
         value: "true"
+      # Free plan has 0.1 CPU: give LaTeX compiles and upload parsing more time than the
+      # defaults (20 s / 30 s / 15 s). Drop these when moving to a paid plan.
+      - key: LATEX_TIMEOUT_S
+        value: "60"
+      - key: LATEX_QUEUE_WAIT_S
+        value: "60"
+      - key: PARSE_TIMEOUT_S
+        value: "30"
 
   - type: web
     name: honne-careers
