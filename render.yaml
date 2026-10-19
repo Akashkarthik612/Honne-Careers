@@ -1,7 +1,7 @@
 # Render Blueprint (plan v4): free static frontend + one paid Docker API with LaTeX inside.
 # Secrets are never in this file: set them in the "honne-careers-api-secrets" env group.
-# Region: Singapore is Render's closest to India; put the Supabase project in a nearby
-# region (ap-south-1 Mumbai or ap-southeast-1 Singapore) to keep DB latency low.
+# Region: Singapore is Render's closest to India (it has no Mumbai). The Supabase project is
+# in the same region (ap-southeast-1) so the API's many DB round trips stay ~1-2 ms.
 
 envVarGroups:
   - name: honne-careers-api-secrets
