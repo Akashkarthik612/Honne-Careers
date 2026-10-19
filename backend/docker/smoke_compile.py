@@ -28,13 +28,22 @@ def diagnose(tex: str) -> None:
     (work / "resume.tex").write_text(tex, encoding="utf-8")
     env = {"PATH": os.environ.get("PATH", ""), "HOME": str(work),
            "TECTONIC_CACHE_DIR": os.environ.get("TECTONIC_CACHE_DIR", "")}
-    proc = subprocess.run(  # noqa: S603 - fixed argv, fixture input
-        ["tectonic",  # noqa: S607 - on PATH in the image, as in TectonicCompiler "--untrusted", "--only-cached", "--chatter", "minimal",
-         "--outdir", str(work), str(work / "resume.tex")],
-        cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-        timeout=120, check=False)
-    out = (proc.stdout + proc.stderr)[-3000:].replace("%", "%25").replace("\n", "%0A")
-    print(f"::error title=tectonic without rlimits: exit {proc.returncode}::{out}")
+    cache = Path(env["TECTONIC_CACHE_DIR"] or "/nonexistent")
+    out = f"uid={os.getuid()} cache={cache}\n"
+    for sub in ("formats", ""):
+        d = cache / sub
+        listing = (", ".join(f"{p.name}:{p.stat().st_size}:{oct(p.stat().st_mode)}"
+                             for p in sorted(d.iterdir()))[:1500] if d.is_dir() else "missing")
+        out += f"[{d}] {listing}\n"
+    argv = ["tectonic", "--untrusted", "--only-cached",
+            "--outdir", str(work), str(work / "resume.tex")]
+    for run in (1, 2):
+        proc = subprocess.run(  # noqa: S603 - fixed argv, fixture input
+            argv, cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+            text=True, timeout=120, check=False)
+        out += f"--- run {run} exit {proc.returncode}\n{(proc.stdout + proc.stderr)[-2500:]}\n"
+    out = out.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+    print(f"::error title=tectonic without rlimits::{out}")
 
 
 async def main() -> None:
