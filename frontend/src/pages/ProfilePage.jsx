@@ -14,7 +14,7 @@ import { ApiError } from '@/services/apiClient';
 // Rough notes are fine (PROF-6); every section takes more than one entry (PROF-7).
 // GET /profile (404 = no profile yet) and PUT /profile with expected_version (409 = changed elsewhere).
 
-const PERSONAL_FIELDS = [['name', 'Full name'], ['city', 'City, country'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['linkedin', 'LinkedIn', 'url'], ['github', 'GitHub or portfolio', 'url']];
+const PERSONAL_FIELDS = [['name', 'Full name'], ['city', 'City, country'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['linkedin', 'LinkedIn', 'url'], ['github', 'GitHub', 'url'], ['portfolio', 'Portfolio', 'url']];
 const ROLE_FIELDS = [['role', 'Role'], ['company', 'Company'], ['start', 'Start'], ['end', 'End'], ['location', 'Location']];
 const EDU_FIELDS = [['school', 'School'], ['degree', 'Degree'], ['years', 'Years'], ['city', 'City']];
 const SECTION_IDS = { personal: 'pf-personal', experience: 'pf-exp', projects: 'pf-proj', education: 'pf-edu', skills: 'pf-skills' };

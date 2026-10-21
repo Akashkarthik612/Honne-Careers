@@ -53,6 +53,14 @@ class Database:
             await conn.execute(SET_CLAIMS_SQL, (claims_json(user_id),))
             yield conn
 
+    @asynccontextmanager
+    async def maintenance_session(self) -> AsyncIterator[AsyncConnection]:
+        """A transaction as honne_backend itself, for the daily clean-up only (Day 2 §4).
+        That role owns nothing and has no table grants: all it can do here is call the
+        app.janitor_* functions granted to it."""
+        async with self._pool.connection() as conn, conn.transaction():
+            yield conn
+
     async def ping(self) -> None:
         async with self._pool.connection() as conn:
             await conn.execute("select 1")

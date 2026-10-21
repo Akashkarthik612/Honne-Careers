@@ -16,6 +16,8 @@ from urllib.parse import urlparse
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
+from app.domain.markup import well_formed
+
 ITEM_ID = r"^[A-Za-z0-9_-]{1,40}$"
 
 
@@ -147,7 +149,7 @@ class CvContent(Model):
 
 class BulletIn(Model):
     id: ItemId
-    text: BulletText
+    text: Annotated[BulletText, AfterValidator(well_formed)]  # **bold** is the only markup
 
 
 class ExperienceIn(Model):

@@ -55,3 +55,21 @@ export const settleBullet = (id, bulletId, action, expectedVersion) => apiReques
 // ── PDF and analysis (PDF-2, ANA-1…4) ───────────────────────────────────────
 export const buildPdf = (id) => apiRequest(`/resumes/${id}/pdf`, { method: 'POST' });
 export const runAnalysis = (id) => apiRequest(`/resumes/${id}/analysis`, { method: 'POST' });
+
+// ── application Database (Day 2: SAVE-1/3, IQ-1/2/3) ────────────────────────
+// Called right after Download PDF. Safe to repeat: one JD = one row (src/services/applicationSaver.js).
+export const recordApplication = (resumeId) => apiRequest(`/resumes/${resumeId}/application`, { method: 'POST' });
+// { retention_days, items: [summary] }, newest first. Rows past the retention window are never returned.
+export function listApplications({ statuses = [], q = '' } = {}) {
+  const params = new URLSearchParams();
+  if (statuses.length) params.set('status', statuses.join(','));
+  if (q.trim()) params.set('q', q.trim());
+  const qs = params.toString();
+  return apiRequest(`/applications${qs ? `?${qs}` : ''}`);
+}
+export const getApplication = (id) => apiRequest(`/applications/${id}`);
+export const addApplication = (body) => apiRequest('/applications', json('POST', body));
+// Only the fields given change. 409 stale_version when another tab saved first.
+export const patchApplication = (id, body) => apiRequest(`/applications/${id}`, json('PATCH', body));
+export const applicationPdf = (id) => apiRequest(`/applications/${id}/pdf`);
+export const deleteApplication = (id) => apiRequest(`/applications/${id}`, { method: 'DELETE' });

@@ -37,7 +37,7 @@ const SUBS = {
 };
 const SCRATCH_SUBS = { ...SUBS, experience: 'Your real work, in your own words.' };
 
-const PERSONAL_FIELDS = [['name', 'Full name'], ['city', 'City, country'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['linkedin', 'LinkedIn', 'url', 'https://linkedin.com/in/…'], ['github', 'GitHub or portfolio', 'url', 'https://github.com/…']];
+const PERSONAL_FIELDS = [['name', 'Full name'], ['city', 'City, country'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['linkedin', 'LinkedIn', 'url', 'https://linkedin.com/in/…'], ['github', 'GitHub', 'url', 'https://github.com/…'], ['portfolio', 'Portfolio', 'url', 'https://…']];
 const ROLE_FIELDS = [['role', 'Role'], ['company', 'Company'], ['start', 'Start'], ['end', 'End'], ['location', 'Location']];
 const EDU_FIELDS = [['school', 'School'], ['degree', 'Degree'], ['years', 'Years'], ['city', 'City']];
 

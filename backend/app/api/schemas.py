@@ -1,13 +1,23 @@
 """HTTP request/response shapes. Responses expose content; never internal columns
 like storage paths."""
 
+from datetime import date
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, StringConstraints, model_validator
 
+from app.domain.applications import (
+    NOTES_MAX,
+    ApplicationStatus,
+    RecordResult,
+    Referral,
+    RetentionWindow,
+)
 from app.domain.cv import CvContentIn, Model
 from app.domain.records import (
     AnalysisRow,
+    ApplicationDetail,
+    ApplicationSummary,
     JdRow,
     ProfileRow,
     ResumeRow,
@@ -45,6 +55,45 @@ class SaveSettings(Model):
 
 class ExpectedVersion(Model):
     expected_version: int | None = Field(default=None, ge=1)
+
+
+AppText = Annotated[str, StringConstraints(min_length=1, max_length=200)]
+Notes = Annotated[str, StringConstraints(max_length=NOTES_MAX)]
+
+
+class AddApplication(Model):
+    """IQ-3: an application made outside Honne. The JD is optional."""
+    company: AppText
+    role: AppText
+    applied_on: date | None = None  # None = today
+    status: ApplicationStatus = "applied"
+    referral: Referral | None = None
+    notes: Notes | None = None
+    jd_text: Annotated[str, StringConstraints(min_length=1, max_length=20000)] | None = None
+
+
+class ApplicationPatch(Model):
+    """Only the fields sent are changed. referral/notes may be null (cleared)."""
+    expected_version: int = Field(ge=1)
+    status: ApplicationStatus | None = None
+    referral: Referral | None = None
+    notes: Notes | None = None
+    company: AppText | None = None
+    role: AppText | None = None
+    applied_on: date | None = None
+
+    @model_validator(mode="after")
+    def _required_stay_set(self) -> "ApplicationPatch":
+        for name in ("status", "company", "role", "applied_on"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} can't be cleared")
+        return self
+
+    def changes(self) -> dict[str, Any]:
+        fields = {k: getattr(self, k) for k in self.model_fields_set if k != "expected_version"}
+        if fields.get("notes") == "":
+            fields["notes"] = None
+        return fields
 
 
 def summary_view(s: ResumeSummary) -> dict[str, Any]:
@@ -89,3 +138,34 @@ def profile_view(p: ProfileRow) -> dict[str, Any]:
 def analysis_view(row: AnalysisRow, cached: bool) -> dict[str, Any]:
     return {"keyword": row.keyword_score, "experience": row.experience_score,
             "narrative": row.narrative_score, "details": row.details, "cached": cached}
+
+
+def application_summary_view(s: ApplicationSummary, window: RetentionWindow) -> dict[str, Any]:
+    return {"id": str(s.id), "source": s.source, "company": s.company, "role": s.role,
+            "applied_on": s.applied_on.isoformat(), "status": s.status,
+            "referral": s.referral, "has_jd": s.has_jd, "has_pdf": s.has_pdf,
+            "has_notes": s.has_notes, "last_sent_at": s.last_sent_at.isoformat(),
+            "deletes_on": window.deletes_on(s.last_sent_at).date().isoformat(),
+            "row_version": s.row_version}
+
+
+def applications_view(items: list[ApplicationSummary], window: RetentionWindow
+                      ) -> dict[str, Any]:
+    return {"retention_days": window.days,
+            "items": [application_summary_view(s, window) for s in items]}
+
+
+def application_view(d: ApplicationDetail, window: RetentionWindow) -> dict[str, Any]:
+    return {**application_summary_view(d.summary, window),
+            "jd_text": d.jd_text,
+            "cv_content": d.cv_content.model_dump(mode="json") if d.cv_content else None,
+            "notes": d.notes, "page_count": d.page_count,
+            "resume_id": str(d.resume_id) if d.resume_id else None,
+            "events": [{"from": e.from_status, "to": e.to_status, "at": e.at.isoformat()}
+                       for e in d.events]}
+
+
+def record_view(r: RecordResult) -> dict[str, Any]:
+    return {"saved": r.saved, "reason": r.reason,
+            "application_id": str(r.application_id) if r.application_id else None,
+            "deletes_on": r.deletes_on.date().isoformat() if r.deletes_on else None}

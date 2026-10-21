@@ -9,6 +9,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from app.domain.cv import CvContent, ExperienceItem, Origin, ProjectItem
+from app.domain.markup import plain
 from app.domain.tailoring import PrefillCv
 from app.domain.truth import FactSet
 from app.truth.text import norm_skill, numbers_in, skills_in, words_in, years_in
@@ -23,6 +24,7 @@ class FactSetBuilder:
         numbers: dict[str, set[str]] = defaultdict(set)
 
         def add_text(text: str, item_id: str | None = None) -> None:
+            text = plain(text)  # **bold** markers are formatting, not facts
             vocabulary.update(words_in(text))
             dates.update(years_in(text))
             skills.update(skills_in(text))

@@ -1,20 +1,24 @@
 import { useCallback, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { AlertCircle, Check, ChevronDown, Download, ExternalLink, Maximize2, PenLine, X } from 'lucide-react';
-import CvDoc from '@/components/CvDoc';
+import { AlertCircle, Check, ChevronDown, Database, Download, ExternalLink, Maximize2, PenLine, X } from 'lucide-react';
+import CvDoc, { BulletText } from '@/components/CvDoc';
 import { ErrorBanner, PageLoading } from '@/components/Status';
+import { shortDate } from '@/data/applications';
 import { bulletToDoc, toResume } from '@/data/cvAdapter';
 import { SKILL_GROUPS, docChanges, docToCv } from '@/data/cvModel';
 import { templateName } from '@/data/templates';
 import useResource from '@/hooks/useResource';
 import { buildPdf, getProfile, getResume, getSettings, saveResumeToProfile, settleBullet, startTailor } from '@/services/api';
 import { errorText } from '@/services/apiClient';
+import { clearPending, isRetryable, markPending, saveWithRetry } from '@/services/applicationSaver';
 import AnalysisSection from './AnalysisSection';
 
 // "Your CV is ready" (design: Preview.dc.html): download, what changed, full screen, analysis.
 // Download = POST /resumes/{id}/pdf (LaTeX, reused when the content is unchanged) → a short-lived signed
 // URL. "Also save to my profile" = POST save-to-profile, which keeps the user's facts and never the AI
 // wording (TRUTH-1). Proposed AI bullets can be kept or reverted here (B6).
+// After the PDF opens, the download is saved to the Database (SAVE-1: POST /resumes/{id}/application) with a
+// bounded retry; if it still fails it is kept as pending and retried on the next visit (applicationSaver.js).
 
 function WhiteSpinner() {
   return (
@@ -52,6 +56,7 @@ function CvReady({ initial, askSave }) {
   const navigate = useNavigate();
   const [resume, setResume] = useState(initial);
   const [dl, setDl] = useState({ phase: 'idle' }); // idle | busy | done {url, pages} | fail {error}
+  const [db, setDb] = useState({ phase: 'idle' }); // idle | saving | saved {deletesOn} | skipped | failed {error, pending}
   const [saveToProfile, setSaveToProfile] = useState(true);
   const [profileError, setProfileError] = useState(null);
   const [settleError, setSettleError] = useState(null);
@@ -80,12 +85,28 @@ function CvReady({ initial, askSave }) {
     }
     setDl({ phase: 'done', url: pdf.url, pages: pdf.page_count });
     window.open(pdf.url, '_blank', 'noopener');
+    saveToDatabase(); // its own status line; never blocks or hides the download
     if (askSave && !saveToProfile) return;
     try {
       const profile = await getProfile();
       await saveResumeToProfile(resume.id, profile ? profile.row_version : null);
     } catch (e) {
       setProfileError(e);
+    }
+  }
+
+  // SAVE-1: the CV downloaded for this JD is the one sent. Retries errors that can fix themselves, then keeps
+  // it as pending for the next visit; errors that can't (signed out, CV changed) stop at once.
+  async function saveToDatabase() {
+    setDb({ phase: 'saving' });
+    try {
+      const r = await saveWithRetry(resume.id);
+      clearPending(resume.id);
+      setDb(r.saved ? { phase: 'saved', deletesOn: r.deletes_on } : { phase: 'skipped' });
+    } catch (e) {
+      const pending = isRetryable(e);
+      if (pending) markPending(resume.id);
+      setDb({ phase: 'failed', error: e, pending });
     }
   }
 
@@ -142,6 +163,19 @@ function CvReady({ initial, askSave }) {
         )}
         <ErrorBanner error={retryError} />
         {dl.phase === 'done' && dl.pages > 1 && <ErrorBanner error={`Your CV runs to ${dl.pages} pages. Recruiters prefer one; trim a few bullets if you can.`} />}
+        {db.phase === 'saving' && <p role="status" style={{ margin: '12px 0 0', fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Saving to your Database…</p>}
+        {db.phase === 'saved' && (
+          <p role="status" className="hc-rise" style={{ margin: '12px 0 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>
+            <Database size={15} color="var(--hc-success)" aria-hidden="true" />
+            Saved to your <Link to="/database">Database</Link> with its JD · deletes on {shortDate(db.deletesOn)}
+          </p>
+        )}
+        {db.phase === 'failed' && (
+          <ErrorBanner
+            error={`We couldn’t save it to your Database${db.pending ? ' (we’ll try again next time you open Honne)' : ''}: ${errorText(db.error)}`}
+            action={db.error?.code === 'pdf_outdated' ? { label: 'Download again', onClick: download } : { label: 'Try again', onClick: saveToDatabase }}
+          />
+        )}
         {profileError && <ErrorBanner error={`Your PDF is ready, but saving to your profile failed: ${errorText(profileError)}`} />}
         {dl.phase === 'fail' && (
           <div role="alert" className="hc-rise hc-err" style={{ marginTop: 14, borderRadius: 14, padding: '12px 14px', fontSize: 14 }}>
@@ -175,7 +209,7 @@ function CvReady({ initial, askSave }) {
                   <div key={c.id} style={{ border: '1px solid var(--hc-hairline)', borderRadius: 14, padding: 14 }}>
                     <div className="hc-lbl" style={{ marginBottom: 8 }}>{c.where}</div>
                     <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--hc-ink-muted)', textDecoration: 'line-through', textDecorationColor: 'var(--hc-ink-faint)' }}>{c.before}</div>
-                    <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.55, background: '#EEF1FD', borderRadius: 10, padding: '8px 10px' }}>{c.after}</div>
+                    <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.55, background: '#EEF1FD', borderRadius: 10, padding: '8px 10px' }}><BulletText text={c.after} /></div>
                     {c.status === 'review' && (
                       <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
                         <button type="button" className="hc-btn-sm" onClick={() => settle(c.id, 'keep')} style={{ border: 0, background: 'var(--hc-brand)', color: '#FFFFFF' }}><Check size={13} strokeWidth={3} aria-hidden="true" />Keep</button>

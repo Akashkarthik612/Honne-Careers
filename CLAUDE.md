@@ -54,9 +54,12 @@ Tests: `tests/unit`, `tests/golden` (truth-check cases), `tests/contract` (front
 - **Tenancy is enforced twice.** Every DB call goes through `UnitOfWork` (`app/db`), which does `SET LOCAL ROLE authenticated` + JWT claims so RLS applies; repositories also filter by `user_id`. The login role `honne_backend` owns nothing. Another user's id → 404, never 403.
 - **Client input shapes (`*In`) carry ids + text only.** `EditStamper` stamps `origin`/`locked` server-side (B5). Never accept origin/locked from a client.
 - **The model never writes LaTeX or structural fields.** Agents return JSON; `TruthChecker` checks AI output against `FactSet` (item-scoped numbers, skills, dates, names); `ResumeMerger` drops edits to locked bullets and keeps originals for violations.
+- **`**bold**` is the only markup a bullet may carry** (`app/domain/markup.py`; frontend mirror `boldParts` in `cvModel.js`). The tailor agents bold 1–3 JD skills/metrics per bullet; `TruthChecker` rejects malformed bold, more than 3 spans, spans over 4 words, and bold on anything that isn't a user skill or one of the item's numbers (`Rule.BAD_BOLD`). Fact building, truth checks and the analyst read `plain(text)`; `LatexRenderer.rich` emits `	extbf`. Client bullets with malformed `**` get a 422.
 - **Agents are config** (`backend/agents/*.yaml` + `backend/prompts/`). `AgentRunner` owns retries, untrusted-data wrapping and the `agent_runs` record. Add an agent by adding files, not code.
 - **No transaction is held across an LLM call, compile or storage call.** Services: short UoW → slow call → short UoW with optimistic concurrency.
-- Never log CV/JD text; `tests/integration/test_logging_privacy.py` enforces it.
+- Never log CV/JD text (or Database notes); `tests/integration/test_logging_privacy.py` enforces it.
+- **Application Database retention** (Day 2): rows keep only `last_sent_at`; `APPLICATION_RETENTION_DAYS` (20) is the one place the number lives. Every user-facing read filters `last_sent_at >= cut-off` (`ApplicationRepository` takes the cut-off), and `RetentionJanitor` (daily, `JanitorLoop` in the container) deletes old rows: files first, then rows. The janitor is the only cross-tenant code: it runs as `honne_backend` without `SET ROLE` (`Database.maintenance_session`) and can only call the `app.janitor_*` SECURITY DEFINER functions, which refuse a cut-off newer than 1 day. Storage deletes across users go through `StorageAdmin` (service-role key, application-PDF paths only).
+- **Tracing** (`app/agents/tracing.py`): `Tracer` port, `LangSmithTracer` when `LANGSMITH_TRACING=true` (needs `LANGSMITH_API_KEY`, else startup fails), `NoopTracer` otherwise. One span per agent run, nested under `tailor_job` / `bullet_tailor_job`. Metadata only: never put CV/JD/model text in a span, and a failed span records only the exception class.
 
 ## AI agents and system prompts
 
@@ -64,8 +67,8 @@ One agent per AI task, no orchestration (Day_1 A2 #2). Each is a YAML config plu
 
 | Agent | Used by | Tier | Config | System prompt |
 |---|---|---|---|---|
-| `cv_tailor` | "Tailor my CV" job (`POST /resumes/{id}/tailor`) | strong | `backend/agents/cv_tailor.yaml` | `backend/prompts/cv_tailor/v1.md` (adapted `cv-jd-tailoring` skill, B4) |
-| `bullet_tailor` | Wizard "Tailor to JD" on one bullet | strong | `backend/agents/bullet_tailor.yaml` | `backend/prompts/bullet_tailor/v1.md` |
+| `cv_tailor` | "Tailor my CV" job (`POST /resumes/{id}/tailor`) | strong | `backend/agents/cv_tailor.yaml` | `backend/prompts/cv_tailor/v2.md` (adapted `cv-jd-tailoring` skill, B4; v2 bolds keywords) |
+| `bullet_tailor` | Wizard "Tailor to JD" on one bullet | strong | `backend/agents/bullet_tailor.yaml` | `backend/prompts/bullet_tailor/v2.md` (v2 bolds keywords) |
 | `cv_parser` | CV upload / LaTeX paste → pre-fill | light | `backend/agents/cv_parser.yaml` | `backend/prompts/cv_parser/v1.md` |
 | `cv_analyst` | "Start analysis" (judgments + evidence; Python computes the %) | light | `backend/agents/cv_analyst.yaml` | `backend/prompts/cv_analyst/v1.md` |
 
@@ -103,7 +106,7 @@ CI (`.github/workflows/frontend.yml`, on PRs and pushes to `test`/`main` touchin
 
 Ported from the Claude Design canvas "Honne Careers Landing Page" and the "Honne" design system; mirrors the conventions of the sibling Honne AI frontend (Vite, react-router, lucide-react, `@/` → `src/` alias, inline style objects). Tailwind is deliberately not used — its preflight reset breaks the design's inline SVG icons.
 
-Routes (`src/App.jsx`): `/` landing, `/login` sign in, `/auth/callback` (Google returns here), then inside `RequireAuth` + `AppShell` (collapsible `Sidebar` + page): `/resumes` dashboard, `/new/template` → `/new/mode` → `/new/jd` → `/new/details?resume=<id>` (wizard) or `/tailoring/:id` (returning user), `/cv/:id` "Your CV is ready", `/profile`, `/settings`. `/home` redirects to `/resumes`.
+Routes (`src/App.jsx`): `/` landing, `/login` sign in, `/auth/callback` (Google returns here), then inside `RequireAuth` + `AppShell` (collapsible `Sidebar` + page): `/resumes` dashboard, `/new/template` → `/new/mode` → `/new/jd` → `/new/details?resume=<id>` (wizard) or `/tailoring/:id` (returning user), `/cv/:id` "Your CV is ready", `/profile`, `/database` (application Database), `/settings`. `/home` redirects to `/resumes`.
 
 Auth (AUTH-1, beta = Google only):
 - `src/services/supabaseClient.js` — the one supabase-js client (PKCE). Throws at load if `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` are missing; no placeholder fallback.
@@ -118,14 +121,15 @@ Styling has two separate layers — keep them separate:
 
 Data (all from the API; nothing seeded):
 - `src/services/api.js` — one function per endpoint. Screens call these, never `fetch`. `getProfile()` resolves `null` for 404 `no_profile`; every other error throws.
-- `src/data/cvAdapter.js` — **the one adapter** between server shapes and UI shapes: `contentToDoc` derives each bullet's `status` from `origin`/`locked`/`tailor_state` (proposed → `review`, kept → `kept`, locked → `edited`); `docToContentIn`/`sectionPatch` send ids + text only (B5). A `review` bullet is sent back unchanged so the server keeps the proposal. Also `validateDoc` (the API's required fields and http(s) links, shown on the field; never auto-fixed), `toResume`/`toSummary` (`state` = draft/tailoring/failed/ready; wizard_step `done` counts as ready), `toAnalysis`, `prefillToDoc`/`mergePrefill` (upload pre-fill fills only empty sections).
+- `src/data/cvAdapter.js` — **the one adapter** between server shapes and UI shapes: `contentToDoc` derives each bullet's `status` from `origin`/`locked`/`tailor_state` (proposed → `review`, kept → `kept`, locked → `edited`); `docToContentIn`/`sectionPatch` send ids + text only (B5). A `review` bullet is sent back unchanged so the server keeps the proposal. Also `validateDoc` (the API's required fields and http(s) links, shown on the field; never auto-fixed), header links (three fields: LinkedIn, GitHub, Portfolio, sent with those labels; other links ride along in `otherLinks`; CV shows the label, linked), `toResume`/`toSummary` (`state` = draft/tailoring/failed/ready; wizard_step `done` counts as ready), `toAnalysis`, `prefillToDoc`/`mergePrefill` (upload pre-fill fills only empty sections).
 - `src/data/cvModel.js` — pure helpers between **profile** (facts, PROF-1), **doc** (per bullet `source` = fact, `text` = CV wording) and **cv** (what `CvDoc` renders).
 - `src/hooks/useResource.js` — load + loading/error/reload for a screen (no fallback data). `src/hooks/useTailorJob.js` — polls `GET /resumes/{id}` (bounded: `src/config/limits.js`) and maps `job_step` to the steps shown (TAIL-3); `pollTailorJob` is the pure, tested loop.
 - `src/state/` — `AppStoreProvider` holds only the new-resume draft (template, mode, JD text, company/role, upload pre-fill).
 - `src/components/Status.jsx` — `PageLoading` and `ErrorBanner` (message + reference + Retry/Reload).
+- `src/data/applications.js` — the Database screen's adapter (`toApplicationList`, `toApplicationDetail`, `summaryOf`, `manualToRequest`, `patchRequest`) and helpers (outcome-only `STATUSES`, `REFERRALS` with null = "—", filters, board grouping). `src/services/applicationSaver.js` — save-on-download with the agreed retry: network/5xx only, bounded back-off (`RECORD_RETRY_*` in `limits.js`), then "pending" in localStorage, retried by `AppShell` on the next visit (`PENDING_SAVE_MAX_VISITS`).
 - `src/data/templatePreview.js` — illustrative content for the template picker's thumbnail only; never user data.
 
-`src/components/CvDoc.jsx` renders a CV (`focus` highlights the section being edited; `CvThumb` is the scaled card thumbnail). Which templates are live comes from `GET /templates` (Jake only); the rest of `src/data/templates.js` shows as "Coming soon". Chat edits (CHAT-1…4) are not in this design and have no UI. Download builds the LaTeX PDF; the SAVE-1 application record is not built yet.
+`src/components/CvDoc.jsx` renders a CV (`focus` highlights the section being edited; `CvThumb` is the scaled card thumbnail). Which templates are live comes from `GET /templates` (Jake only); the rest of `src/data/templates.js` shows as "Coming soon". Chat edits (CHAT-1…4) are not in this design and have no UI. Download builds the LaTeX PDF, then saves the download to the Database (SAVE-1).
 
 ## Frontend ↔ backend wiring (Day 2, 19 Oct 2026)
 
@@ -142,9 +146,12 @@ Every screen is wired; `mockApi.js`, the seeded store, `?user=new` and `?sim=` a
 | CV ready | `GET /resumes/{id}`, `GET /settings`, `POST /resumes/{id}/pdf` (signed URL), Keep/Revert in "What changed", save to profile (respects `ask_before_save`) |
 | Analysis | `POST /resumes/{id}/analysis` |
 | Profile | `GET /profile`, `PUT /profile` with `expected_version` (409 → Reload) |
-| Settings | `GET/PUT /settings` (display name, ask-before-save, product emails), `DELETE /me`, export = `GET /profile` + `GET /resumes` |
+| Settings | `GET/PUT /settings` (display name, ask-before-save, product emails), `DELETE /me`, export = `GET /profile` + `GET /resumes` + `GET /applications` (+ each `GET /applications/{id}`) |
+| Database (`/database`) | `GET /applications` (`retention_days` + summaries, no text), `GET /applications/{id}` (JD, CV sent, notes, history), `PATCH /applications/{id}` with `expected_version` (409 → Reload), `GET /applications/{id}/pdf`, `POST /applications` (add by hand), `DELETE /applications/{id}`; CV ready calls `POST /resumes/{id}/application` after Download PDF |
 
-Backend additions for this (migration `20261019000001`): `resumes.job_step`, `user_settings` table (RLS forced), `PUT /jd` optional `company`/`role`, `GET/PUT /settings`. Truth fix (TRUTH-1): Keep keeps `original_text`; re-tailoring and save-to-profile use the fact behind an AI bullet (`truth/copying.py: fact_text`, raises `FactMissing` rather than guessing).
+Day 2 Database (migration `20261021000001`): `applications` (one per JD: `unique(user_id, jd_id)`; CV sent as a JSON snapshot + our own PDF copy at `{user}/applications/{id}/{hash}.pdf`, made with a storage-side copy; deleting the resume card keeps it), `application_events` (status history, append-only), `storage_trash` (old PDFs whose delete failed; the janitor empties it), `maintenance_runs`, and the `app.janitor_*` functions (EXECUTE for `honne_backend` only). Re-download for the same JD replaces the CV + PDF, deletes the old PDF and restarts the clock; status/referral/notes stay. Statuses are outcome only (applied/interview/offer/rejected/no_reply); referral is yes/asked/no/null.
+
+Backend additions for the wiring (migration `20261019000001`): `resumes.job_step`, `user_settings` table (RLS forced), `PUT /jd` optional `company`/`role`, `GET/PUT /settings`. Truth fix (TRUTH-1): Keep keeps `original_text`; re-tailoring and save-to-profile use the fact behind an AI bullet (`truth/copying.py: fact_text`, raises `FactMissing` rather than guessing).
 
 ### Frontend ↔ backend contract
 

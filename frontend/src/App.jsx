@@ -13,6 +13,7 @@ import TailoringPage from './pages/new/TailoringPage';
 import CvReadyPage from './pages/cv/CvReadyPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
+import DatabasePage from './pages/DatabasePage';
 
 // Landing, sign-in and the OAuth callback are public; every app screen needs a signed-in user (AUTH-1).
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/tailoring/:id" element={<TailoringPage />} />
         <Route path="/cv/:id"       element={<CvReadyPage />} />
         <Route path="/profile"      element={<ProfilePage />} />
+        <Route path="/database"     element={<DatabasePage />} />
         <Route path="/settings"     element={<SettingsPage />} />
       </Route>
       <Route path="/home" element={<Navigate to="/resumes" replace />} />

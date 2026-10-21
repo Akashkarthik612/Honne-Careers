@@ -104,11 +104,7 @@ class ResumeService:
                      company: str | None = None, role: str | None = None) -> JdRow:
         """company/role from the client are the user's correction (SAVE-2) and replace what
         the heuristic or an earlier paste stored; omitted ones keep the stored/detected value."""
-        text = text.strip()
-        words = len(text.split())
-        if not 1 <= words <= JD_MAX_WORDS:
-            raise InvalidInput(f"Paste a job description of 1 to {JD_MAX_WORDS} words.",
-                               reason="jd_length", word_count=words)
+        text, words = checked_jd(text)
         detected_company, detected_role = _detect_company_role(text)
         async with self._uow(user.id) as uow:
             jd = await uow.jds.upsert(user.id, text, words, text_hash(text),
@@ -122,6 +118,16 @@ class ResumeService:
                 raise JobAlreadyRunning(reason="set_jd_during_tailor")
         log.info("resume_jd_set", resume_id=resume_id, jd_id=jd.id, word_count=words)
         return jd
+
+
+def checked_jd(text: str) -> tuple[str, int]:
+    """TAIL-1: 1..1000 words. Returns the stripped text and its word count."""
+    text = text.strip()
+    words = len(text.split())
+    if not 1 <= words <= JD_MAX_WORDS:
+        raise InvalidInput(f"Paste a job description of 1 to {JD_MAX_WORDS} words.",
+                           reason="jd_length", word_count=words)
+    return text, words
 
 
 def _default_title() -> str:

@@ -17,7 +17,8 @@ from app.db.session import SET_CLAIMS_SQL, SET_ROLE_SQL, claims_json
 pytestmark = pytest.mark.db
 
 TABLES = ["user_accounts", "personal_profiles", "cv_uploads", "job_descriptions",
-          "agent_runs", "resumes", "cv_analyses", "usage_events", "user_settings"]
+          "agent_runs", "resumes", "cv_analyses", "usage_events", "user_settings",
+          "applications", "application_events", "storage_trash"]
 H = hashlib.sha256(b"x").hexdigest()
 
 
@@ -53,9 +54,15 @@ def a_rows(database: str, users: tuple[uuid.UUID, uuid.UUID]) -> dict[str, uuid.
                   " values (%s, %s, %s, %s, 1, 1, 1, '{}', %s)", (a, res, H, H, run))
         c.execute("insert into app.usage_events (user_id, action) values (%s, 'pdf')", (a,))
         c.execute("insert into app.user_settings (user_id) values (%s)", (a,))
+        app = c.execute("insert into app.applications (user_id, jd_id, resume_id, source,"
+                        " cv_content) values (%s, %s, %s, 'honne', '{}') returning id",
+                        (a, jd, res)).fetchone()[0]
+        c.execute("insert into app.application_events (user_id, application_id, to_status)"
+                  " values (%s, %s, 'applied')", (a, app))
+        c.execute("insert into app.storage_trash (user_id, path) values (%s, 'x')", (a,))
         c.execute("insert into storage.objects (bucket_id, name) values ('cv-files', %s)",
                   (f"{a}/resumes/{res}/{H}.pdf",))
-    return {"upload": up, "jd": jd, "run": run, "resume": res}
+    return {"upload": up, "jd": jd, "run": run, "resume": res, "application": app}
 
 
 @pytest.mark.parametrize("table", TABLES)
@@ -72,7 +79,7 @@ def test_other_user_reads_nothing(database, users, a_rows, table):
         assert c.execute(f"select count(*) from app.{table}").fetchone()[0] == 0  # noqa: S608
 
 
-@pytest.mark.parametrize("table", ["personal_profiles", "resumes"])
+@pytest.mark.parametrize("table", ["personal_profiles", "resumes", "applications"])
 def test_other_user_cannot_update_or_delete(database, users, a_rows, table):
     a, b = users
     with as_user(database, b) as c:
@@ -138,3 +145,48 @@ def test_storage_other_user_sees_and_writes_nothing(database, users, a_rows):
                   (f"{a}/uploads/evil.pdf",))
     with as_user(database, a) as c:
         assert c.execute("select count(*) from storage.objects").fetchone()[0] == 1
+
+
+def test_application_history_is_append_only(database, users, a_rows):
+    a, _ = users
+    with pytest.raises(errors.InsufficientPrivilege), as_user(database, a) as c:
+        c.execute("update app.application_events set to_status = 'offer'")
+
+
+def test_cannot_attach_an_application_to_another_users_jd(database, users, a_rows):
+    _, b = users
+    with as_user(database, b) as c:
+        c.execute("insert into app.user_accounts (user_id) values (%s) on conflict do nothing",
+                  (b,))
+    with pytest.raises(errors.ForeignKeyViolation), as_user(database, b) as c:
+        c.execute("insert into app.applications (user_id, jd_id, source, cv_content)"
+                  " values (%s, %s, 'honne', '{}')", (b, a_rows["jd"]))
+
+
+@pytest.mark.parametrize("call", [
+    "select app.janitor_claim('x', interval '1 day')",
+    "select * from app.janitor_expired_applications(now() - interval '30 days', 10)",
+    "select * from app.janitor_purge_applications('{}'::uuid[], now() - interval '30 days')",
+    "select * from app.janitor_trash(10)",
+    "select app.janitor_trash_done('{}'::uuid[])",
+])
+def test_requests_cannot_call_the_cleanup(database, users, a_rows, call):
+    """Only the clean-up job (honne_backend without SET ROLE) may cross tenants."""
+    a, _ = users
+    with pytest.raises(errors.InsufficientPrivilege), as_user(database, a) as c:
+        c.execute(call)
+
+
+def test_users_cannot_read_maintenance_runs(database, users, a_rows):
+    a, _ = users
+    with pytest.raises(errors.InsufficientPrivilege), as_user(database, a) as c:
+        c.execute("select * from app.maintenance_runs")
+
+
+def test_cleanup_refuses_a_recent_cutoff(database, a_rows):
+    """A caller bug can never purge fresh rows: cut-offs newer than one day are rejected."""
+    with pytest.raises(errors.RaiseException), psycopg.connect(database) as c:
+        c.execute("select * from app.janitor_purge_applications(%s::uuid[], now())",
+                  ([a_rows["application"]],))
+    with pytest.raises(errors.RaiseException), psycopg.connect(database) as c:
+        c.execute("select * from app.janitor_expired_applications(now(), 10)")

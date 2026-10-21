@@ -1,10 +1,10 @@
 id: bullet_tailor
-version: 1
+version: 2
 description: Rewrites one bullet in the JD's terms using only its own facts
 model_tier: strong
 temperature: 0.2
 max_output_tokens: 512
-instructions: prompts/bullet_tailor/v1.md
+instructions: prompts/bullet_tailor/v2.md
 input_schema: BulletTailorInput
 output_schema: BulletTailorOutput
 tools: []

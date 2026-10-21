@@ -20,7 +20,13 @@ from app.agents.providers.fake import FakeProvider
 from app.container import Container, build_container
 from app.core.config import Settings
 from app.main import create_app
-from tests.fakes import FakeAdmin, FakeFileStore, FakeLatexCompiler, FakeVerifier
+from tests.fakes import (
+    FakeAdmin,
+    FakeFileStore,
+    FakeLatexCompiler,
+    FakeStorageAdmin,
+    FakeVerifier,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 MIGRATIONS = sorted((ROOT / "supabase" / "migrations").glob("*.sql"))
@@ -92,6 +98,7 @@ class Api:
     files: FakeFileStore
     compiler: FakeLatexCompiler
     admin_url: str
+    storage_admin: FakeStorageAdmin
 
     def new_user(self) -> dict[str, str]:
         """Auth headers for a brand-new user."""
@@ -104,19 +111,21 @@ def make_settings(database_url: str) -> Settings:
         supabase_url="https://proj.supabase.test", supabase_anon_key="anon",
         supabase_service_role_key="service", cors_origins="https://app.test",
         llm_strong="fake:strong", llm_light="fake:light", gemini_api_key="unused",
-        llm_backoff_base_s=0.001,
+        llm_backoff_base_s=0.001, janitor_enabled=False,  # tests call the janitor directly
     )
 
 
 @pytest.fixture
 async def api(database: str, admin_url: str) -> AsyncIterator[Api]:
     provider, files, compiler = FakeProvider(), FakeFileStore(), FakeLatexCompiler()
+    storage_admin = FakeStorageAdmin(files)
     container = build_container(make_settings(database), providers={"fake": provider},
                                 jwt_verifier=FakeVerifier(), files=files,
-                                admin=FakeAdmin(admin_url), compiler=compiler)
+                                admin=FakeAdmin(admin_url), compiler=compiler,
+                                storage_admin=storage_admin)
     await container.start()
     app = create_app(container)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://api.test") as client:
-        yield Api(client, container, provider, files, compiler, admin_url)
+        yield Api(client, container, provider, files, compiler, admin_url, storage_admin)
     await container.stop()
