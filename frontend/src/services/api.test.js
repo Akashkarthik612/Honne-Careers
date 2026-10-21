@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requestFixture, response } from '@/test/contracts';
 import { contentToProfile, prefillToDoc, profileToContentIn, sectionPatch, toResume } from '@/data/cvAdapter';
 import { docToProfile } from '@/data/cvModel';
+import { manualToRequest, patchRequest, toApplicationDetail } from '@/data/applications';
 import * as api from './api';
 import { ApiError, apiRequest } from './apiClient';
 
@@ -34,6 +35,8 @@ describe('request contracts', () => {
     ['profile_put.json', () => api.saveProfile(profileToContentIn(contentToProfile(response('profile.json').content)), 3), 'PUT', '/profile'],
     // A first-time user's profile from an upload, after the wizard made them fix the scheme-less link.
     ['profile_put_new.json', () => api.saveProfile(profileToContentIn(docToProfile(fixedPrefill())), null), 'PUT', '/profile'],
+    ['application_add.json', () => api.addApplication(manualToRequest({ company: 'Dust', role: 'Backend Engineer', sentAt: '2026-10-10', status: 'no_reply', referral: 'yes', notes: 'Referral from Meera', jdText: 'Build event-driven services in Rust.' })), 'POST', '/applications'],
+    ['application_patch.json', () => api.patchApplication('a1', patchRequest(toApplicationDetail(response('application.json')), { status: 'offer', referral: null })), 'PATCH', '/applications/a1'],
     ...['personal', 'experience', 'projects', 'education', 'skills'].map((section) => [
       `resume_patch_${section}.json`, () => api.patchResume('r1', sectionPatch(withLinks, section, 7, section === 'skills' ? 'done' : null)), 'PATCH', '/resumes/r1',
     ]),
@@ -45,6 +48,15 @@ describe('request contracts', () => {
     expect([calledPath, opts.method]).toEqual([path, method]);
     const [actual, expected] = requestFixture(name, opts.body);
     expect(actual).toEqual(expected);
+  });
+
+  it('Database: save after download, list filters as a query string', async () => {
+    await api.recordApplication('r1');
+    expect(sent()).toEqual(['/resumes/r1/application', { method: 'POST' }]);
+    await api.listApplications({ statuses: ['applied', 'offer'], q: ' Zoho ' });
+    expect(sent()[0]).toBe('/applications?status=applied%2Coffer&q=Zoho');
+    await api.listApplications();
+    expect(sent()[0]).toBe('/applications');
   });
 
   it('uploads a file as multipart, not JSON', async () => {

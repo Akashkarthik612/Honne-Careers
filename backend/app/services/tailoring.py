@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.agents.runner import AgentRunner
+from app.agents.tracing import Span, Tracer
 from app.core.errors import (
     AppError,
     InvalidInput,
@@ -89,13 +90,20 @@ def _kind(content: CvContent, item_id: str) -> str:
 
 class BulletTailorService:
     def __init__(self, uow: UnitOfWorkFactory, runner: AgentRunner, quota: QuotaGuard,
-                 entitlements: Entitlements) -> None:
+                 entitlements: Entitlements, tracer: Tracer) -> None:
         self._uow = uow
+        self._tracer = tracer
         self._runner = runner
         self._quota = quota
         self._entitlements = entitlements
 
     async def tailor(self, user: AuthUser, resume_id: UUID, bullet_id: str) -> tuple[Bullet, int]:
+        async with self._tracer.span("bullet_tailor_job", user_id=user.id,
+                                     entity_id=resume_id) as span:
+            return await self._tailor(span, user, resume_id, bullet_id)
+
+    async def _tailor(self, span: Span, user: AuthUser, resume_id: UUID, bullet_id: str
+                      ) -> tuple[Bullet, int]:
         async with self._uow(user.id) as uow:
             ctx = await load_context(uow, user, resume_id)
             if ctx.resume.status == "tailoring":
@@ -116,6 +124,7 @@ class BulletTailorService:
 
         path = f"{_kind(ctx.resume.content, item.id)}[{item.id}].bullets[{bullet_id}]"
         violations = TruthChecker(ctx.facts).check_bullet(item.id, path, run.output.text)
+        span.update(truth_violations=len(violations))
         if violations:
             # B9: suggestion rejected, bullet unchanged. Rules only in details (no text).
             log.warning("bullet_tailor_rejected", resume_id=resume_id, bullet_id=bullet_id,
@@ -170,8 +179,9 @@ class TailorService:
     """Full tailor (returning user's "Tailor my CV", or "Tailor all"): 202 + job + polling."""
 
     def __init__(self, uow: UnitOfWorkFactory, runner: AgentRunner, quota: QuotaGuard,
-                 entitlements: Entitlements, job_timeout_s: int) -> None:
+                 entitlements: Entitlements, job_timeout_s: int, tracer: Tracer) -> None:
         self._uow = uow
+        self._tracer = tracer
         self._runner = runner
         self._quota = quota
         self._entitlements = entitlements
@@ -198,7 +208,9 @@ class TailorService:
                   ) -> None:
         """The job. Any failure marks the resume failed with a code; content is untouched."""
         try:
-            await self._run(user, resume_id, started_version, scope)
+            async with self._tracer.span("tailor_job", user_id=user.id, entity_id=resume_id,
+                                         scope=scope) as span:
+                await self._run(span, user, resume_id, started_version, scope)
         except AppError as exc:
             await self._fail(user, resume_id, exc.code)
             log.warning("tailor_job_failed", resume_id=resume_id, code=exc.code)
@@ -207,8 +219,8 @@ class TailorService:
             log.exception("tailor_job_crashed", resume_id=resume_id)
             await self._fail(user, resume_id, "internal_error")
 
-    async def _run(self, user: AuthUser, resume_id: UUID, started_version: int, scope: str
-                   ) -> None:
+    async def _run(self, span: Span, user: AuthUser, resume_id: UUID, started_version: int,
+                   scope: str) -> None:
         async with self._uow(user.id) as uow:  # job_step 'reading' was set by start()
             ctx = await load_context(uow, user, resume_id)
         content = ctx.resume.content
@@ -237,6 +249,7 @@ class TailorService:
         summary = {"changed": merged.changed, "kept_original": sorted(report.violating_paths()),
                    "dropped_locked": merged.dropped_locked,
                    "rules": sorted({v.rule.value for v in report.violations})}
+        span.update(truth_violations=len(report.violations), changed=merged.changed)
         if not report.passed:
             log.warning("tailor_truth_violations", resume_id=resume_id,
                         count=len(report.violations), rules=summary["rules"])

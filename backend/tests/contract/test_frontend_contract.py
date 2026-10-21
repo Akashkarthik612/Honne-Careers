@@ -21,20 +21,28 @@ from pydantic import BaseModel
 from app.analysis.scores import ScoreCalculator
 from app.api.routes.tailoring import SettleRequest, TailorRequest
 from app.api.schemas import (
+    AddApplication,
+    ApplicationPatch,
     CreateResume,
     SaveProfile,
     SaveSettings,
     SetJd,
     analysis_view,
+    application_view,
+    applications_view,
     profile_view,
+    record_view,
     resume_view,
     settings_view,
     summary_view,
 )
 from app.domain.analysis import AnalysisJudgment
+from app.domain.applications import RecordResult, RetentionWindow
 from app.domain.cv import Bullet, Origin, ResumePatch, TailorState
 from app.domain.records import (
     AnalysisRow,
+    ApplicationDetail,
+    ApplicationSummary,
     JdRow,
     ProfileRow,
     ResumeRow,
@@ -53,6 +61,8 @@ HASH = "a" * 64
 
 # File name -> the input shape that endpoint accepts.
 REQUEST_SHAPES: dict[str, type[BaseModel]] = {
+    "application_add.json": AddApplication,
+    "application_patch.json": ApplicationPatch,
     "create_resume.json": CreateResume,
     "profile_put.json": SaveProfile,
     "profile_put_new.json": SaveProfile,
@@ -137,7 +147,40 @@ def _upload() -> dict:
             "prefill": prefill.model_dump(mode="json")}
 
 
+AID = UUID("33333333-3333-4333-8333-333333333333")
+WINDOW = RetentionWindow(20)
+
+
+def _app_summary(**over) -> ApplicationSummary:
+    base = dict(id=AID, source="honne", company="Freshworks", role="SDE-2 Backend",
+                applied_on=date(2026, 10, 19), status="interview", referral="asked",
+                has_jd=True, has_pdf=True, has_notes=True, last_sent_at=WHEN, row_version=4)
+    return ApplicationSummary(**{**base, **over})
+
+
+def _applications() -> dict:
+    manual = _app_summary(id=RID, source="manual", company="Dust", role="Backend Engineer",
+                          status="no_reply", referral=None, has_jd=False, has_pdf=False,
+                          has_notes=False, row_version=1)
+    return applications_view([_app_summary(), manual], WINDOW)
+
+
+def _application() -> dict:
+    from app.domain.records import StatusEvent
+    return application_view(ApplicationDetail(
+        summary=_app_summary(), jd_text=SAMPLE_JD, cv_content=_content(),
+        notes="Referral from Priya", page_count=1, resume_id=RID,
+        events=[StatusEvent(None, "applied", WHEN), StatusEvent("applied", "interview", WHEN)]),
+        WINDOW)
+
+
 RESPONSES = {
+    "applications.json": _applications,
+    "application.json": _application,
+    "application_record.json": lambda: record_view(RecordResult(
+        saved=True, application_id=AID, deletes_on=WINDOW.deletes_on(WHEN))),
+    "application_record_no_jd.json": lambda: record_view(RecordResult(saved=False,
+                                                                      reason="no_jd")),
     "resume.json": lambda: resume_view(_resume(), _jd()),
     "resume_summary.json": lambda: summary_view(ResumeSummary(
         id=RID, title="SDE-2 Backend · Freshworks", template="jake", mode="tailored",

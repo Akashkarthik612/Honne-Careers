@@ -17,7 +17,7 @@ export const blankEducation = () => ({ id: newId('e'), school: '', degree: '', y
 
 export function emptyProfile() {
   return {
-    personal: { name: '', city: '', email: '', phone: '', linkedin: '', github: '', otherLinks: [] },
+    personal: { name: '', city: '', email: '', phone: '', linkedin: '', github: '', portfolio: '', otherLinks: [] },
     roles: [], projects: [], education: [],
     skills: { lang: [], fw: [], tools: [] },
   };
@@ -52,13 +52,48 @@ export function docToProfile(doc) {
 const filled = (s) => Boolean(s && s.trim());
 const span = (a, b) => [a, b].filter(filled).join(' – ');
 
+// ── header links: one field each for LinkedIn, GitHub and portfolio; anything else rides along in otherLinks ──
+
+export const LINK_FIELDS = [['linkedin', 'LinkedIn'], ['github', 'GitHub'], ['portfolio', 'Portfolio']];
+
+// The text a link prints as (the CV shows "LinkedIn", not the URL). Same host rule as latex.py link_label.
+export function linkLabel(link) {
+  if (filled(link.label)) return link.label.trim();
+  if (/linkedin\.com/i.test(link.url)) return 'LinkedIn';
+  if (/github\.com/i.test(link.url)) return 'GitHub';
+  return 'Portfolio';
+}
+
+// personal → [{ label, url }] in header order.
+export function personalLinks(p) {
+  const named = LINK_FIELDS.filter(([k]) => filled(p[k])).map(([k, label]) => ({ label, url: p[k].trim() }));
+  return [...named, ...(p.otherLinks ?? [])];
+}
+
+// ── bold: tailored bullets may wrap a few words in **…** (backend app/truth/markup.py is the same rule) ──
+
+// "Cut **p95 latency** by 38%" → [{ text: 'Cut ', bold: false }, { text: 'p95 latency', bold: true }, …].
+// Returns null when the markers are unbalanced, empty or nested, so callers can flag the field.
+export function boldParts(text) {
+  const pieces = text.split('**');
+  if (pieces.length % 2 === 0) return null;
+  const parts = pieces.map((t, i) => ({ text: t, bold: i % 2 === 1 }));
+  if (parts.some((part) => part.bold && (!part.text.trim() || part.text.includes('*')))) return null;
+  return parts.filter((part) => part.text);
+}
+
+export const plainText = (text) => text.replaceAll('**', '');
+
 // doc → cv. Empty fields and entries are dropped so the live preview never shows blank rows.
 export function docToCv(doc) {
   const texts = (bullets) => bullets.map((b) => b.text).filter(filled);
   const p = doc.personal;
   return {
     name: p.name,
-    contact: [p.city, p.phone, p.email, p.linkedin, p.github].filter(filled),
+    contact: [
+      ...[p.city, p.phone, p.email].filter(filled).map((text) => ({ text })),
+      ...personalLinks(p).map((l) => ({ text: linkLabel(l), href: l.url })),
+    ],
     experience: doc.roles
       .filter((r) => filled(r.role) || filled(r.company))
       .map((r) => ({ role: r.role, company: r.company, location: r.location, dates: span(r.start, r.end), bullets: texts(r.bullets) })),

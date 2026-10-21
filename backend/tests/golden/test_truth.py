@@ -36,6 +36,37 @@ def test_reworded_facts_pass(text):
     assert rules(text) == set()
 
 
+# ---------- **bold** (cv_tailor v2) ----------
+
+@pytest.mark.parametrize("text", [
+    "Reduced p95 payment-event latency by **38%** by migrating the ledger service to "
+    "**Kafka Streams** on **AWS** using Java",
+    "**Kafka Streams** cut p95 payment-event latency by **38%** on AWS",  # bold at sentence start
+])
+def test_bold_on_own_skills_and_metrics_passes(text):
+    assert rules(text) == set()
+
+
+def test_bold_markers_do_not_create_unknown_names():
+    # The checks read plain text: "**Reduced" is a sentence start, not a new name.
+    assert rules("**Reduced** p95 payment-event latency by 38% using Kafka Streams") == {
+        Rule.BAD_BOLD}  # only because "Reduced" is neither a skill nor a metric
+
+
+@pytest.mark.parametrize("text", [
+    "Reduced latency by **38%** using **Kafka Streams** on **AWS** in **Java**",  # 4 spans
+    "**Reduced p95 payment-event latency by 38%** using Kafka Streams",           # > 4 words
+    "Reduced latency by 38% for the **payments team** using Kafka Streams",       # not a fact
+    "Reduced latency by **38% using Kafka Streams",                               # unbalanced
+])
+def test_bad_bold_is_caught(text):
+    assert Rule.BAD_BOLD in rules(text)
+
+
+def test_bold_metric_from_another_job_is_caught():
+    assert Rule.BAD_BOLD in rules("Cut payment-event latency by **30%** using Kafka Streams")
+
+
 # ---------- invention is caught ----------
 
 def test_invented_metric():

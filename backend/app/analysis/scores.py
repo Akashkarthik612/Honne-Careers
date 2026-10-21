@@ -12,6 +12,7 @@ from datetime import date
 
 from app.domain.analysis import AnalysisJudgment, CvScores
 from app.domain.cv import CvContent
+from app.domain.markup import plain
 from app.truth.text import mentions, norm_skill, skills_in
 
 LEVEL_WEIGHT = {"strong": 1.0, "yes": 1.0, "partial": 0.5, "none": 0.0}
@@ -27,10 +28,10 @@ class CvTextRenderer:
         lines = [cv.header.name]
         for e in cv.experience:
             lines.append(f"{e.role} at {e.company} ({e.start} - {e.end or 'Present'})")
-            lines += [f"- {b.text}" for b in e.bullets]
+            lines += [f"- {plain(b.text)}" for b in e.bullets]
         for p in cv.projects:
             lines.append(f"Project: {p.name} [{', '.join(p.tech)}] {p.date}")
-            lines += [f"- {b.text}" for b in p.bullets]
+            lines += [f"- {plain(b.text)}" for b in p.bullets]
         for ed in cv.education:
             lines.append(f"{ed.degree}, {ed.school} {ed.years}")
         for label, items in (("Languages", cv.skills.languages),

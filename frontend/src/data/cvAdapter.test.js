@@ -4,7 +4,7 @@ import {
   contentToDoc, contentToProfile, docToContentIn, mergePrefill, openSuggestions, prefillToDoc, profileToContentIn,
   sectionPatch, timeAgo, toAnalysis, toResume, toSummary, validateDoc,
 } from './cvAdapter';
-import { emptyProfile, pruneDoc } from './cvModel';
+import { boldParts, docToCv, emptyProfile, plainText, pruneDoc } from './cvModel';
 
 const SERVER_ONLY = ['origin', 'locked', 'original_text', 'original_origin', 'tailor_state'];
 
@@ -43,7 +43,7 @@ describe('server responses → UI (contracts/responses)', () => {
 
   it('upload pre-fill: string links split into LinkedIn and GitHub fields', () => {
     const doc = prefillToDoc(response('upload.json').prefill);
-    expect(doc.personal).toMatchObject({ linkedin: 'https://linkedin.com/in/arjun', github: 'github.com/arjun', otherLinks: [] });
+    expect(doc.personal).toMatchObject({ linkedin: 'https://linkedin.com/in/arjun', github: 'github.com/arjun', portfolio: '', otherLinks: [] });
     expect(doc.roles[0].bullets[0]).toMatchObject({ id: 'u1b1', status: 'plain' });
   });
 
@@ -53,6 +53,65 @@ describe('server responses → UI (contracts/responses)', () => {
     expect(a.experience.requirements.map((r) => r.level)).toEqual(['Strong', 'Yes', 'None']);
     expect(a.experience).toMatchObject({ minYears: 3, cvYears: 6.2 });
     expect(a.narrative.suggestion).toBe('Open your first bullet with Owned.');
+  });
+});
+
+describe('header links: LinkedIn, GitHub and portfolio are separate fields', () => {
+  const withLinks = (links) => contentToDoc({ header: { name: 'A', links } }).personal;
+
+  it('splits labelled links, and reads an older "Portfolio" row into the portfolio field', () => {
+    const p = withLinks([
+      { label: 'Portfolio', url: 'https://arjun.dev' },
+      { label: 'GitHub', url: 'https://github.com/arjun' },
+      { label: 'LinkedIn', url: 'https://linkedin.com/in/arjun' },
+      { label: 'Blog', url: 'https://blog.arjun.dev' },
+    ]);
+    expect(p).toMatchObject({ linkedin: 'https://linkedin.com/in/arjun', github: 'https://github.com/arjun', portfolio: 'https://arjun.dev' });
+    expect(p.otherLinks).toEqual([{ label: 'Blog', url: 'https://blog.arjun.dev' }]);
+  });
+
+  it('round-trips the three fields with fixed labels', () => {
+    const personal = { ...emptyProfile().personal, name: 'A', linkedin: 'https://linkedin.com/in/a', github: 'https://github.com/a', portfolio: 'https://a.dev' };
+    const header = docToContentIn({ ...pruneDoc(contentToDoc({})), personal }).header;
+    expect(header.links).toEqual([
+      { label: 'LinkedIn', url: 'https://linkedin.com/in/a' },
+      { label: 'GitHub', url: 'https://github.com/a' },
+      { label: 'Portfolio', url: 'https://a.dev' },
+    ]);
+    expect(withLinks(header.links)).toMatchObject({ linkedin: personal.linkedin, github: personal.github, portfolio: personal.portfolio });
+  });
+
+  it('the preview prints link labels with the URL as href, not the bare URL', () => {
+    const cv = docToCv({ ...pruneDoc(contentToDoc({})), personal: { ...emptyProfile().personal, email: 'a@b.co', github: 'https://github.com/a', portfolio: 'https://a.dev' } });
+    expect(cv.contact).toEqual([
+      { text: 'a@b.co' },
+      { text: 'GitHub', href: 'https://github.com/a' },
+      { text: 'Portfolio', href: 'https://a.dev' },
+    ]);
+  });
+
+  it('flags a portfolio link without https://', () => {
+    const doc = { ...pruneDoc(contentToDoc({})), personal: { ...emptyProfile().personal, portfolio: 'a.dev' } };
+    expect(validateDoc(doc, ['personal'])).toEqual({ 'personal.portfolio': 'Paste the full link, starting with https://' });
+  });
+});
+
+describe('boldParts: **bold** spans in tailored bullets', () => {
+  it('splits bold and plain text', () => {
+    expect(boldParts('Cut **p95 latency** by **38%**')).toEqual([
+      { text: 'Cut ', bold: false }, { text: 'p95 latency', bold: true }, { text: ' by ', bold: false }, { text: '38%', bold: true },
+    ]);
+    expect(boldParts('no markers')).toEqual([{ text: 'no markers', bold: false }]);
+  });
+
+  it('returns null for unbalanced, empty or nested markers', () => {
+    expect(boldParts('Cut **latency')).toBeNull();
+    expect(boldParts('Cut **** latency')).toBeNull();
+    expect(boldParts('Cut ***latency*** now')).toBeNull();
+  });
+
+  it('plainText drops the markers', () => {
+    expect(plainText('Cut **p95 latency** by 38%')).toBe('Cut p95 latency by 38%');
   });
 });
 

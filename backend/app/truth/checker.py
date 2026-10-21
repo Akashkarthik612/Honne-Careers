@@ -6,11 +6,14 @@ Runs on AI output only, never on user text. For each AI-written bullet:
   * every recognised skill must be one of the user's skills
   * no JD skill the user lacks (missing_skills) may appear
   * no new capitalised name (employer, product, team) may appear
+  * **bold** is well formed, at most 3 spans of at most 4 words, each holding one of the
+    user's skills or one of this item's numbers (the checks above read the plain text)
 Structure: same item ids, same bullet ids and counts, skills reordered only.
 Time O(output text + facts); space O(facts). No I/O.
 """
 
 from app.domain.cv import SKILL_CATEGORIES, CvContent
+from app.domain.markup import MalformedMarkup, parse, plain
 from app.domain.tailoring import SkillsView, TailorOutput
 from app.domain.truth import FactSet, Rule, TruthReport, Violation
 from app.truth.text import (
@@ -23,6 +26,9 @@ from app.truth.text import (
     years_in,
 )
 
+MAX_BOLD_SPANS = 3
+MAX_BOLD_WORDS = 4
+
 
 class TruthChecker:
     def __init__(self, facts: FactSet) -> None:
@@ -32,7 +38,8 @@ class TruthChecker:
                      missing_skills: list[str] | None = None) -> list[Violation]:
         facts = self._facts
         item_numbers = facts.numbers_by_item.get(item_id, frozenset())
-        out: list[Violation] = []
+        out = self._check_bold(item_numbers, path, text)
+        text = plain(text)
         out += [Violation(path, n, Rule.UNKNOWN_NUMBER)
                 for n in sorted(numbers_in(text) - item_numbers)]
         out += [Violation(path, y, Rule.UNKNOWN_DATE)
@@ -49,6 +56,23 @@ class TruthChecker:
                     or key in known_skill_words or skills_in(name)):
                 continue  # user's own word, generic acronym, or a skill (checked above)
             out.append(Violation(path, name, Rule.UNKNOWN_NAME))
+        return out
+
+    def _check_bold(self, item_numbers: frozenset[str], path: str,
+                    text: str) -> list[Violation]:
+        """Bold may only mark the user's own skills or this item's metrics (cv_tailor v2)."""
+        try:
+            spans = [s.text for s in parse(text) if s.bold]
+        except MalformedMarkup:
+            return [Violation(path, "**", Rule.BAD_BOLD)]
+        if len(spans) > MAX_BOLD_SPANS:
+            return [Violation(path, str(len(spans)), Rule.BAD_BOLD)]
+        out: list[Violation] = []
+        for span in spans:
+            is_fact = bool(numbers_in(span) & item_numbers
+                           or skills_in(span) & self._facts.skills)
+            if len(span.split()) > MAX_BOLD_WORDS or not is_fact:
+                out.append(Violation(path, span, Rule.BAD_BOLD))
         return out
 
     def check_tailor(self, content: CvContent, output: TailorOutput,

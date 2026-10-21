@@ -1,4 +1,4 @@
-import { pruneDoc, toDoc } from './cvModel';
+import { LINK_FIELDS, personalLinks, pruneDoc, toDoc } from './cvModel';
 
 // The one adapter between the backend's shapes (Day_1 B2) and the UI's (cvModel.js).
 //
@@ -16,23 +16,24 @@ const trim = (s) => (s ?? '').trim();
 const EMAIL = /^[^@\s]{1,64}@[^@\s]{1,190}\.[^@\s]{2,}$/;
 const HTTP_URL = /^https?:\/\/[^\s/]+/i;
 
-// ── links: the UI has two fields (LinkedIn, GitHub or portfolio); the API stores up to 5 links ──
+// ── links: the UI has three fields (LinkedIn, GitHub, portfolio); the API stores up to 5 labelled links ──
 
 function splitLinks(links) {
   const all = links.map((l) => (typeof l === 'string' ? { label: '', url: l } : l)); // upload pre-fill sends strings
-  const isLinkedIn = (l) => l.label.toLowerCase() === 'linkedin' || /linkedin\.com/i.test(l.url);
-  const linkedin = all.find(isLinkedIn);
-  const rest = all.filter((l) => l !== linkedin);
-  const [github, ...otherLinks] = rest;
-  return { linkedin: linkedin?.url ?? '', github: github?.url ?? '', otherLinks };
+  const take = (test) => {
+    const i = all.findIndex(test);
+    return i < 0 ? null : all.splice(i, 1)[0];
+  };
+  const labelled = (name, host) => (l) => l.label.toLowerCase() === name || host.test(l.url);
+  const linkedin = take(labelled('linkedin', /linkedin\.com/i));
+  const github = take(labelled('github', /github\.com/i));
+  // An older "GitHub or portfolio" row was saved as Portfolio; an unlabelled upload link is a portfolio too.
+  const portfolio = take((l) => l.label.toLowerCase() === 'portfolio') ?? take((l) => !l.label);
+  return { linkedin: linkedin?.url ?? '', github: github?.url ?? '', portfolio: portfolio?.url ?? '', otherLinks: all };
 }
 
 function personalToHeader(p) {
-  const links = [];
-  if (filled(p.linkedin)) links.push({ label: 'LinkedIn', url: trim(p.linkedin) });
-  if (filled(p.github)) links.push({ label: /github\.com/i.test(p.github) ? 'GitHub' : 'Portfolio', url: trim(p.github) });
-  links.push(...(p.otherLinks ?? []));
-  return { name: trim(p.name), location: trim(p.city), email: trim(p.email), phone: trim(p.phone), links };
+  return { name: trim(p.name), location: trim(p.city), email: trim(p.email), phone: trim(p.phone), links: personalLinks(p) };
 }
 
 function headerToPersonal(h) {
@@ -123,7 +124,7 @@ export function validateDoc(doc, sections = WIZARD_ORDER) {
   if (sections.includes('personal')) {
     const p = d.personal;
     if (filled(p.email) && !EMAIL.test(trim(p.email))) errors['personal.email'] = 'Enter a valid email address.';
-    for (const k of ['linkedin', 'github']) {
+    for (const [k] of LINK_FIELDS) {
       if (filled(p[k]) && !HTTP_URL.test(trim(p[k]))) errors[`personal.${k}`] = 'Paste the full link, starting with https://';
     }
   }

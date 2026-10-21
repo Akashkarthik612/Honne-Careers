@@ -25,6 +25,8 @@ uvicorn app.main:app --reload --port 8000
 ```
 PDF builds need `tectonic` on `PATH` (or `TECTONIC_BIN`). The first compile downloads LaTeX packages; after that it works offline.
 
+Tracing: set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` to send one span per agent run (nested under `tailor_job` / `bullet_tailor_job`) to the `LANGSMITH_PROJECT`. Spans hold metadata only (agent and version, model, attempts, tokens, latency, truth-violation count, correlation/user/resume ids), never CV, JD or model text (`app/agents/tracing.py`). Tests and CI use no tracer.
+
 ## Tests
 
 ```

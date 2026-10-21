@@ -1,7 +1,8 @@
 """AgentRunner: runs any agent from its config (Day_1 B3).
 
 Steps: validate input -> build prompt -> call model with bounded retries ->
-validate output -> record the run (always, success or failure).
+validate output -> record the run (always, success or failure). Each run is one tracer
+span carrying the same metadata as the agent_runs row, never the prompt or output.
 
 Fallbacks (B9, approved): retry only transient errors, max_retries times, exponential
 backoff, each retry logged at WARNING. Schema-invalid output fails at once.
@@ -17,6 +18,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.agents.providers.base import LlmPermanentError, LlmTransientError
 from app.agents.registry import AgentRegistry, ModelResolver, ProviderFactory
+from app.agents.tracing import Span, Tracer
 from app.core import context
 from app.core.errors import LlmOutputInvalid, LlmUnavailable
 from app.core.logging import get_logger
@@ -47,8 +49,9 @@ class AgentRun[T]:
 class AgentRunner:
     def __init__(self, registry: AgentRegistry, resolver: ModelResolver,
                  providers: ProviderFactory, recorder: AgentRunRecorder,
-                 backoff_base_s: float) -> None:
+                 backoff_base_s: float, tracer: Tracer) -> None:
         self._registry = registry
+        self._tracer = tracer
         self._resolver = resolver
         self._providers = providers
         self._recorder = recorder
@@ -56,6 +59,12 @@ class AgentRunner:
 
     async def run(self, agent_id: str, payload: BaseModel, output_type: type[Out], *,
                   user_id: UUID, entity_id: UUID | None = None) -> AgentRun[Out]:
+        async with self._tracer.span(agent_id, "llm", user_id=user_id,
+                                     entity_id=entity_id) as span:
+            return await self._run(span, agent_id, payload, output_type, user_id, entity_id)
+
+    async def _run(self, span: Span, agent_id: str, payload: BaseModel, output_type: type[Out],
+                   user_id: UUID, entity_id: UUID | None) -> AgentRun[Out]:
         agent = self._registry.get(agent_id)
         cfg = agent.config
         if not isinstance(payload, agent.input_model) or output_type is not agent.output_model:
@@ -116,6 +125,11 @@ class AgentRunner:
                 output_tokens=result.output_tokens if result else None,
                 latency_ms=latency_ms, error_code=error_code, entity_id=entity_id,
                 correlation_id=context.correlation_id.get()))
+            span.update(agent_version=cfg.version, provider=spec.provider, model=spec.model_id,
+                        status="succeeded" if output is not None else "failed",
+                        attempts=attempts, latency_ms=latency_ms, error_code=error_code,
+                        input_tokens=result.input_tokens if result else None,
+                        output_tokens=result.output_tokens if result else None, run_id=run_id)
             log.info("agent_run", agent=cfg.id, version=cfg.version, model=spec.model_id,
                      status="succeeded" if output is not None else "failed",
                      attempts=attempts, latency_ms=latency_ms, entity_id=entity_id,

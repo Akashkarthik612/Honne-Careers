@@ -84,7 +84,13 @@ TECTONIC = os.environ.get("TECTONIC_BIN") or shutil.which("tectonic")
 async def test_real_compile_offline_one_page():
     compiler = TectonicCompiler(TECTONIC, 60, 4096, CompileQueue(1, 1, 60),
                                 os.environ.get("TECTONIC_CACHE_DIR"))
-    cv = sample_cv().model_copy(update={"header": Header(name=ATTACKS[0])})
+    cv = sample_cv()
+    exp = cv.experience[0]
+    bold = exp.bullets[0].model_copy(update={"text": "Cut latency by **38%** with **Kafka**"})
+    cv = cv.model_copy(update={
+        "header": Header(name=ATTACKS[0]),
+        "experience": [exp.model_copy(update={"bullets": [bold, *exp.bullets[1:]]}),
+                       *cv.experience[1:]]})
     pdf = await compiler.compile(LatexRenderer().render(cv))
     assert PdfInspector().page_count(pdf) == 1
     from io import BytesIO
@@ -92,3 +98,4 @@ async def test_real_compile_offline_one_page():
     from pypdf import PdfReader
     text = PdfReader(BytesIO(pdf)).pages[0].extract_text()
     assert r"\input{/etc/passwd}" in text  # printed literally, not executed
+    assert "Cut latency by 38% with Kafka" in text and "**" not in text  # bold, no markers

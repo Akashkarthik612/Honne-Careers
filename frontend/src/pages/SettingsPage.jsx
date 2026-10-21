@@ -6,7 +6,7 @@ import { ErrorBanner, PageLoading } from '@/components/Status';
 import { templateName } from '@/data/templates';
 import useResource from '@/hooks/useResource';
 import useSignOut from '@/hooks/useSignOut';
-import { deleteMe, getProfile, getSettings, listResumes, saveSettings } from '@/services/api';
+import { deleteMe, getApplication, getProfile, getSettings, listApplications, listResumes, saveSettings } from '@/services/api';
 import { ApiError, errorText } from '@/services/apiClient';
 import { signOut as forgetSession } from '@/services/authService';
 import { useAuth } from '@/state/auth';
@@ -75,13 +75,18 @@ function SettingsForm({ initial }) {
     if (name !== settings.display_name) setSettings({ display_name: name });
   }
 
-  // AUTH-3 / data export: the saved profile and every resume (with content), as the API returns them.
+  // AUTH-3 / data export: the saved profile, every resume (with content) and every application in the
+  // Database (with its JD, CV sent and notes), as the API returns them.
   async function downloadData() {
     setExportError(null);
     let data;
     try {
-      const [profile, resumes] = await Promise.all([getProfile(), listResumes()]);
-      data = { exported_at: new Date().toISOString(), profile, resumes, settings };
+      const [profile, resumes, list] = await Promise.all([getProfile(), listResumes(), listApplications()]);
+      const applications = [];
+      for (let i = 0; i < list.items.length; i += 5) { // 5 at a time: bounded load on the API
+        applications.push(...await Promise.all(list.items.slice(i, i + 5).map((a) => getApplication(a.id))));
+      }
+      data = { exported_at: new Date().toISOString(), profile, resumes, applications, settings };
     } catch (e) {
       setExportError(e);
       return;
@@ -209,7 +214,7 @@ function SettingsForm({ initial }) {
         <section id="st-data" className="hc-card hc-sec" aria-labelledby="h-data">
           <h2 id="h-data" className="hc-disp" style={{ ...h2, marginBottom: 6 }}>Data &amp; privacy</h2>
           <div className="hc-row">
-            <div><div style={{ fontSize: 14.5, fontWeight: 600 }}>Download your data</div><div style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>Your profile, all resumes and settings, as JSON.</div></div>
+            <div><div style={{ fontSize: 14.5, fontWeight: 600 }}>Download your data</div><div style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>Your profile, all resumes, your applications and settings, as JSON.</div></div>
             <button type="button" className="hc-btn-s" onClick={downloadData}>Download</button>
           </div>
           <ErrorBanner error={exportError} />

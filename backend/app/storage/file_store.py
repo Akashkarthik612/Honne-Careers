@@ -38,6 +38,18 @@ def pdf_path(user_id: UUID, resume_id: UUID, content_hash: str) -> str:
     return f"{resume_prefix(user_id, resume_id)}/{content_hash}.pdf"
 
 
+def application_prefix(user_id: UUID, application_id: UUID) -> str:
+    return f"{user_id}/applications/{application_id}"
+
+
+def application_pdf_path(user_id: UUID, application_id: UUID, content_hash: str) -> str:
+    """Our own copy of a downloaded PDF (Day 2 §1). Outside resumes/, so it outlives the
+    resume card and is removed with the application row."""
+    if len(content_hash) != 64 or not all(c in "0123456789abcdef" for c in content_hash):
+        raise ValueError("content hash must be sha256 hex")
+    return f"{application_prefix(user_id, application_id)}/{content_hash}.pdf"
+
+
 class CvFileStore:
     def __init__(self, http: httpx.AsyncClient, supabase_url: str, anon_key: str, bucket: str,
                  signed_url_ttl_s: int) -> None:
@@ -73,6 +85,23 @@ class CvFileStore:
         response = await self._call("sign", "POST", f"/object/sign/{self._bucket}/{path}", user,
                                     json={"expiresIn": self._ttl})
         return f"{self._base}{response.json()['signedURL']}"
+
+    async def copy(self, user: AuthUser, source: str, dest: str) -> None:
+        """Server-side copy inside the bucket: no bytes pass through the API. Overwrites, so a
+        retried save that already copied succeeds (paths are content-addressed)."""
+        self._own(user, source)
+        self._own(user, dest)
+        await self._call("copy", "POST", "/object/copy", user, headers={"x-upsert": "true"},
+                         json={"bucketId": self._bucket, "sourceKey": source,
+                               "destinationKey": dest})
+
+    async def delete_paths(self, user: AuthUser, paths: list[str]) -> None:
+        """Deletes exact objects; a path that is already gone is not an error."""
+        for path in paths:
+            self._own(user, path)
+        for start in range(0, len(paths), 100):
+            await self._call("delete", "DELETE", f"/object/{self._bucket}", user,
+                             json={"prefixes": paths[start:start + 100]})
 
     async def delete_prefix(self, user: AuthUser, prefix: str) -> int:
         """Deletes every object under prefix (storage doesn't cascade, B12 #4)."""

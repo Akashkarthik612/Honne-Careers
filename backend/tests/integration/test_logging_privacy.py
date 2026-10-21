@@ -43,3 +43,25 @@ async def test_full_flow_logs_no_content_and_records_runs(api, capsys):
                             "where user_id = %s order by created_at", (user_id,)).fetchall()
     assert [r[0] for r in runs] == ["cv_parser", "bullet_tailor", "cv_tailor", "cv_analyst"]
     assert all(r[2] and r[3] is not None for r in runs)
+
+
+async def test_application_database_logs_no_jd_cv_or_notes(api, capsys):
+    configure_logging("DEBUG")
+    h, rid = await returning_user(api)
+    await api.client.post(f"/resumes/{rid}/pdf", headers=h)
+    aid = (await api.client.post(f"/resumes/{rid}/application", headers=h)).json()[
+        "application_id"]
+    await api.client.patch(f"/applications/{aid}", headers=h, json={
+        "expected_version": 1, "status": "interview", "notes": "Called Priya on 9876543210"})
+    await api.client.post("/applications", headers=h, json={
+        "company": "Dust", "role": "SWE", "notes": "Referral from Meera",
+        "jd_text": "Secret manual JD about Rust and Kafka"})
+    await api.client.get("/applications?q=Dust", headers=h)
+    await api.client.get(f"/applications/{aid}", headers=h)
+    await api.container.janitor.run_once()
+
+    out = capsys.readouterr().out
+    assert "application_recorded" in out and "janitor_finished" in out
+    for secret in [*SECRETS, SAMPLE_JD[:40], "Called Priya", "Referral from Meera",
+                   "Secret manual JD"]:
+        assert secret not in out, f"content leaked into logs: {secret!r}"

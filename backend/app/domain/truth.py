@@ -13,6 +13,7 @@ class Rule(StrEnum):
     COUNT_CHANGED = "count_changed"            # bullets per item / skills per category
     SKILL_SET_CHANGED = "skill_set_changed"    # skills added or removed, not just reordered
     UNKNOWN_ID = "unknown_id"                  # output refers to an id that wasn't sent
+    BAD_BOLD = "bad_bold"                      # malformed **, too many/long spans, or not a fact
 
 
 @dataclass(frozen=True, slots=True)
