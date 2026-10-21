@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import account, resumes, tailoring, uploads
+from app.api.routes import account, applications, resumes, tailoring, uploads
 from app.container import Container, build_container
 from app.core.config import get_settings
 from app.core.http import (
@@ -18,7 +18,8 @@ from app.core.http import (
 from app.core.logging import configure_logging, get_logger
 
 log = get_logger(__name__)
-ROUTERS = [account.router, resumes.router, tailoring.router, uploads.router]
+ROUTERS = [account.router, applications.router, resumes.router, tailoring.router,
+           uploads.router]
 
 
 def create_app(container: Container) -> FastAPI:

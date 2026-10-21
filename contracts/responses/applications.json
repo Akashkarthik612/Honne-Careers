@@ -1,0 +1,35 @@
+{
+  "retention_days": 20,
+  "items": [
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "source": "honne",
+      "company": "Freshworks",
+      "role": "SDE-2 Backend",
+      "applied_on": "2026-10-19",
+      "status": "interview",
+      "referral": "asked",
+      "has_jd": true,
+      "has_pdf": true,
+      "has_notes": true,
+      "last_sent_at": "2026-10-19T09:30:00+00:00",
+      "deletes_on": "2026-11-08",
+      "row_version": 4
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "source": "manual",
+      "company": "Dust",
+      "role": "Backend Engineer",
+      "applied_on": "2026-10-19",
+      "status": "no_reply",
+      "referral": null,
+      "has_jd": false,
+      "has_pdf": false,
+      "has_notes": false,
+      "last_sent_at": "2026-10-19T09:30:00+00:00",
+      "deletes_on": "2026-11-08",
+      "row_version": 1
+    }
+  ]
+}

@@ -9,6 +9,7 @@ from app.agents.registry import AgentRegistry, ModelResolver, ProviderFactory
 from app.agents.runner import AgentRunner
 from app.core.errors import ConfigError, LlmOutputInvalid, LlmUnavailable
 from app.domain.tailoring import BulletTailorInput, BulletTailorOutput
+from tests.fakes import FakeTracer
 
 BACKEND = Path(__file__).resolve().parents[2]
 USER = uuid.uuid4()
@@ -23,12 +24,12 @@ class MemoryRecorder:
         return uuid.uuid4()
 
 
-def _runner(fake):
+def _runner(fake, tracer=None):
     registry = AgentRegistry.load(BACKEND / "agents", BACKEND)
     resolver = ModelResolver({"strong": "fake:strong-model", "light": "fake:light-model"})
     recorder = MemoryRecorder()
     runner = AgentRunner(registry, resolver, ProviderFactory({"fake": fake}), recorder,
-                         backoff_base_s=0.001)
+                         backoff_base_s=0.001, tracer=tracer or FakeTracer())
     return runner, recorder
 
 
@@ -109,3 +110,54 @@ async def test_schema_invalid_output_fails_without_retry():
         await runner.run("bullet_tailor", PAYLOAD, BulletTailorOutput, user_id=USER)
     assert recorder.runs[0].error_code == "llm_output_invalid"
     assert len(fake.calls) == 1
+
+
+# ---------- tracing: one metadata-only span per run ----------
+
+async def test_trace_span_has_run_metadata_and_no_text():
+    fake, tracer = FakeProvider(), FakeTracer()
+    fake.push({"text": "Built Python APIs at Acme"})
+    runner, recorder = _runner(fake, tracer)
+    await runner.run("bullet_tailor", PAYLOAD, BulletTailorOutput, user_id=USER)
+    [span] = tracer.spans
+    assert span["name"] == "bullet_tailor" and span["run_type"] == "llm"
+    assert span["status"] == "succeeded" and span["attempts"] == 1
+    assert span["model"] == "strong-model" and span["agent_version"] == 2
+    assert span["user_id"] == USER and span["run_id"] is not None
+    values = " ".join(str(v) for v in span.values())
+    for text in ("Python role", "Built APIs in Python", "Built Python APIs at Acme", "Acme"):
+        assert text not in values
+
+
+async def test_trace_span_records_failure():
+    fake, tracer = FakeProvider(), FakeTracer()
+    fake.push({"wrong": "shape"})
+    runner, _ = _runner(fake, tracer)
+    with pytest.raises(LlmOutputInvalid):
+        await runner.run("bullet_tailor", PAYLOAD, BulletTailorOutput, user_id=USER)
+    assert tracer.spans[0]["status"] == "failed"
+    assert tracer.spans[0]["error_code"] == "llm_output_invalid"
+
+
+async def test_langsmith_spans_send_no_text_and_only_the_error_class(monkeypatch):
+    from langsmith.run_trees import RunTree
+
+    from app.agents.tracing import LangSmithTracer
+
+    sent: list[RunTree] = []
+    monkeypatch.setattr(RunTree, "post", lambda self, *a, **k: sent.append(self))
+    monkeypatch.setattr(RunTree, "patch", lambda self, *a, **k: None)
+    tracer = LangSmithTracer(object(), "test-project")  # type: ignore[arg-type]  # never called
+    with pytest.raises(ValueError, match="secret CV text"):
+        async with (tracer.span("tailor_job", entity_id=USER) as job,
+                    tracer.span("cv_tailor", "llm") as agent):
+            agent.update(attempts=1)
+            job.update(truth_violations=0)
+            raise ValueError("secret CV text")
+    parent, child = sent
+    assert child.parent_run_id == parent.id  # agent span nests under the job span
+    for run in sent:
+        assert run.inputs == {} and not run.outputs
+        assert run.error == "ValueError"
+    assert parent.extra["metadata"]["entity_id"] == str(USER)
+    assert child.extra["metadata"]["attempts"] == 1

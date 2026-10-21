@@ -1,5 +1,7 @@
 // One-page CV in the P1 templates (PDF-1). Switching template only restyles; content is unchanged.
 // `focus` highlights the section being edited in the wizard's live preview.
+import { Fragment } from 'react';
+import { boldParts } from '@/data/cvModel';
 
 const row = { display: 'flex', justifyContent: 'space-between', gap: 12 };
 const list = { margin: '3px 0 6px', paddingLeft: 16 };
@@ -18,6 +20,26 @@ function templateStyles(template) {
   };
 }
 
+// A bullet with its **bold** spans; text with malformed markers shows as typed (the field flags it).
+export function BulletText({ text }) {
+  const parts = boldParts(text);
+  if (!parts) return text;
+  return parts.map((p, i) => (p.bold ? <b key={i}>{p.text}</b> : <Fragment key={i}>{p.text}</Fragment>));
+}
+
+function Contact({ items, style }) {
+  return (
+    <div style={style}>
+      {items.map((c, i) => (
+        <Fragment key={i}>
+          {i > 0 && ' | '}
+          {c.href ? <a href={c.href} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>{c.text}</a> : c.text}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 function Section({ id, focus, children }) {
   const on = focus === id;
   return (
@@ -33,7 +55,7 @@ export default function CvDoc({ cv, template = 'jake', focus = null }) {
     <div style={{ width: '100%', background: '#FFFFFF', padding: '36px 40px', fontFamily: '"Times New Roman", Times, Georgia, serif', color: '#111', fontSize: 11.5, lineHeight: 1.38, textAlign: 'left' }}>
       <Section id="personal" focus={focus}>
         <div style={s.name}>{cv.name || 'Your name'}</div>
-        {cv.contact.length > 0 && <div style={s.contact}>{cv.contact.join(' | ')}</div>}
+        {cv.contact.length > 0 && <Contact items={cv.contact} style={s.contact} />}
       </Section>
 
       {cv.experience.length > 0 && (
@@ -43,7 +65,7 @@ export default function CvDoc({ cv, template = 'jake', focus = null }) {
             <div key={i} style={{ marginTop: i === 0 ? 4 : 2 }}>
               <div style={row}><b>{job.role}</b><span>{job.dates}</span></div>
               <div style={{ ...row, fontStyle: 'italic' }}><span>{job.company}</span><span>{job.location}</span></div>
-              {job.bullets.length > 0 && <ul style={list}>{job.bullets.map((b, j) => <li key={j} style={{ margin: '1px 0' }}>{b}</li>)}</ul>}
+              {job.bullets.length > 0 && <ul style={list}>{job.bullets.map((b, j) => <li key={j} style={{ margin: '1px 0' }}><BulletText text={b} /></li>)}</ul>}
             </div>
           ))}
         </Section>
@@ -55,7 +77,7 @@ export default function CvDoc({ cv, template = 'jake', focus = null }) {
           {cv.projects.map((p, i) => (
             <div key={i} style={{ marginTop: 4 }}>
               <div style={row}><span><b>{p.name}</b>{p.tech && <> | <span style={{ fontStyle: 'italic' }}>{p.tech}</span></>}</span><span>{p.year}</span></div>
-              {p.bullets.length > 0 && <ul style={list}>{p.bullets.map((b, j) => <li key={j} style={{ margin: '1px 0' }}>{b}</li>)}</ul>}
+              {p.bullets.length > 0 && <ul style={list}>{p.bullets.map((b, j) => <li key={j} style={{ margin: '1px 0' }}><BulletText text={b} /></li>)}</ul>}
             </div>
           ))}
         </Section>

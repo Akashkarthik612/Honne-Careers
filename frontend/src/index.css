@@ -113,19 +113,39 @@ a:hover { color: var(--hc-brand-hover); }
 .hc-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-top: 1px solid #F0F1F5; }
 .hc-row:first-of-type { border-top: 0; }
 
+/* application database (Database.dc.html) */
+.hc-th { font-family: var(--hc-font-mono); font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--hc-ink-muted); text-transform: uppercase; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--hc-hairline); background: var(--hc-ground); white-space: nowrap; position: sticky; top: 0; }
+.hc-td { padding: 8px 12px; border-bottom: 1px solid #F0F1F5; font-size: 14px; vertical-align: middle; white-space: nowrap; }
+.hc-tr:hover .hc-td { background: #FAFBFF; }
+.hc-open { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; border: 0; background: none; padding: 0; font-family: inherit; font-size: 14px; font-weight: 700; color: var(--hc-ink); cursor: pointer; text-align: left; }
+.hc-openhint { opacity: 0; font-family: var(--hc-font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; color: var(--hc-ink-muted); border: 1px solid var(--hc-hairline); border-radius: 6px; padding: 2px 6px; transition: opacity .15s ease; }
+.hc-open:hover .hc-openhint, .hc-open:focus-visible .hc-openhint { opacity: 1; }
+.hc-sel { border: 0; border-radius: 999px; font-family: inherit; font-size: 12.5px; font-weight: 700; padding: 0 8px 0 10px; min-height: 32px; cursor: pointer; outline-offset: 2px; }
+.hc-fchip { min-height: 36px; padding: 0 12px; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid var(--hc-hairline); background: #FFFFFF; color: var(--hc-ink); }
+.hc-fchip[aria-pressed="true"] { border-color: var(--hc-ink); background: var(--hc-ink); color: #FFFFFF; }
+.hc-file { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--hc-ink); background: #F3F4F8; border: 0; border-radius: 8px; padding: 5px 8px; font-family: inherit; text-decoration: none; }
+.hc-vtab { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 0; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; background: transparent; color: var(--hc-ink-muted); }
+.hc-vtab[aria-selected="true"] { background: #FFFFFF; color: var(--hc-ink); box-shadow: 0 1px 3px rgba(22,26,43,.12); }
+.hc-ptab { min-height: 40px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; color: var(--hc-ink-muted); }
+.hc-ptab[aria-selected="true"] { color: var(--hc-ink); border-bottom-color: var(--hc-brand); }
+.hc-prop { display: grid; grid-template-columns: 140px minmax(0,1fr); gap: 10px; align-items: center; min-height: 38px; font-size: 14px; }
+@media (max-width: 620px) { .hc-prop { grid-template-columns: 110px minmax(0,1fr); } }
+
 /* ── Motion ───────────────────────────────────────────────────────────────── */
 @keyframes hc-rise    { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes hc-pulse   { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 @keyframes hc-spin    { to { transform: rotate(360deg); } }
+@keyframes hc-slidein  { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes hc-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 
 .hc-rise   { animation: hc-rise .5s cubic-bezier(.2,.8,.2,1) both; }
 .hc-rise-lg { animation: hc-rise .7s cubic-bezier(.2,.8,.2,1) both; }
 .hc-dot    { animation: hc-pulse 1.6s ease-in-out infinite; }
 .hc-spin   { animation: hc-spin .9s linear infinite; }
+.hc-peek   { animation: hc-slidein .25s cubic-bezier(.2,.8,.2,1) both; }
 .hc-sk { border-radius: 99px; height: 9px; background: linear-gradient(90deg, #EEF0F5 0, #E2E6F2 40%, #EEF0F5 80%); background-size: 800px 100%; animation: hc-shimmer 1.4s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .hc-rise, .hc-rise-lg, .hc-dot, .hc-spin, .hc-sk { animation: none !important; }
-  .hc-btn-p, .hc-btn-s, .hc-sso, .hc-drop, .hc-opt, .hc-rcard { transition: none !important; }
+  .hc-rise, .hc-rise-lg, .hc-dot, .hc-spin, .hc-sk, .hc-peek { animation: none !important; }
+  .hc-btn-p, .hc-btn-s, .hc-sso, .hc-drop, .hc-opt, .hc-rcard, .hc-openhint { transition: none !important; }
 }

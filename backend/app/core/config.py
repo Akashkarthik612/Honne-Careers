@@ -7,7 +7,7 @@ Limits that Day_1 B11 fixed have defaults equal to the approved values.
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic import Field, HttpUrl, PostgresDsn, SecretStr, field_validator
+from pydantic import Field, HttpUrl, PostgresDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr
     llm_backoff_base_s: float = Field(default=1.0, gt=0)
 
+    # LangSmith tracing (metadata only, app/agents/tracing.py). Off unless asked for.
+    langsmith_tracing: bool = False
+    langsmith_api_key: SecretStr | None = None
+    langsmith_project: str = Field(default="honne-careers-dev", min_length=1)
+    langsmith_endpoint: str | None = None  # None = LangSmith's default (US) endpoint
+
     # PDF (B11 #6)
     tectonic_bin: str = "tectonic"
     latex_timeout_s: int = Field(default=20, ge=5, le=120)
@@ -69,6 +75,17 @@ class Settings(BaseSettings):
     quota_analysis_per_day: int = Field(default=40, ge=0)
     quota_upload_per_day: int = Field(default=20, ge=0)
 
+    # Application Database (Day 2 §4). The one place the number of days lives: reads hide
+    # older rows at once and the daily clean-up deletes them. Changing it needs no migration.
+    application_retention_days: int = Field(default=20, ge=1, le=3650)
+    application_list_max: int = Field(default=500, ge=1, le=5000)
+    janitor_enabled: bool = True
+    janitor_every_h: int = Field(default=24, ge=1)          # one run per day across instances
+    janitor_tick_s: int = Field(default=3600, ge=10)        # how often a woken instance checks
+    janitor_start_delay_s: int = Field(default=60, ge=0)    # don't slow a cold start
+    janitor_batch: int = Field(default=200, ge=1, le=1000)
+    janitor_max_batches: int = Field(default=50, ge=1)
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -82,6 +99,12 @@ class Settings(BaseSettings):
         if not value or "*" in value:
             raise ValueError("CORS_ORIGINS must be an explicit allowlist, never '*'")
         return value
+
+    @model_validator(mode="after")
+    def _tracing_needs_key(self) -> "Settings":
+        if self.langsmith_tracing and self.langsmith_api_key is None:
+            raise ValueError("LANGSMITH_TRACING=true needs LANGSMITH_API_KEY")
+        return self
 
     @property
     def jwt_issuer(self) -> str:

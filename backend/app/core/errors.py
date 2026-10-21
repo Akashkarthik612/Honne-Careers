@@ -43,6 +43,23 @@ class JobAlreadyRunning(AppError):
     status_code, code, message = 409, "job_running", "Tailoring is already running."
 
 
+class PdfOutdated(AppError):
+    # Saving to the Database needs the PDF of the CV as it is now (SAVE-1).
+    status_code, code = 409, "pdf_outdated"
+    message = "Your CV changed after this PDF was built. Download it again to save it."
+
+
+class ApplicationExists(AppError):
+    # One JD = one row in the Database (SAVE-3).
+    status_code, code = 409, "application_exists"
+    message = "This job is already in your Database."
+
+
+class SaveConflict(AppError):
+    # Two saves for the same job at once; the other one won. Safe to retry.
+    status_code, code, message = 503, "save_conflict", "Couldn't save it, try again."
+
+
 class EntitlementRequired(AppError):
     status_code, code, message = 402, "upgrade_required", "This feature needs an upgrade."
 
