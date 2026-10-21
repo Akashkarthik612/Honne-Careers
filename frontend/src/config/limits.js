@@ -1,5 +1,8 @@
 // Bounded, configured client limits (guardrails §3: no unbounded or hard-coded-in-place retries).
 
+// Longest JD the API accepts (TAIL-1). Home and the JD page check it before anything is sent.
+export const MAX_JD_WORDS = 1000;
+
 // Tailor job polling (TAIL-3). 100 polls × 2 s = 200 s, just past the backend's tailor_job_timeout_s
 // (180 s), after which the backend itself marks the job failed/stale_job.
 export const TAILOR_POLL_MS = 2000;

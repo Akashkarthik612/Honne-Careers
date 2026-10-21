@@ -54,6 +54,7 @@ function SettingsForm({ initial }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const shownName = settings.display_name || user.name;
+  const memberSince = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : null;
   const initials = shownName.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
 
   // Saves the whole row (last write wins). On failure the switch shows the stored value again.
@@ -134,7 +135,7 @@ function SettingsForm({ initial }) {
             {user.avatarUrl
               ? <img src={user.avatarUrl} alt="" width={52} height={52} referrerPolicy="no-referrer" style={{ borderRadius: 99, objectFit: 'cover' }} />
               : <span style={{ width: 52, height: 52, borderRadius: 99, background: 'var(--hc-ink)', color: '#FFFFFF', fontSize: 17, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>}
-            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{shownName}</div><div style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Member since Oct 2026</div></div>
+            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{shownName}</div>{memberSince && <div style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Member since {memberSince}</div>}</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <div className="hc-f"><label className="hc-flabel" htmlFor="st-name">Display name</label><input id="st-name" className="hc-in" type="text" maxLength={120} value={nameInput} placeholder={user.name} onChange={(e) => setNameInput(e.target.value)} onBlur={saveName} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} /></div>

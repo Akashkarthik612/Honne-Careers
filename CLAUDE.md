@@ -106,7 +106,7 @@ CI (`.github/workflows/frontend.yml`, on PRs and pushes to `test`/`main` touchin
 
 Ported from the Claude Design canvas "Honne Careers Landing Page" and the "Honne" design system; mirrors the conventions of the sibling Honne AI frontend (Vite, react-router, lucide-react, `@/` → `src/` alias, inline style objects). Tailwind is deliberately not used — its preflight reset breaks the design's inline SVG icons.
 
-Routes (`src/App.jsx`): `/` landing, `/login` sign in, `/auth/callback` (Google returns here), then inside `RequireAuth` + `AppShell` (collapsible `Sidebar` + page): `/resumes` dashboard, `/new/template` → `/new/mode` → `/new/jd` → `/new/details?resume=<id>` (wizard) or `/tailoring/:id` (returning user), `/cv/:id` "Your CV is ready", `/profile`, `/database` (application Database), `/settings`. `/home` redirects to `/resumes`.
+Routes (`src/App.jsx`): `/` landing, `/login` sign in, `/auth/callback` (Google returns here), then inside `RequireAuth` + `AppShell` (collapsible `Sidebar` + page): `/resumes` dashboard, `/home` (start page after sign-in: paste a JD, Agents/Honne IQ as "Coming soon"), `/new/template` → `/new/mode` → `/new/jd` → `/new/details?resume=<id>` (wizard) or `/tailoring/:id` (returning user), `/cv/:id` "Your CV is ready", `/profile`, `/database` (application Database), `/settings`. A JD pasted on Home sets `draft.jdFromHome`, so setup goes `/new/template` → `/new/jd` (Mode skipped, JD pre-filled); every "New resume" entry calls `resetDraft`.
 
 Auth (AUTH-1, beta = Google only):
 - `src/services/supabaseClient.js` — the one supabase-js client (PKCE). Throws at load if `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` are missing; no placeholder fallback.

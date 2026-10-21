@@ -149,3 +149,6 @@ a:hover { color: var(--hc-brand-hover); }
   .hc-rise, .hc-rise-lg, .hc-dot, .hc-spin, .hc-sk, .hc-peek { animation: none !important; }
   .hc-btn-p, .hc-btn-s, .hc-sso, .hc-drop, .hc-opt, .hc-rcard, .hc-openhint { transition: none !important; }
 }
+
+/* Home (design: Home.dc.html): the JD box grows a focus ring like an input */
+.hc-jdbox:focus-within { border-color: var(--hc-brand); box-shadow: 0 0 0 3px rgba(63,95,216,.12); }

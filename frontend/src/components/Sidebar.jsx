@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Bot, Database, FileText, LogOut, Plus, Settings, Table2, User } from 'lucide-react';
+import { Bot, Database, FileText, House, LogOut, Plus, Settings, Table2, User } from 'lucide-react';
 import { HonneTile, Wordmark } from '@/components/HonneMark';
 import useSignOut from '@/hooks/useSignOut';
 import { useAppStore } from '@/state/appStore';
@@ -22,6 +22,7 @@ function writeCollapsed(collapsed) {
 
 // Which nav item a path belongs to; the whole new-resume flow counts as "Resumes".
 function activeSection(pathname) {
+  if (pathname.startsWith('/home')) return 'home';
   if (pathname.startsWith('/profile')) return 'profile';
   if (pathname.startsWith('/settings')) return 'settings';
   if (pathname.startsWith('/database')) return 'database';
@@ -124,11 +125,12 @@ export default function Sidebar() {
         </div>
 
         <nav aria-label="Sections" style={{ padding: '4px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {navItem('/home', 'home', 'Home', House)}
           {navItem('/resumes', 'resumes', 'Resumes', FileText)}
           {navItem('/profile', 'profile', 'Profile', User)}
           {navItem('/database', 'database', 'Database', Table2)}
-          {soon('Honne IQ', Database)}
           {soon('Agents', Bot)}
+          {soon('Honne IQ', Database)}
         </nav>
 
         <div style={{ flex: 1 }} />
