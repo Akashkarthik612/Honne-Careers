@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 // Sign-in operations (AUTH-1). Beta: Google only; GitHub shows as "Coming soon".
 // Every failure becomes an AuthError with a code the UI can branch on; nothing is retried here.
 
-export const DEFAULT_NEXT = '/resumes';
+export const DEFAULT_NEXT = '/home';
 const NEXT_KEY = 'honne-auth-next';
 const CALLBACK_PATH = '/auth/callback';
 
@@ -77,5 +77,6 @@ export function toAuthUser(user) {
     name: meta.full_name || meta.name || email.split('@')[0],
     avatarUrl: meta.avatar_url || meta.picture || null,
     provider: user.app_metadata?.provider ?? null,
+    createdAt: user.created_at ?? null, // ISO time the account was made (Settings: "Member since")
   };
 }

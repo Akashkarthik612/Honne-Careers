@@ -1,0 +1,11 @@
+{
+  "handle": "nudger",
+  "description": "Drafts follow-ups for applications with no reply",
+  "instructions": "Look at applications older than 7 days with no reply. Draft a follow-up.",
+  "guardrails": "Never mention salary.",
+  "knowledge": [
+    "profile",
+    "applications"
+  ],
+  "expected_version": 3
+}

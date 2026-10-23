@@ -7,18 +7,15 @@ Narrative %  = mean of the five 0-5 sub-scores x 20.
 A JD with no skills or no requirements gives 0 with a reason, never a made-up number.
 """
 
-import re
 from datetime import date
 
 from app.domain.analysis import AnalysisJudgment, CvScores
+from app.domain.career import experience_span
 from app.domain.cv import CvContent
 from app.domain.markup import plain
 from app.truth.text import mentions, norm_skill, skills_in
 
 LEVEL_WEIGHT = {"strong": 1.0, "yes": 1.0, "partial": 0.5, "none": 0.0}
-_MONTHS = {m: i for i, m in enumerate(
-    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
-_DATE = re.compile(r"(?:(?P<mon>[A-Za-z]{3})[a-z]*\.?\s+)?(?P<year>(?:19|20)\d{2})")
 
 
 class CvTextRenderer:
@@ -42,39 +39,9 @@ class CvTextRenderer:
         return "\n".join(line for line in lines if line.strip())
 
 
-def parse_month(text: str, *, today: date) -> tuple[int, int] | None:
-    if text.strip().lower() in ("present", "current", "now", ""):
-        return (today.year, today.month) if text.strip() else None
-    match = _DATE.search(text)
-    if not match:
-        return None
-    month = _MONTHS.get((match.group("mon") or "").lower()[:3], 1)
-    return int(match.group("year")), month
-
-
 def years_of_experience(cv: CvContent, *, today: date) -> float:
-    """Union of role intervals in months (overlaps counted once). O(r log r)."""
-    spans: list[tuple[int, int]] = []
-    for e in cv.experience:
-        start = parse_month(e.start, today=today)
-        end = parse_month(e.end or "present", today=today)
-        if start and end:
-            # Inclusive: "Aug 2020 - Jun 2021" is 11 months, so the end month counts.
-            a, b = start[0] * 12 + start[1], end[0] * 12 + end[1] + 1
-            if b > a:
-                spans.append((a, b))
-    spans.sort()
-    total, cur_a, cur_b = 0, None, None
-    for a, b in spans:
-        if cur_b is None or a > cur_b:
-            if cur_b is not None:
-                total += cur_b - cur_a
-            cur_a, cur_b = a, b
-        else:
-            cur_b = max(cur_b, b)
-    if cur_b is not None:
-        total += cur_b - cur_a
-    return round(total / 12, 1)
+    """Union of role intervals (overlaps counted once), shared with the career stage."""
+    return round(experience_span(cv, today=today).months / 12, 1)
 
 
 class ScoreCalculator:

@@ -3,6 +3,7 @@ import { requestFixture, response } from '@/test/contracts';
 import { contentToProfile, prefillToDoc, profileToContentIn, sectionPatch, toResume } from '@/data/cvAdapter';
 import { docToProfile } from '@/data/cvModel';
 import { manualToRequest, patchRequest, toApplicationDetail } from '@/data/applications';
+import { agentToForm, blankForm, formToRequest, formToUpdate, toAgent } from '@/data/agentsAdapter';
 import * as api from './api';
 import { ApiError, apiRequest } from './apiClient';
 
@@ -37,8 +38,15 @@ describe('request contracts', () => {
     ['profile_put_new.json', () => api.saveProfile(profileToContentIn(docToProfile(fixedPrefill())), null), 'PUT', '/profile'],
     ['application_add.json', () => api.addApplication(manualToRequest({ company: 'Dust', role: 'Backend Engineer', sentAt: '2026-10-10', status: 'no_reply', referral: 'yes', notes: 'Referral from Meera', jdText: 'Build event-driven services in Rust.' })), 'POST', '/applications'],
     ['application_patch.json', () => api.patchApplication('a1', patchRequest(toApplicationDetail(response('application.json')), { status: 'offer', referral: null })), 'PATCH', '/applications/a1'],
-    ...['personal', 'experience', 'projects', 'education', 'skills'].map((section) => [
-      `resume_patch_${section}.json`, () => api.patchResume('r1', sectionPatch(withLinks, section, 7, section === 'skills' ? 'done' : null)), 'PATCH', '/resumes/r1',
+    // Day 3: agents and chat.
+    ['agent_create.json', () => api.createAgent(formToRequest({ ...blankForm(), name: '@Follow-Up', description: ' Drafts follow-ups for applications with no reply ', instructions: 'Look at applications older than 7 days with no reply. Draft a follow-up for each.' })), 'POST', '/agents'],
+    ['agent_update.json', () => { const a = toAgent(response('agent.json')); return api.updateAgent(a.id, formToUpdate({ ...agentToForm(a), name: 'nudger' }, a.rowVersion)); }, 'PUT', '/agents/44444444-4444-4444-8444-444444444444'],
+    ['agent_preview.json', () => api.previewAgent(formToRequest({ ...blankForm(), name: 'interview-prep', description: 'Interview prep', instructions: 'Give me 10 likely questions.', knowledge: ['applications', 'resumes'] }), 'Prep me for Freshworks'), 'POST', '/agents/preview'],
+    ['chat_send_new.json', () => api.sendChatMessage(null, { message: '@follow-up who hasn’t replied?', agent: 'follow-up' }), 'POST', '/chats/messages'],
+    ['chat_send.json', () => api.sendChatMessage('c1', { message: 'Draft one for Freshworks' }), 'POST', '/chats/c1/messages'],
+    // Preview saves every section in this order; the last one marks the wizard done.
+    ...['personal', 'experience', 'projects', 'education', 'skills', 'spoken_languages'].map((section) => [
+      `resume_patch_${section}.json`, () => api.patchResume('r1', sectionPatch(withLinks, section, 7, section === 'spoken_languages' ? 'done' : null)), 'PATCH', '/resumes/r1',
     ]),
   ];
 

@@ -24,20 +24,43 @@ from app.api.schemas import (
     AddApplication,
     ApplicationPatch,
     CreateResume,
+    PreviewAgent,
     SaveProfile,
     SaveSettings,
     SetJd,
+    UpdateAgent,
+    agent_view,
+    agents_view,
     analysis_view,
     application_view,
     applications_view,
+    chat_summary_view,
+    chat_view,
+    message_view,
+    preview_view,
     profile_view,
     record_view,
     resume_view,
     settings_view,
     summary_view,
+    turn_view,
+    usage_view,
 )
 from app.domain.analysis import AnalysisJudgment
 from app.domain.applications import RecordResult, RetentionWindow
+from app.domain.chat_agents import (
+    AgentSpec,
+    ChatAnswer,
+    ChatMessageRow,
+    ChatRow,
+    ChatTurnIn,
+    CustomAgentIn,
+    CustomAgentRow,
+    Knowledge,
+    SourceRef,
+    StepRecord,
+    TurnResult,
+)
 from app.domain.cv import Bullet, Origin, ResumePatch, TailorState
 from app.domain.records import (
     AnalysisRow,
@@ -50,9 +73,12 @@ from app.domain.records import (
     SettingsRow,
 )
 from app.domain.tailoring import PrefillCv
+from app.policy.limits import LimitsConfig
+from app.policy.quota import Usage, UsageItem
 from tests.fixtures import SAMPLE_JD, sample_cv
 
 CONTRACTS = Path(__file__).resolve().parents[3] / "contracts"
+BACKEND = Path(__file__).resolve().parents[2]
 UPDATE = os.environ.get("UPDATE_CONTRACTS") == "1"
 WHEN = datetime(2026, 10, 19, 9, 30, tzinfo=UTC)
 RID = UUID("11111111-1111-4111-8111-111111111111")
@@ -61,6 +87,11 @@ HASH = "a" * 64
 
 # File name -> the input shape that endpoint accepts.
 REQUEST_SHAPES: dict[str, type[BaseModel]] = {
+    "agent_create.json": CustomAgentIn,
+    "agent_update.json": UpdateAgent,
+    "agent_preview.json": PreviewAgent,
+    "chat_send.json": ChatTurnIn,
+    "chat_send_new.json": ChatTurnIn,
     "application_add.json": AddApplication,
     "application_patch.json": ApplicationPatch,
     "create_resume.json": CreateResume,
@@ -71,6 +102,7 @@ REQUEST_SHAPES: dict[str, type[BaseModel]] = {
     "resume_patch_projects.json": ResumePatch,
     "resume_patch_education.json": ResumePatch,
     "resume_patch_skills.json": ResumePatch,
+    "resume_patch_spoken_languages.json": ResumePatch,
     "set_jd.json": SetJd,
     "settings_put.json": SaveSettings,
     "settle.json": SettleRequest,
@@ -174,7 +206,82 @@ def _application() -> dict:
         WINDOW)
 
 
+GID = UUID("44444444-4444-4444-8444-444444444444")   # agent
+CID = UUID("55555555-5555-4555-8555-555555555555")   # chat
+MID = UUID("66666666-6666-4666-8666-666666666666")   # message
+VID = UUID("77777777-7777-4777-8777-777777777777")   # agent version
+
+
+def _agent() -> CustomAgentRow:
+    return CustomAgentRow(
+        id=GID, handle="follow-up", current_version=2, row_version=3, version_id=VID,
+        description="Drafts follow-ups for applications with no reply",
+        instructions="Look at applications older than 7 days with no reply. Draft a follow-up.",
+        guardrails="Never mention salary.", knowledge=(Knowledge.APPLICATIONS, Knowledge.PROFILE),
+        created_at=WHEN, updated_at=WHEN, chat_count=3, last_used_at=WHEN)
+
+
+def _builtin() -> AgentSpec:
+    return AgentSpec(handle="analyst", kind="builtin",
+                     description="Reads your Database and tells you what's working",
+                     instructions="x", guardrails="", version=1,
+                     knowledge=frozenset({Knowledge.APPLICATIONS, Knowledge.PROFILE}))
+
+
+def _chat(**over) -> ChatRow:
+    return ChatRow(**{**dict(id=CID, title="Follow-ups this week", turn_count=1,
+                             last_message_at=WHEN, created_at=WHEN, running=False), **over})
+
+
+SOURCE = SourceRef(ref=1, kind="application", id=str(AID), label="Freshworks · SDE-2 Backend",
+                   meta={"company": "Freshworks", "role": "SDE-2 Backend", "status": "applied",
+                         "referral": None, "sent": "2026-10-08"})
+STEPS = [StepRecord("list_applications", "Read your Database · 6 applications", 6),
+         StepRecord("read_application", "Opened Freshworks · SDE-2 Backend", 1)]
+DRAFT = {"to": "Recruiting team, Freshworks", "subject": "Following up: SDE-2 Backend",
+         "body": "Hi there,\n\nI applied for the SDE-2 Backend role on 8 October."}
+
+
+def _message(role="assistant", status="ok", **over) -> ChatMessageRow:
+    base = dict(id=MID, chat_id=CID, seq=2, role=role, status=status,
+                content="Freshworks hasn't replied in 14 days [1]. A short nudge usually works.",
+                agent_handle="follow-up", agent_kind="user", sources=[SOURCE.to_json()],
+                drafts=[DRAFT], steps=[s.to_json() for s in STEPS], error_code=None,
+                started_at=WHEN, finished_at=WHEN, created_at=WHEN)
+    return ChatMessageRow(**{**base, **over})
+
+
+def _user_message() -> ChatMessageRow:
+    return _message(role="user", id=RID, seq=1, content="@follow-up who hasn't replied?",
+                    agent_handle=None, agent_kind=None, sources=[], drafts=[], steps=[],
+                    started_at=None, finished_at=None)
+
+
+def _usage():
+    """GET /me/usage with the real beta limits (config/limits.yaml), part used."""
+    beta = LimitsConfig.load(BACKEND / "config" / "limits.yaml").plans["beta"]
+    used = {"full_tailor": 1, "chat_start": 2, "custom_agents": 1}
+    items = [UsageItem(a.value, used.get(a.value, 0), n, True) for a, n in beta.daily.items()]
+    items += [UsageItem(t.value, used.get(t.value, 0), n, False) for t, n in beta.total.items()]
+    return usage_view(Usage(items, datetime(2026, 10, 20, tzinfo=UTC)))
+
+
 RESPONSES = {
+    "agents.json": lambda: agents_view([_agent()], [_builtin()], 10),
+    "agent.json": lambda: agent_view(_agent()),
+    "agent_preview.json": lambda: preview_view(TurnResult(
+        answer=ChatAnswer(content="Freshworks [1] is waiting on you.", cited=[1],
+                          drafts=[], note=None), sources=[SOURCE], steps=STEPS, rounds=2,
+        forced_submit=False)),
+    "chats.json": lambda: {"items": [chat_summary_view(_chat(running=True)),
+                                     chat_summary_view(_chat(id=GID, title="Referral ask"))],
+                           "retention_days": 20, "limit": 50},
+    "chat.json": lambda: chat_view(_chat(), [_user_message(), _message()], 25, 20, WINDOW),
+    "chat_turn.json": lambda: turn_view(_chat(), _user_message(), _message(
+        status="running", content="", sources=[], drafts=[], steps=[STEPS[0].to_json()],
+        finished_at=None)),
+    "chat_message_failed.json": lambda: message_view(_message(
+        status="failed", content="", sources=[], drafts=[], error_code="llm_unavailable")),
     "applications.json": _applications,
     "application.json": _application,
     "application_record.json": lambda: record_view(RecordResult(
@@ -193,6 +300,7 @@ RESPONSES = {
     "settings.json": lambda: settings_view(SettingsRow(display_name=None,
                                                        ask_before_save=True,
                                                        product_emails=False)),
+    "usage.json": _usage,
 }
 
 

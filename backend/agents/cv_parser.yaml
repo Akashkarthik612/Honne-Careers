@@ -1,10 +1,10 @@
 id: cv_parser
-version: 1
+version: 2
 description: Turns extracted CV text into structured fields, copying, never writing
 model_tier: light
 temperature: 0
 max_output_tokens: 8192
-instructions: prompts/cv_parser/v1.md
+instructions: prompts/cv_parser/v2.md
 input_schema: ParserInput
 output_schema: ParsedCv
 tools: []

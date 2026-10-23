@@ -57,6 +57,14 @@ services:
         value: "60"
       - key: PARSE_TIMEOUT_S
         value: "30"
+      # Day 3 chat agents: turns run in the background on the same 0.1 CPU. Over this many
+      # at once, a send gets 429 agents_busy (no queue). Raise on a paid plan.
+      - key: CHAT_CONCURRENT_TURNS_MAX
+        value: "2"
+      # LangGraph checkpoint pool (AgentStateStore): one connection per running turn is
+      # enough, on top of DB_POOL_MAX. Keep it equal to CHAT_CONCURRENT_TURNS_MAX.
+      - key: AGENT_STATE_POOL_MAX
+        value: "2"
 
   - type: web
     name: honne-careers

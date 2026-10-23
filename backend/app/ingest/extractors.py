@@ -20,6 +20,15 @@ from pypdf.errors import PdfReadError
 from app.core.errors import InvalidInput, UnreadableUpload
 
 MIN_TEXT_CHARS = 200  # less than this from a PDF = image-only scan
+_SPACES = re.compile(r"[ \t]+")
+_BLANK_LINES = re.compile(r"\n{3,}")
+
+
+def _tidy(text: str) -> str:
+    """Layout-mode text pads columns with spaces: one space between words, at most one
+    blank line between blocks."""
+    lines = (_SPACES.sub(" ", line).strip() for line in text.splitlines())
+    return _BLANK_LINES.sub("\n\n", "\n".join(lines)).strip()
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +59,11 @@ class PdfExtractor:
             if len(reader.pages) > self._max_pages:
                 raise UnreadableUpload(f"CVs up to {self._max_pages} pages, please.",
                                        reason="too_many_pages")
-            text = "\n".join(page.extract_text() or "" for page in reader.pages)
+            # Layout mode places glyphs by position. The default mode drops the space at a
+            # font switch ("through **Python**" -> "throughPython") and splits kerned pairs
+            # ("T echnology"); the parser copies verbatim, so those would reach the CV.
+            text = "\n".join(_tidy(page.extract_text(extraction_mode="layout") or "")
+                             for page in reader.pages)
         except PdfReadError as exc:
             raise UnreadableUpload("This PDF looks corrupt.", reason="corrupt_pdf") from exc
         if len(text.strip()) < MIN_TEXT_CHARS:

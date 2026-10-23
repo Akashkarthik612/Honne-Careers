@@ -2,7 +2,7 @@ id: cv_analyst
 version: 1
 description: Judges how a CV fits a JD; returns evidence, not percentages
 model_tier: light
-temperature: 0
+temperature: 0.4
 max_output_tokens: 4096
 instructions: prompts/cv_analyst/v1.md
 input_schema: AnalystInput

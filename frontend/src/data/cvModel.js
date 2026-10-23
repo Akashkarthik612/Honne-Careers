@@ -7,19 +7,24 @@
 // All are O(n) in the number of entries and bullets.
 
 export const SKILL_GROUPS = [['lang', 'Languages'], ['fw', 'Frameworks'], ['tools', 'Cloud & tools']];
+// Spoken languages (not programming ones). Same values as the backend's LanguageLevel; '' = no level.
+export const LANGUAGE_LEVELS = [['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['professional', 'Professional'], ['native', 'Native']];
+export const SPOKEN_LANGUAGES_MAX = 10; // the API's cap (cv.py SpokenLanguages)
 
 let seq = 0;
 export const newId = (prefix) => `${prefix}${Date.now().toString(36)}${(seq += 1)}`;
 
 export const blankRole = () => ({ id: newId('r'), role: '', company: '', start: '', end: '', location: '', bullets: [] });
-export const blankProject = () => ({ id: newId('p'), name: '', tech: '', year: '', bullets: [] });
+export const blankProject = () => ({ id: newId('p'), name: '', tech: '', year: '', link: '', bullets: [] });
 export const blankEducation = () => ({ id: newId('e'), school: '', degree: '', years: '', city: '' });
+export const blankLanguage = () => ({ id: newId('l'), name: '', level: '' });
 
 export function emptyProfile() {
   return {
     personal: { name: '', city: '', email: '', phone: '', linkedin: '', github: '', portfolio: '', otherLinks: [] },
     roles: [], projects: [], education: [],
     skills: { lang: [], fw: [], tools: [] },
+    spoken: [],
   };
 }
 
@@ -34,6 +39,7 @@ export function toDoc(profile) {
     projects: mapBullets(profile.projects, bullet),
     education: profile.education.map((e) => ({ ...e })),
     skills: { lang: [...profile.skills.lang], fw: [...profile.skills.fw], tools: [...profile.skills.tools] },
+    spoken: profile.spoken.map((l) => ({ ...l })),
   };
 }
 
@@ -46,6 +52,7 @@ export function docToProfile(doc) {
     projects: mapBullets(doc.projects, bullet),
     education: doc.education.map((e) => ({ ...e })),
     skills: { ...doc.skills },
+    spoken: doc.spoken.map((l) => ({ ...l })),
   };
 }
 
@@ -84,6 +91,12 @@ export function boldParts(text) {
 
 export const plainText = (text) => text.replaceAll('**', '');
 
+// "French (Professional)": how a spoken language prints, here and in latex.py _spoken.
+export function languageText(l) {
+  const level = LANGUAGE_LEVELS.find(([k]) => k === l.level);
+  return level ? `${l.name.trim()} (${level[1]})` : l.name.trim();
+}
+
 // doc → cv. Empty fields and entries are dropped so the live preview never shows blank rows.
 export function docToCv(doc) {
   const texts = (bullets) => bullets.map((b) => b.text).filter(filled);
@@ -99,11 +112,12 @@ export function docToCv(doc) {
       .map((r) => ({ role: r.role, company: r.company, location: r.location, dates: span(r.start, r.end), bullets: texts(r.bullets) })),
     projects: doc.projects
       .filter((pr) => filled(pr.name))
-      .map((pr) => ({ name: pr.name, tech: pr.tech, year: pr.year, bullets: texts(pr.bullets) })),
+      .map((pr) => ({ name: pr.name, tech: pr.tech, year: pr.year, link: filled(pr.link) ? pr.link.trim() : null, bullets: texts(pr.bullets) })),
     education: doc.education
       .filter((e) => filled(e.school))
       .map((e) => ({ school: e.school, location: e.city, degree: e.degree, years: e.years })),
     skills: SKILL_GROUPS.filter(([k]) => doc.skills[k].length).map(([k, label]) => [label, doc.skills[k].join(', ')]),
+    languages: doc.spoken.filter((l) => filled(l.name)).map(languageText).join(', '),
   };
 }
 
@@ -136,8 +150,9 @@ export function pruneDoc(doc) {
   return {
     ...doc,
     roles: keep(doc.roles, ['role', 'company', 'start', 'end', 'location']),
-    projects: keep(doc.projects, ['name', 'tech']),
+    projects: keep(doc.projects, ['name', 'tech', 'link']),
     education: keep(doc.education, ['school', 'degree', 'years', 'city']),
+    spoken: doc.spoken.filter((l) => filled(l.name)),
   };
 }
 

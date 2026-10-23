@@ -15,6 +15,8 @@ from psycopg import AsyncConnection
 from app.db.session import Database
 from app.repositories.accounts import AccountRepository
 from app.repositories.applications import ApplicationRepository
+from app.repositories.chat_agents import CustomAgentRepository
+from app.repositories.chats import ChatRepository
 from app.repositories.job_descriptions import JobDescriptionRepository
 from app.repositories.misc import (
     AgentRunRepository,
@@ -39,6 +41,8 @@ class UnitOfWork:
         self.usage = UsageRepository(conn)
         self.settings = SettingsRepository(conn)
         self.applications = ApplicationRepository(conn)
+        self.agents = CustomAgentRepository(conn)
+        self.chats = ChatRepository(conn)
 
 
 class UnitOfWorkFactory(Protocol):

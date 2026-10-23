@@ -61,9 +61,11 @@ export function contentToDoc(c) {
   return {
     personal: headerToPersonal(c.header ?? {}),
     roles: (c.experience ?? []).map((e) => ({ id: e.id, role: e.role ?? '', company: e.company ?? '', start: e.start ?? '', end: e.end ?? '', location: e.location ?? '', bullets: e.bullets.map(bulletToDoc) })),
-    projects: (c.projects ?? []).map((p) => ({ id: p.id, name: p.name ?? '', tech: (p.tech ?? []).join(', '), year: p.date ?? '', bullets: p.bullets.map(bulletToDoc) })),
+    projects: (c.projects ?? []).map((p) => ({ id: p.id, name: p.name ?? '', tech: (p.tech ?? []).join(', '), year: p.date ?? '', link: p.link ?? '', bullets: p.bullets.map(bulletToDoc) })),
     education: (c.education ?? []).map((e) => ({ id: e.id, school: e.school ?? '', degree: e.degree ?? '', years: e.years ?? '', city: e.location ?? '' })),
     skills: Object.fromEntries(SKILL_KEYS.map(([ui, api]) => [ui, (c.skills?.[api] ?? []).map((s) => (typeof s === 'string' ? s : s.name))])),
+    // Spoken languages carry no server id: `id` is a React key only and is never sent.
+    spoken: (c.spoken_languages ?? []).map((l, i) => ({ id: `sl${i}`, name: l.name ?? '', level: l.level ?? '' })),
   };
 }
 
@@ -72,15 +74,19 @@ const splitTech = (tech) => tech.split(',').map((t) => t.trim()).filter(Boolean)
 const SECTION_IN = {
   personal: (d) => personalToHeader(d.personal),
   experience: (d) => d.roles.map((r) => ({ id: r.id, role: trim(r.role), company: trim(r.company), location: trim(r.location), start: trim(r.start), end: trim(r.end), bullets: r.bullets.map(bulletIn) })),
-  projects: (d) => d.projects.map((p) => ({ id: p.id, name: trim(p.name), tech: splitTech(p.tech), date: trim(p.year), bullets: p.bullets.map(bulletIn) })),
+  projects: (d) => d.projects.map((p) => ({ id: p.id, name: trim(p.name), tech: splitTech(p.tech), date: trim(p.year), link: trim(p.link), bullets: p.bullets.map(bulletIn) })),
   education: (d) => d.education.map((e) => ({ id: e.id, school: trim(e.school), degree: trim(e.degree), years: trim(e.years), location: trim(e.city) })),
   skills: (d) => Object.fromEntries(SKILL_KEYS.map(([ui, api]) => [api, d.skills[ui].map(trim).filter(Boolean)])),
+  spoken_languages: (d) => d.spoken.map((l) => ({ name: trim(l.name), level: l.level || null })),
 };
+
+// The sections each wizard step saves. Spoken languages are edited on the Skills step.
+export const STEP_SECTIONS = { personal: ['personal'], experience: ['experience'], projects: ['projects'], education: ['education'], skills: ['skills', 'spoken_languages'] };
 
 // Empty entries and bullets are dropped first, as the wizard's "Preview" always did.
 export function docToContentIn(doc) {
   const d = pruneDoc(doc);
-  return { header: SECTION_IN.personal(d), experience: SECTION_IN.experience(d), projects: SECTION_IN.projects(d), education: SECTION_IN.education(d), skills: SECTION_IN.skills(d) };
+  return { header: SECTION_IN.personal(d), experience: SECTION_IN.experience(d), projects: SECTION_IN.projects(d), education: SECTION_IN.education(d), skills: SECTION_IN.skills(d), spoken_languages: SECTION_IN.spoken_languages(d) };
 }
 
 // PATCH /resumes/{id} body for one wizard step.
@@ -112,6 +118,7 @@ export function mergePrefill(doc, pre) {
     projects: doc.projects.length ? doc.projects : pre.projects,
     education: doc.education.length ? doc.education : pre.education,
     skills: hasSkills ? doc.skills : pre.skills,
+    spoken: doc.spoken.length ? doc.spoken : pre.spoken,
   };
 }
 
@@ -135,7 +142,10 @@ export function validateDoc(doc, sections = WIZARD_ORDER) {
     }
   }
   if (sections.includes('projects')) {
-    for (const p of d.projects) if (!filled(p.name)) errors[`${p.id}.name`] = 'Add the project name.';
+    for (const p of d.projects) {
+      if (!filled(p.name)) errors[`${p.id}.name`] = 'Add the project name.';
+      if (filled(p.link) && !HTTP_URL.test(trim(p.link))) errors[`${p.id}.link`] = 'Paste the full link, starting with https://';
+    }
   }
   if (sections.includes('education')) {
     for (const e of d.education) if (!filled(e.school)) errors[`${e.id}.school`] = 'Add the school.';

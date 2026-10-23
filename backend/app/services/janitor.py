@@ -69,12 +69,35 @@ class RetentionJanitor:
                                                                    cutoff)
             result.rows_deleted += n_rows
             result.jds_deleted += n_jds
+        await self._purge_chats(cutoff, result)
+        await self._purge_agent_state(result)
         level = log.warning if result.failed_batches else log.info
         level("janitor_finished", rows_deleted=result.rows_deleted,
               files_deleted=result.files_deleted, jds_deleted=result.jds_deleted,
-              trash_cleared=result.trash_cleared, batches=result.batches,
+              trash_cleared=result.trash_cleared, chats_deleted=result.chats_deleted,
+              agent_states_deleted=result.agent_states_deleted,
+              batches=result.batches,
               failed_batches=result.failed_batches)
         return result
+
+    async def _purge_chats(self, cutoff: datetime, result: PurgeResult) -> None:
+        """Day 3: chats go on the same clock as the Database (no files to delete first)."""
+        for _ in range(self._max_batches):
+            async with self._db.maintenance_session() as conn:
+                n = await JanitorRepository(conn).purge_chats(cutoff, self._batch)
+            result.chats_deleted += n
+            if n < self._batch:
+                return
+
+    async def _purge_agent_state(self, result: PurgeResult) -> None:
+        """F5 backstop: run state left by a turn that kept writing after its chat was deleted.
+        Finished and deleted turns drop their own (trigger in 20261024000001)."""
+        for _ in range(self._max_batches):
+            async with self._db.maintenance_session() as conn:
+                n = await JanitorRepository(conn).purge_agent_state(self._batch)
+            result.agent_states_deleted += n
+            if n < self._batch:
+                return
 
     async def _empty_trash(self, result: PurgeResult) -> None:
         for _ in range(self._max_batches):

@@ -1,7 +1,7 @@
 """HTTP request/response shapes. Responses expose content; never internal columns
 like storage paths."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, StringConstraints, model_validator
@@ -12,6 +12,15 @@ from app.domain.applications import (
     RecordResult,
     Referral,
     RetentionWindow,
+)
+from app.domain.chat_agents import (
+    MESSAGE_MAX,
+    AgentSpec,
+    ChatMessageRow,
+    ChatRow,
+    CustomAgentIn,
+    CustomAgentRow,
+    TurnResult,
 )
 from app.domain.cv import CvContentIn, Model
 from app.domain.records import (
@@ -24,6 +33,7 @@ from app.domain.records import (
     ResumeSummary,
     SettingsRow,
 )
+from app.policy.quota import Usage
 
 
 class CreateResume(Model):
@@ -130,6 +140,12 @@ def settings_view(s: SettingsRow) -> dict[str, Any]:
             "product_emails": s.product_emails}
 
 
+def usage_view(u: Usage) -> dict[str, Any]:
+    return {"items": [{"key": i.key, "used": i.used, "limit": i.limit, "daily": i.daily}
+                      for i in u.items],
+            "resets_at": u.resets_at.isoformat()}
+
+
 def profile_view(p: ProfileRow) -> dict[str, Any]:
     return {"content": p.content.model_dump(mode="json"), "row_version": p.row_version,
             "updated_at": p.updated_at.isoformat()}
@@ -169,3 +185,81 @@ def record_view(r: RecordResult) -> dict[str, Any]:
     return {"saved": r.saved, "reason": r.reason,
             "application_id": str(r.application_id) if r.application_id else None,
             "deletes_on": r.deletes_on.date().isoformat() if r.deletes_on else None}
+
+
+# ---------- custom agents + chat (Day 3) ----------
+
+class UpdateAgent(CustomAgentIn):
+    """PUT /agents/{id}: the whole agent again (a new version) + optimistic concurrency."""
+    expected_version: int = Field(ge=1)
+
+
+class PreviewAgent(Model):
+    """CUST-3: try an unsaved agent with one message."""
+    agent: CustomAgentIn
+    message: Annotated[str, StringConstraints(min_length=1, max_length=MESSAGE_MAX)]
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def agent_view(a: CustomAgentRow) -> dict[str, Any]:
+    return {"id": str(a.id), "kind": "user", "handle": a.handle,
+            "description": a.description, "instructions": a.instructions,
+            "guardrails": a.guardrails, "knowledge": [k.value for k in a.knowledge],
+            "version": a.current_version, "row_version": a.row_version,
+            "chat_count": a.chat_count, "last_used_at": _iso(a.last_used_at),
+            "created_at": a.created_at.isoformat(), "updated_at": a.updated_at.isoformat()}
+
+
+def builtin_agent_view(s: AgentSpec) -> dict[str, Any]:
+    return {"kind": "builtin", "handle": s.handle, "description": s.description,
+            "knowledge": sorted(k.value for k in s.knowledge)}
+
+
+def agents_view(mine: list[CustomAgentRow], builtin: list[AgentSpec], limit: int
+                ) -> dict[str, Any]:
+    return {"mine": [agent_view(a) for a in mine],
+            "builtin": [builtin_agent_view(s) for s in builtin],
+            "limit": limit, "count": len(mine)}
+
+
+def chat_summary_view(c: ChatRow) -> dict[str, Any]:
+    return {"id": str(c.id), "title": c.title, "turn_count": c.turn_count,
+            "last_message_at": c.last_message_at.isoformat(),
+            "created_at": c.created_at.isoformat(), "running": c.running}
+
+
+def message_view(m: ChatMessageRow) -> dict[str, Any]:
+    return {"id": str(m.id), "seq": m.seq, "role": m.role, "status": m.status,
+            "content": m.content,
+            "agent": ({"handle": m.agent_handle, "kind": m.agent_kind}
+                      if m.agent_handle else None),
+            "sources": m.sources, "drafts": m.drafts, "steps": m.steps,
+            "error_code": m.error_code, "created_at": m.created_at.isoformat(),
+            "finished_at": _iso(m.finished_at)}
+
+
+def chat_view(c: ChatRow, messages: list[ChatMessageRow], turns_max: int,
+              long_warn_turns: int, window: RetentionWindow) -> dict[str, Any]:
+    return {**chat_summary_view(c),
+            "running": any(m.status == "running" for m in messages),
+            "turns_max": turns_max, "long_warn_turns": long_warn_turns,
+            "deletes_on": window.deletes_on(c.created_at).date().isoformat(),
+            "messages": [message_view(m) for m in messages]}
+
+
+def turn_view(chat: ChatRow, user_message: ChatMessageRow, answer: ChatMessageRow
+              ) -> dict[str, Any]:
+    return {"chat": {**chat_summary_view(chat), "running": True},
+            "user_message": message_view(user_message),
+            "assistant_message": message_view(answer),
+            "poll": f"/chats/{chat.id}/messages/{answer.id}"}
+
+
+def preview_view(r: TurnResult) -> dict[str, Any]:
+    return {"content": r.answer.content, "note": r.answer.note,
+            "sources": [s.to_json() for s in r.sources],
+            "drafts": [d.model_dump(mode="json") for d in r.answer.drafts],
+            "steps": [s.to_json() for s in r.steps]}

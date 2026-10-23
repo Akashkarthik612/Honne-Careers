@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles, Trash2 } from 'lucide-react';
 import CvDoc from '@/components/CvDoc';
 import SkillChips from '@/components/SkillChips';
+import SpokenLanguagesEditor from '@/components/SpokenLanguagesEditor';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { BULLET_TAILOR_CONCURRENCY } from '@/config/limits';
 import {
-  WIZARD_ORDER, bulletToDoc, mergePrefill, openSuggestions, prefillToDoc, sectionPatch, toResume, validateDoc,
+  STEP_SECTIONS, WIZARD_ORDER, bulletToDoc, mergePrefill, openSuggestions, prefillToDoc, sectionPatch, toResume, validateDoc,
 } from '@/data/cvAdapter';
 import {
   SKILL_GROUPS, blankBullet, blankEducation, blankProject, blankRole, docToCv, ensureEntries, settleDoc,
@@ -55,6 +56,36 @@ function Field({ id, label, value, onChange, type = 'text', placeholder, error }
 }
 
 const entryBox = { border: '1px solid var(--hc-hairline)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 };
+const stepOf = (section) => ORDER.find((k) => STEP_SECTIONS[k].includes(section));
+const hasContent = (entry) => Object.entries(entry).some(([k, v]) => (k === 'bullets' ? v.some((b) => b.text.trim()) : k !== 'id' && typeof v === 'string' && v.trim()));
+
+// Removes a whole role / project / education entry. One click when it's empty; asks first when it
+// has content, since the entry and its bullets go with it (saved when the step is left).
+function RemoveEntry({ noun, entry, onRemove, disabled }) {
+  const [asking, setAsking] = useState(false);
+  const btn = { display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 36, padding: '0 12px', borderRadius: 999, fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' };
+  if (!asking) {
+    return (
+      <button type="button" disabled={disabled} onClick={() => (hasContent(entry) ? setAsking(true) : onRemove())} aria-label={`Remove this ${noun}`} style={{ ...btn, border: '1px solid var(--hc-hairline)', background: '#FFFFFF', color: 'var(--hc-ink-muted)' }}>
+        <Trash2 size={14} aria-hidden="true" />Remove
+      </button>
+    );
+  }
+  return (
+    <div role="group" aria-label={`Remove this ${noun}?`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 13, fontWeight: 600 }}>Remove this {noun}?</span>
+      <button type="button" disabled={disabled} onClick={onRemove} style={{ ...btn, border: 0, background: 'var(--hc-warm)', color: '#FFFFFF' }}>Remove</button>
+      <button type="button" onClick={() => setAsking(false)} style={{ ...btn, border: '1px solid var(--hc-hairline)', background: '#FFFFFF', color: 'var(--hc-ink)' }}>Cancel</button>
+    </div>
+  );
+}
+
+const entryHead = (title, remove) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+    <span className="hc-flabel" style={{ color: 'var(--hc-ink-muted)' }}>{title}</span>
+    {remove}
+  </div>
+);
 
 // Per-bullet failures shown inline. Anything that isn't an API error is a bug: re-thrown, not hidden.
 function bulletError(e) {
@@ -117,6 +148,9 @@ function WizardForm({ resume, stepParam, onReload }) {
   const setPersonal = (key, value) => edit((d) => ({ ...d, personal: { ...d.personal, [key]: value } }));
   const patchEntry = (key, id, patch) => edit((d) => ({ ...d, [key]: d[key].map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
   const addEntry = (key, entry) => edit((d) => ({ ...d, [key]: [...d[key], entry] }));
+  // Removing every entry leaves the section empty, so it's left off the CV.
+  const removeEntry = (key, id) => edit((d) => ({ ...d, [key]: d[key].filter((e) => e.id !== id) }));
+  const removeButton = (key, noun, entry) => <RemoveEntry noun={noun} entry={entry} disabled={locked} onRemove={() => removeEntry(key, entry.id)} />;
   // Server-driven bullet changes (busy, tailor/settle results) don't make the step dirty.
   const patchBullet = (key, entryId, bulletId, patch) => setDoc((d) => ({
     ...d, [key]: d[key].map((e) => (e.id !== entryId ? e : { ...e, bullets: e.bullets.map((b) => (b.id === bulletId ? { ...b, ...patch } : b)) })),
@@ -133,7 +167,7 @@ function WizardForm({ resume, stepParam, onReload }) {
     const errors = validateDoc(doc, sections);
     setFieldErrors(errors);
     const firstBad = sections.find((s) => Object.keys(validateDoc(doc, [s])).length);
-    if (firstBad) { setStep(firstBad); return null; }
+    if (firstBad) { setStep(stepOf(firstBad)); return null; }
     setSaving(true);
     setSaveError(null);
     try {
@@ -159,7 +193,7 @@ function WizardForm({ resume, stepParam, onReload }) {
   async function goStep(next) {
     if (locked || next === step) return;
     // Keeps the dashboard's "Continue" on the step the user reached; a finished resume stays finished.
-    const version = await saveSections([step], editing ? null : next);
+    const version = await saveSections(STEP_SECTIONS[step], editing ? null : next);
     if (version === null) return;
     setStep(next);
     window.scrollTo({ top: 0 });
@@ -167,7 +201,7 @@ function WizardForm({ resume, stepParam, onReload }) {
 
   async function finish() {
     if (locked) return;
-    const version = await saveSections(ORDER, 'done');
+    const version = await saveSections(ORDER.flatMap((k) => STEP_SECTIONS[k]), 'done');
     if (version === null) return;
     try {
       // First-time user: this resume's facts become their profile (expected_version null = create).
@@ -316,8 +350,9 @@ function WizardForm({ resume, stepParam, onReload }) {
                   </div>
                 )}
                 {note && <div role="status" style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>{note}</div>}
-                {doc.roles.map((r) => (
+                {doc.roles.map((r, i) => (
                   <div key={r.id} style={entryBox}>
+                    {entryHead(`Role ${i + 1}`, removeButton('roles', 'role', r))}
                     <div className="hc-g2">
                       {ROLE_FIELDS.map(([k, label]) => <Field key={k} id={`${r.id}-${k}`} label={label} value={r[k]} error={fieldErrors[`${r.id}.${k}`]} onChange={(v) => patchEntry('roles', r.id, { [k]: v })} />)}
                     </div>
@@ -331,11 +366,13 @@ function WizardForm({ resume, stepParam, onReload }) {
 
             {step === 'projects' && (
               <div key="projects" className="hc-rise" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {doc.projects.map((p) => (
+                {doc.projects.map((p, i) => (
                   <div key={p.id} style={entryBox}>
+                    {entryHead(`Project ${i + 1}`, removeButton('projects', 'project', p))}
                     <div className="hc-g2">
                       <Field id={`${p.id}-name`} label="Project name" value={p.name} placeholder="e.g. Rate limiter" error={fieldErrors[`${p.id}.name`]} onChange={(v) => patchEntry('projects', p.id, { name: v })} />
                       <Field id={`${p.id}-tech`} label="Tech used" value={p.tech} placeholder="e.g. Go, Redis" onChange={(v) => patchEntry('projects', p.id, { tech: v })} />
+                      <Field id={`${p.id}-link`} label="Live link (optional, shows as “Click here”)" type="url" value={p.link} placeholder="https://…" error={fieldErrors[`${p.id}.link`]} onChange={(v) => patchEntry('projects', p.id, { link: v })} />
                     </div>
                     <div className="hc-flabel">What it does, and any result</div>
                     {bulletList('projects', p)}
@@ -347,9 +384,12 @@ function WizardForm({ resume, stepParam, onReload }) {
 
             {step === 'education' && (
               <div key="education" className="hc-rise" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {doc.education.map((e) => (
-                  <div key={e.id} className="hc-g2" style={{ border: '1px solid var(--hc-hairline)', borderRadius: 16, padding: 16 }}>
-                    {EDU_FIELDS.map(([k, label]) => <Field key={k} id={`${e.id}-${k}`} label={label} value={e[k]} error={fieldErrors[`${e.id}.${k}`]} onChange={(v) => patchEntry('education', e.id, { [k]: v })} />)}
+                {doc.education.map((e, i) => (
+                  <div key={e.id} style={entryBox}>
+                    {entryHead(`Education ${i + 1}`, removeButton('education', 'education entry', e))}
+                    <div className="hc-g2">
+                      {EDU_FIELDS.map(([k, label]) => <Field key={k} id={`${e.id}-${k}`} label={label} value={e[k]} error={fieldErrors[`${e.id}.${k}`]} onChange={(v) => patchEntry('education', e.id, { [k]: v })} />)}
+                    </div>
                   </div>
                 ))}
                 <div><button type="button" className="hc-add" onClick={() => addEntry('education', blankEducation())}>+ Add education</button></div>
@@ -359,6 +399,7 @@ function WizardForm({ resume, stepParam, onReload }) {
             {step === 'skills' && (
               <div key="skills" className="hc-rise" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {SKILL_GROUPS.map(([k, label]) => <SkillChips key={k} id={`sk-${k}`} label={label} values={doc.skills[k]} onChange={(v) => setSkills(k, v)} />)}
+                <SpokenLanguagesEditor id="sk-spoken" values={doc.spoken} disabled={saving} onChange={(v) => edit((d) => ({ ...d, spoken: v }))} />
                 {tailoring && resume.missingSkills.length > 0 && (
                   // TAIL-6: JD skills the profile lacks are offered, never added automatically.
                   <div style={{ background: '#F7F8FD', border: '1px solid #C9D3F7', borderRadius: 14, padding: '14px 16px' }}>

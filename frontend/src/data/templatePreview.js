@@ -34,4 +34,5 @@ export const PREVIEW_PROFILE = {
     fw: ['Spring Boot', 'Kafka Streams', 'JUnit'],
     tools: ['AWS (EC2, SQS, RDS)', 'Git', 'Grafana'],
   },
+  spoken: [{ id: 'l1', name: 'English', level: 'professional' }, { id: 'l2', name: 'Tamil', level: 'native' }],
 };

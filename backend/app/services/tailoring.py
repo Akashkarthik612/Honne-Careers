@@ -6,6 +6,7 @@ optimistic concurrency). The model never writes a locked field (B5).
 """
 
 from dataclasses import dataclass
+from datetime import date
 from uuid import UUID
 
 from app.agents.runner import AgentRunner
@@ -22,6 +23,7 @@ from app.core.hashing import content_hash
 from app.core.logging import get_logger
 from app.db.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from app.domain.auth import AuthUser
+from app.domain.career import CareerStage, career_stage, experience_span
 from app.domain.cv import Bullet, CvContent, ExperienceItem, Origin, ProjectItem
 from app.domain.records import JdRow, JobStep, ResumeRow
 from app.domain.tailoring import (
@@ -35,6 +37,7 @@ from app.domain.tailoring import (
 )
 from app.domain.truth import FactSet
 from app.policy.entitlements import Entitlements
+from app.policy.limits import DailyAction
 from app.policy.quota import QuotaGuard
 from app.truth.checker import TruthChecker
 from app.truth.copying import fact_text
@@ -88,6 +91,18 @@ def _kind(content: CvContent, item_id: str) -> str:
     return "experience" if any(e.id == item_id for e in content.experience) else "projects"
 
 
+def stage_of(content: CvContent, span: Span, resume_id: UUID) -> CareerStage:
+    """TAIL-8: fresher (< 2 yrs) gets a professional rewrite, senior (> 8 yrs) is never
+    condensed. Unreadable dates are skipped, never guessed (logged, counts only)."""
+    exp = experience_span(content, today=date.today())
+    stage = career_stage(exp)
+    if exp.unreadable:
+        log.warning("career_date_unreadable", resume_id=resume_id, roles=exp.roles,
+                    unreadable=exp.unreadable, career_stage=stage.value)
+    span.update(career_stage=stage.value, experience_months=exp.months)
+    return stage
+
+
 class BulletTailorService:
     def __init__(self, uow: UnitOfWorkFactory, runner: AgentRunner, quota: QuotaGuard,
                  entitlements: Entitlements, tracer: Tracer) -> None:
@@ -111,7 +126,7 @@ class BulletTailorService:
             account = await uow.accounts.get(user.id)
             self._entitlements.require(account.plan if account else "free", "tailor_mode")
             item, bullet = _find_bullet(ctx.resume.content, bullet_id)
-            await self._quota.consume(uow, user.id, "bullet_tailor")
+            await self._quota.consume(uow, user.id, DailyAction.BULLET_TAILOR)
 
         title, context = _title_context(item)
         siblings = [b.text for b in item.bullets if b.id != bullet_id and b.origin is not Origin.AI]
@@ -119,7 +134,8 @@ class BulletTailorService:
         run = await self._runner.run(
             "bullet_tailor",
             BulletTailorInput(jd_text=ctx.jd.text, item_title=title, item_context=context,
-                              item_facts=siblings, bullet_text=source_text),
+                              item_facts=siblings, bullet_text=source_text,
+                              career_stage=stage_of(ctx.resume.content, span, resume_id)),
             BulletTailorOutput, user_id=user.id, entity_id=resume_id)
 
         path = f"{_kind(ctx.resume.content, item.id)}[{item.id}].bullets[{bullet_id}]"
@@ -197,7 +213,7 @@ class TailorService:
                 raise InvalidInput("Add some experience or projects first.", reason="empty_cv")
             account = await uow.accounts.get(user.id)
             self._entitlements.require(account.plan if account else "free", "tailor_mode")
-            await self._quota.consume(uow, user.id, "full_tailor")
+            await self._quota.consume(uow, user.id, DailyAction.FULL_TAILOR)
             started = await uow.resumes.start_tailoring(user.id, resume_id, self._job_timeout_s)
             if started is None:
                 raise JobAlreadyRunning(reason="full_tailor")
@@ -228,6 +244,7 @@ class TailorService:
             return
         payload = TailorInput(
             jd_text=ctx.jd.text, scope=scope,  # type: ignore[arg-type]
+            career_stage=stage_of(content, span, resume_id),
             items=[ItemView(id=i.id, kind="experience" if isinstance(i, ExperienceItem)
                             else "project", title=_title_context(i)[0],
                             context=_title_context(i)[1],

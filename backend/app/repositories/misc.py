@@ -83,12 +83,13 @@ class AgentRunRepository:
             """insert into app.agent_runs
                    (user_id, agent_id, agent_version, provider, model, status, attempts,
                     input_tokens, output_tokens, latency_ms, error_code, entity_id,
-                    correlation_id)
-               values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    correlation_id, tool_calls, tool_names)
+               values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                returning id""",
             (r.user_id, r.agent_id, r.agent_version, r.provider, r.model, r.status, r.attempts,
              r.input_tokens, r.output_tokens, r.latency_ms, r.error_code, r.entity_id,
-             r.correlation_id))
+             r.correlation_id, r.tool_calls,
+             list(r.tool_names) if r.tool_names is not None else None))
         return (await cur.fetchone())["id"]
 
 
@@ -110,6 +111,17 @@ class UsageRepository:
                                     at time zone 'utc'""",
             (user_id, action))
         return (await cur.fetchone())["n"]
+
+    async def counts_today(self, user_id: UUID) -> dict[str, int]:
+        """Today's (UTC) count per action, for the usage panel. One indexed scan."""
+        cur = await self._conn.execute(
+            """select action, count(*) as n from app.usage_events
+                where user_id = %s
+                  and created_at >= date_trunc('day', now() at time zone 'utc')
+                                    at time zone 'utc'
+                group by action""",
+            (user_id,))
+        return {r["action"]: r["n"] for r in await cur.fetchall()}
 
     async def record(self, user_id: UUID, action: str) -> None:
         await self._conn.execute(

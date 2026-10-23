@@ -34,7 +34,8 @@ def _runner(fake, tracer=None):
 
 
 PAYLOAD = BulletTailorInput(jd_text="Python role", item_title="Engineer",
-                            item_context="Acme", bullet_text="Built APIs in Python")
+                            item_context="Acme", bullet_text="Built APIs in Python",
+                            career_stage="experienced")
 
 
 def test_registry_loads_all_agent_files():
@@ -122,7 +123,7 @@ async def test_trace_span_has_run_metadata_and_no_text():
     [span] = tracer.spans
     assert span["name"] == "bullet_tailor" and span["run_type"] == "llm"
     assert span["status"] == "succeeded" and span["attempts"] == 1
-    assert span["model"] == "strong-model" and span["agent_version"] == 2
+    assert span["model"] == "strong-model" and span["agent_version"] == 4
     assert span["user_id"] == USER and span["run_id"] is not None
     values = " ".join(str(v) for v in span.values())
     for text in ("Python role", "Built APIs in Python", "Built Python APIs at Acme", "Acme"):

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "title": "Follow-ups this week",
+      "turn_count": 1,
+      "last_message_at": "2026-10-19T09:30:00+00:00",
+      "created_at": "2026-10-19T09:30:00+00:00",
+      "running": true
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "title": "Referral ask",
+      "turn_count": 1,
+      "last_message_at": "2026-10-19T09:30:00+00:00",
+      "created_at": "2026-10-19T09:30:00+00:00",
+      "running": false
+    }
+  ],
+  "retention_days": 20,
+  "limit": 50
+}

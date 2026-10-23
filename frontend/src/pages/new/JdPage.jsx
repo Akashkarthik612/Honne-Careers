@@ -4,18 +4,19 @@ import { AlertCircle, ArrowLeft, ArrowRight, Check, Sparkles, Upload } from 'luc
 import PageTitle from '@/components/PageTitle';
 import SetupSteps from '@/components/SetupSteps';
 import { ErrorBanner, PageLoading } from '@/components/Status';
+import { MAX_JD_WORDS } from '@/config/limits';
 import { countWords, guessJobMeta } from '@/data/cvModel';
 import useResource from '@/hooks/useResource';
 import { createResume, getProfile, setJd, startTailor, uploadCv, uploadLatex } from '@/services/api';
 import { ApiError, errorText } from '@/services/apiClient';
 import { useAppStore } from '@/state/appStore';
 
-// Step 3 of new-resume setup (design: PasteJd.dc.html).
+// Step 3 of new-resume setup (design: PasteJd.dc.html). A JD pasted on Home arrives pre-filled here
+// (Mode skipped, so Back goes to the template picker).
 // First-time users (no saved profile) can upload a CV to pre-fill (POST /uploads), then check details in
 // the wizard. Returning users tailor their saved profile straight away (TAIL-2: tailoring needs a profile):
 // POST /resumes (the server copies the profile in) -> PUT /jd -> POST /tailor -> /tailoring/:id.
 
-const MAX_WORDS = 1000; // TAIL-1
 const UPLOAD_TYPES = ['.pdf', '.docx', '.tex']; // PROF-2
 const LATEX_MAX_CHARS = 100_000; // the API's cap on pasted LaTeX
 
@@ -35,7 +36,7 @@ export default function JdPage() {
   const fileInput = useRef(null);
 
   const words = countWords(draft.jd);
-  const tooLong = words > MAX_WORDS;
+  const tooLong = words > MAX_JD_WORDS;
   const canGo = words > 0 && !tooLong;
   const countText = words.toLocaleString('en-US');
 
@@ -112,7 +113,7 @@ export default function JdPage() {
 
   return (
     <main className="hc-wrap" style={{ maxWidth: 960 }}>
-      <SetupSteps current={2} />
+      <SetupSteps current={2} jdFromHome={draft.jdFromHome} />
       <PageTitle before="Paste the" accent="job description" style={{ marginTop: 24 }} />
       <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>
         {returning ? 'We’ll tailor your saved profile to it. You can review every change after.' : 'Next, you’ll check your details step by step — tailored to this job.'}
@@ -193,7 +194,7 @@ export default function JdPage() {
       <ErrorBanner error={failed?.error} action={failed && { label: 'Try again', onClick: () => go(failed.kind) }} />
 
       <div style={{ marginTop: 22, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Link className="hc-back" to="/new/mode"><ArrowLeft size={16} aria-hidden="true" />Back</Link>
+        <Link className="hc-back" to={draft.jdFromHome ? '/new/template' : '/new/mode'}><ArrowLeft size={16} aria-hidden="true" />Back</Link>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
           {returning && canGo && <button type="button" className="hc-btn-t" onClick={() => go('details')} disabled={busy !== null}>{busy === 'details' ? 'Opening…' : 'Review step by step instead'}</button>}
           {canGo && !uploading ? (

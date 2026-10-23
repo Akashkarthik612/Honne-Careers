@@ -102,7 +102,7 @@ Backend work starts at P1. P2–P4 are listed so P1 data shapes don't block them
 | TAIL-5 | MUST put the experience most relevant to the JD first ("everything relevant, up top"). |
 | TAIL-6 | MUST NOT add a JD skill the profile lacks; list it as missing instead (see TRUTH rules, §7). |
 | TAIL-7 | MUST produce a versioned tailored CV (structured content \+ PDF), linked to its JD and profile version. "Tailor again" creates a new version. |
-| TAIL-8 | SHOULD keep the CV to one page unless the user asks otherwise. |
+| TAIL-8 | SHOULD keep the CV to one page unless the user asks otherwise, or has more than 8 years of experience (counted in Python from role dates, internships excluded). A fresher (under 2 years, internships included, or no roles) gets every editable bullet rewritten professionally, from its own facts only (tailor prompts v3, 23 Oct 2026). |
 
 ### 6.4 Edit via chat (P1)
 

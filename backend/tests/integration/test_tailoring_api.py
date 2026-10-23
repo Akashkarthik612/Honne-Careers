@@ -2,6 +2,7 @@
 
 import json
 
+import psycopg
 import pytest
 
 from app.agents.providers.base import LlmTransientError
@@ -49,6 +50,7 @@ async def test_bullet_tailor_then_revert_then_keep(api):
     r = await api.client.post(f"/resumes/{rid}/bullets/nw1/tailor", headers=h)
     assert r.status_code == 200, r.text
     assert r.json()["bullet"]["tailor_state"] == "proposed"
+    assert '"career_stage": "experienced"' in api.provider.calls[0]["user"]  # TAIL-8, ~6 yrs
     version = r.json()["row_version"]
 
     r = await api.client.post(f"/resumes/{rid}/bullets/nw1/revert",
@@ -129,6 +131,7 @@ async def test_full_tailor_job(api):
 
     res = await get(api, h, rid)  # ASGITransport has run the background task by now
     assert res["status"] == "ready", res["error_code"]
+    assert '"career_stage": "experienced"' in api.provider.calls[0]["user"]  # TAIL-8
     assert bullet(res, "nw1")["tailor_state"] == "proposed"
     assert bullet(res, "nw2")["text"].startswith("Owned the settlement pipeline")  # kept
     assert res["missing_skills"] == ["Kubernetes"]
@@ -156,7 +159,10 @@ async def test_tailor_needs_jd_and_respects_quota(api):
     assert r.json()["error"]["details"]["reason"] == "no_jd"
 
     await api.client.put(f"/resumes/{rid}/jd", json={"text": SAMPLE_JD}, headers=h)
-    api.container.quota._limits["full_tailor"] = 1
+    uid = (await api.client.get("/me", headers=h)).json()["user_id"]
+    with psycopg.connect(api.admin_url, autocommit=True) as conn:  # 19 of the 20 used
+        conn.execute("insert into app.usage_events (user_id, action) "
+                     "select %s, 'full_tailor' from generate_series(1, 19)", (uid,))
     api.provider.push(honest_tailor)
     assert (await api.client.post(f"/resumes/{rid}/tailor", json={},
                                   headers=h)).status_code == 202

@@ -10,6 +10,7 @@ from app.db.unit_of_work import UnitOfWorkFactory
 from app.domain.analysis import AnalysisJudgment, AnalystInput
 from app.domain.auth import AuthUser
 from app.domain.records import AnalysisRow
+from app.policy.limits import DailyAction
 from app.policy.quota import QuotaGuard
 
 log = get_logger(__name__)
@@ -35,7 +36,7 @@ class AnalysisService:
             cached = await uow.analyses.get_cached(user.id, resume_id, row.content_hash,
                                                    jd.content_hash)
             if cached is None:
-                await self._quota.consume(uow, user.id, "analysis")
+                await self._quota.consume(uow, user.id, DailyAction.ANALYSIS)
         if cached is not None:
             log.info("analysis_cache_hit", resume_id=resume_id)
             return cached, True
