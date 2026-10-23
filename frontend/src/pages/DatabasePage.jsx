@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowUpDown, Clock, Columns3, Download, FileText, NotebookPen, Plus, Search, Table2, Trash2, X } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import CvDoc from '@/components/CvDoc';
@@ -389,7 +389,9 @@ export default function DatabasePage() {
   const [view, setView] = useState('table');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const [peek, setPeek] = useState(null); // { id, tab }
+  // ?open=<id> opens that row's side panel (links from a chat answer's sources, Day 3).
+  const [params] = useSearchParams();
+  const [peek, setPeek] = useState(() => (params.get('open') ? { id: params.get('open'), tab: 'jd' } : null)); // { id, tab }
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [rowError, setRowError] = useState(null);

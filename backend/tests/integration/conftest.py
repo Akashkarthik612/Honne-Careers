@@ -105,21 +105,26 @@ class Api:
         return {"Authorization": f"Bearer user:{_new_auth_user(self.admin_url)}"}
 
 
-def make_settings(database_url: str) -> Settings:
+TEST_LIMITS = Path(__file__).resolve().parents[1] / "limits_test.yaml"
+BETA_LIMITS = Path(__file__).resolve().parents[2] / "config" / "limits.yaml"
+
+
+def make_settings(database_url: str, limits_file: Path = TEST_LIMITS) -> Settings:
     return Settings(
         _env_file=None, env="test", database_url=database_url,
         supabase_url="https://proj.supabase.test", supabase_anon_key="anon",
         supabase_service_role_key="service", cors_origins="https://app.test",
         llm_strong="fake:strong", llm_light="fake:light", gemini_api_key="unused",
         llm_backoff_base_s=0.001, janitor_enabled=False,  # tests call the janitor directly
+        limits_file=limits_file,  # generous, so only limit tests hit limits
     )
 
 
-@pytest.fixture
-async def api(database: str, admin_url: str) -> AsyncIterator[Api]:
+async def _harness(database: str, admin_url: str, limits_file: Path) -> AsyncIterator[Api]:
     provider, files, compiler = FakeProvider(), FakeFileStore(), FakeLatexCompiler()
     storage_admin = FakeStorageAdmin(files)
-    container = build_container(make_settings(database), providers={"fake": provider},
+    container = build_container(make_settings(database, limits_file),
+                                providers={"fake": provider},
                                 jwt_verifier=FakeVerifier(), files=files,
                                 admin=FakeAdmin(admin_url), compiler=compiler,
                                 storage_admin=storage_admin)
@@ -129,3 +134,16 @@ async def api(database: str, admin_url: str) -> AsyncIterator[Api]:
     async with httpx.AsyncClient(transport=transport, base_url="http://api.test") as client:
         yield Api(client, container, provider, files, compiler, admin_url, storage_admin)
     await container.stop()
+
+
+@pytest.fixture
+async def api(database: str, admin_url: str) -> AsyncIterator[Api]:
+    async for harness in _harness(database, admin_url, TEST_LIMITS):
+        yield harness
+
+
+@pytest.fixture
+async def beta_api(database: str, admin_url: str) -> AsyncIterator[Api]:
+    """The API with the real beta limits (config/limits.yaml)."""
+    async for harness in _harness(database, admin_url, BETA_LIMITS):
+        yield harness

@@ -1,0 +1,7 @@
+# Built-in chat agent (Day 3). Same mechanism as a user-made agent: the platform rules,
+# tools and output contract are added by ChatPromptBuilder; this file only says what it does.
+handle: analyst
+version: 1
+description: Reads your Database and tells you what's working, what isn't, and who to follow up
+instructions: prompts/chat/analyst/v1.md
+knowledge: [applications, resumes, profile]

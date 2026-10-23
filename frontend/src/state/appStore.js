@@ -13,6 +13,7 @@ export function useAppStore() {
 }
 
 // upload: { filename, prefill } after POST /uploads; the wizard pre-fills from it once (PROF-2, PROF-4).
+// jdFromHome: the JD was pasted on Home, so setup skips the Mode step (template → JD page).
 export function blankDraft() {
-  return { template: 'jake', mode: 'jd', jd: '', company: '', role: '', upload: null };
+  return { template: 'jake', mode: 'jd', jd: '', company: '', role: '', upload: null, jdFromHome: false };
 }

@@ -42,6 +42,7 @@
           "PostgreSQL"
         ],
         "date": "2023",
+        "link": "",
         "bullets": []
       }
     ],
@@ -62,6 +63,7 @@
       "tools": [
         "AWS"
       ]
-    }
+    },
+    "spoken_languages": []
   }
 }

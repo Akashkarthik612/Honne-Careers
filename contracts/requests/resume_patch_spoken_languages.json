@@ -1,0 +1,17 @@
+{
+  "expected_version": 7,
+  "change": {
+    "section": "spoken_languages",
+    "value": [
+      {
+        "name": "English",
+        "level": "professional"
+      },
+      {
+        "name": "Tamil",
+        "level": "native"
+      }
+    ]
+  },
+  "wizard_step": "done"
+}

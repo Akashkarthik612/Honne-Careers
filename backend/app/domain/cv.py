@@ -47,7 +47,12 @@ def _email(value: str) -> str:
     return value
 
 
+def _optional_http_url(value: str) -> str:
+    return value and _http_url(value)
+
+
 Url = Annotated[str, StringConstraints(max_length=300), AfterValidator(_http_url)]
+OptionalUrl = Annotated[str, StringConstraints(max_length=300), AfterValidator(_optional_http_url)]
 Email = Annotated[str, StringConstraints(max_length=254), AfterValidator(_email)]
 
 
@@ -62,6 +67,13 @@ class TailorState(StrEnum):
     NONE = "none"
     PROPOSED = "proposed"
     KEPT = "kept"
+
+
+class LanguageLevel(StrEnum):
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    PROFESSIONAL = "professional"
+    NATIVE = "native"
 
 
 # ---------- stored shapes ----------
@@ -109,6 +121,7 @@ class ProjectItem(Model):
     name: Required
     tech: list[SkillName] = Field(default_factory=list, max_length=15)
     date: DateText = ""
+    link: OptionalUrl = ""  # deployed / demo URL, printed as "Click here"
     bullets: list[Bullet] = Field(default_factory=list, max_length=12)
 
 
@@ -129,12 +142,23 @@ class Skills(Model):
 SKILL_CATEGORIES: tuple[str, ...] = ("languages", "frameworks", "tools")
 
 
+class SpokenLanguage(Model):
+    """A human language (not a programming one: those are skills.languages). Typed by the
+    user, so it is stored as sent: the same shape in and out."""
+    name: Annotated[str, StringConstraints(min_length=1, max_length=60)]
+    level: LanguageLevel | None = None
+
+
+SpokenLanguages = Annotated[list[SpokenLanguage], Field(max_length=10)]
+
+
 class CvContent(Model):
     header: Header = Field(default_factory=Header)
     experience: list[ExperienceItem] = Field(default_factory=list, max_length=15)
     projects: list[ProjectItem] = Field(default_factory=list, max_length=15)
     education: list[EducationItem] = Field(default_factory=list, max_length=10)
     skills: Skills = Field(default_factory=Skills)
+    spoken_languages: SpokenLanguages = Field(default_factory=list)
 
     def bullet_owners(self) -> dict[str, ExperienceItem | ProjectItem]:
         """bullet id -> the experience/project item that holds it."""
@@ -167,6 +191,7 @@ class ProjectIn(Model):
     name: Required
     tech: list[SkillName] = Field(default_factory=list, max_length=15)
     date: DateText = ""
+    link: OptionalUrl = ""
     bullets: list[BulletIn] = Field(default_factory=list, max_length=12)
 
 
@@ -182,6 +207,7 @@ class CvContentIn(Model):
     projects: list[ProjectIn] = Field(default_factory=list, max_length=15)
     education: list[EducationItem] = Field(default_factory=list, max_length=10)
     skills: SkillsIn = Field(default_factory=SkillsIn)
+    spoken_languages: SpokenLanguages = Field(default_factory=list)
 
 
 # ---------- autosave unit (one wizard step) ----------
@@ -211,8 +237,14 @@ class SkillsPatch(Model):
     value: SkillsIn
 
 
+class SpokenLanguagesPatch(Model):
+    section: Literal["spoken_languages"]  # saved with the Skills step
+    value: SpokenLanguages
+
+
 SectionPatch = Annotated[
-    PersonalPatch | ExperiencePatch | ProjectsPatch | EducationPatch | SkillsPatch,
+    PersonalPatch | ExperiencePatch | ProjectsPatch | EducationPatch | SkillsPatch
+    | SpokenLanguagesPatch,
     Field(discriminator="section"),
 ]
 

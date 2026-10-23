@@ -43,6 +43,7 @@ WORKDIR /srv
 COPY app ./app
 COPY agents ./agents
 COPY prompts ./prompts
+COPY config ./config
 COPY docker ./docker
 
 # Warm the cache by compiling the real Jake template once (needs network at build only).

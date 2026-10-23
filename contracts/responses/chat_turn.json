@@ -1,0 +1,48 @@
+{
+  "chat": {
+    "id": "55555555-5555-4555-8555-555555555555",
+    "title": "Follow-ups this week",
+    "turn_count": 1,
+    "last_message_at": "2026-10-19T09:30:00+00:00",
+    "created_at": "2026-10-19T09:30:00+00:00",
+    "running": true
+  },
+  "user_message": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "seq": 1,
+    "role": "user",
+    "status": "ok",
+    "content": "@follow-up who hasn't replied?",
+    "agent": null,
+    "sources": [],
+    "drafts": [],
+    "steps": [],
+    "error_code": null,
+    "created_at": "2026-10-19T09:30:00+00:00",
+    "finished_at": null
+  },
+  "assistant_message": {
+    "id": "66666666-6666-4666-8666-666666666666",
+    "seq": 2,
+    "role": "assistant",
+    "status": "running",
+    "content": "",
+    "agent": {
+      "handle": "follow-up",
+      "kind": "user"
+    },
+    "sources": [],
+    "drafts": [],
+    "steps": [
+      {
+        "tool": "list_applications",
+        "label": "Read your Database · 6 applications",
+        "count": 6
+      }
+    ],
+    "error_code": null,
+    "created_at": "2026-10-19T09:30:00+00:00",
+    "finished_at": null
+  },
+  "poll": "/chats/55555555-5555-4555-8555-555555555555/messages/66666666-6666-4666-8666-666666666666"
+}

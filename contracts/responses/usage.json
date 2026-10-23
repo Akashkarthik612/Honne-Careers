@@ -1,0 +1,53 @@
+{
+  "items": [
+    {
+      "key": "full_tailor",
+      "used": 1,
+      "limit": 3,
+      "daily": true
+    },
+    {
+      "key": "chat_start",
+      "used": 2,
+      "limit": 5,
+      "daily": true
+    },
+    {
+      "key": "chat_message",
+      "used": 0,
+      "limit": 125,
+      "daily": true
+    },
+    {
+      "key": "bullet_tailor",
+      "used": 0,
+      "limit": 150,
+      "daily": true
+    },
+    {
+      "key": "pdf",
+      "used": 0,
+      "limit": 40,
+      "daily": true
+    },
+    {
+      "key": "analysis",
+      "used": 0,
+      "limit": 40,
+      "daily": true
+    },
+    {
+      "key": "upload",
+      "used": 0,
+      "limit": 20,
+      "daily": true
+    },
+    {
+      "key": "custom_agents",
+      "used": 1,
+      "limit": 2,
+      "daily": false
+    }
+  ],
+  "resets_at": "2026-10-20T00:00:00+00:00"
+}

@@ -1,0 +1,22 @@
+# Usage limits (PLAN-1, PLAN-2, CUST-4): the one place these numbers live.
+# Read once at startup (app/policy/limits.py); a bad value stops the app.
+#
+# While use_account_plan is false, every account gets default_plan.
+# Later: add one block per plan (names = user_accounts.plan values: free, plus, pro,
+# pro_plus) and set use_account_plan to true. No code change needed.
+version: 1
+default_plan: beta
+use_account_plan: false
+
+plans:
+  beta:
+    daily:                 # per user per UTC day (resets 05:30 IST); every attempt counts
+      full_tailor: 3       # "Tailor my CV" runs, Retry included
+      chat_start: 5        # new AI chats; each "Try it" message in the agent builder too
+      chat_message: 125    # safety cap on answers + retries (5 chats x 25 turns)
+      bullet_tailor: 150   # per-bullet "Tailor to JD" in the wizard ("Tailor all" uses these)
+      pdf: 40              # PDF builds
+      analysis: 40         # "Start analysis" runs
+      upload: 20           # CV uploads / LaTeX pastes
+    total:                 # never reset
+      custom_agents: 2     # active agents a user has made

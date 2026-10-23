@@ -5,7 +5,7 @@ needs no migration and applies to every row that still exists.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -42,6 +42,9 @@ class RecordResult:
 class ApplicationFilter:
     statuses: frozenset[str] = frozenset()   # empty = every status
     query: str | None = None                 # company or role contains, case-insensitive
+    referral: str | None = None              # yes/asked/no, or "none" = not set; None = any
+    sent_after: date | None = None           # applied_on >= (inclusive)
+    sent_before: date | None = None          # applied_on <= (inclusive)
 
 
 @dataclass(slots=True)
@@ -51,5 +54,7 @@ class PurgeResult:
     files_deleted: int = 0
     jds_deleted: int = 0
     trash_cleared: int = 0
+    chats_deleted: int = 0            # Day 3: chats past the window (cascade: messages)
+    agent_states_deleted: int = 0     # orphan run state (F5); finished turns drop their own
     batches: int = 0
     failed_batches: list[int] = field(default_factory=list)

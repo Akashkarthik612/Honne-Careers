@@ -48,6 +48,17 @@ class ApplicationRepository:
         if flt.query:
             where.append("(a.company ilike %s or a.role ilike %s)")
             params += [_like(flt.query)] * 2
+        if flt.referral == "none":
+            where.append("a.referral is null")
+        elif flt.referral:
+            where.append("a.referral = %s")
+            params.append(flt.referral)
+        if flt.sent_after:
+            where.append("a.applied_on >= %s")
+            params.append(flt.sent_after)
+        if flt.sent_before:
+            where.append("a.applied_on <= %s")
+            params.append(flt.sent_before)
         params.append(limit)
         cur = await self._conn.execute(
             f"""select {_SUMMARY} from app.applications a

@@ -3,7 +3,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, Response
 
 from app.api.deps import Deps, User
-from app.api.schemas import SaveSettings, settings_view
+from app.api.schemas import SaveSettings, settings_view, usage_view
 from app.domain.records import SettingsRow
 
 router = APIRouter(tags=["account"])
@@ -19,6 +19,12 @@ async def health(c: Deps) -> dict[str, str]:
 @router.get("/me")
 async def me(user: User, c: Deps) -> dict[str, object]:
     return asdict(await c.accounts.me(user))
+
+
+@router.get("/me/usage")
+async def my_usage(user: User, c: Deps) -> dict[str, object]:
+    """Today's usage against the user's limits (config/limits.yaml), for Settings."""
+    return usage_view(await c.accounts.usage(user))
 
 
 @router.delete("/me", status_code=204)

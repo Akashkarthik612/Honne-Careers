@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import SkillChips from '@/components/SkillChips';
+import SpokenLanguagesEditor from '@/components/SpokenLanguagesEditor';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { contentToProfile, profileToContentIn, timeAgo, validateDoc } from '@/data/cvAdapter';
 import { SKILL_GROUPS, blankEducation, blankProject, blankRole, emptyProfile, newId, profileSections, toDoc } from '@/data/cvModel';
@@ -186,6 +187,7 @@ function ProfileForm({ initial, onReload }) {
                   <div className="hc-g2">
                     <Field id={`${p.id}-name`} label="Project name" value={p.name} error={errors[`${p.id}.name`]} onChange={(v) => patch('projects', p.id, { name: v })} />
                     <Field id={`${p.id}-tech`} label="Tech used" value={p.tech} onChange={(v) => patch('projects', p.id, { tech: v })} />
+                    <Field id={`${p.id}-link`} label="Live link (optional, shows as “Click here”)" value={p.link} error={errors[`${p.id}.link`]} onChange={(v) => patch('projects', p.id, { link: v })} />
                   </div>
                   <Bullets entry={p} label="What it does, and any result" onChange={(c) => patch('projects', p.id, c)} />
                 </div>
@@ -212,6 +214,7 @@ function ProfileForm({ initial, onReload }) {
               {SKILL_GROUPS.map(([k, label]) => (
                 <SkillChips key={k} id={`pf-sk-${k}`} label={label} values={profile.skills[k]} onChange={(v) => update((p) => ({ ...p, skills: { ...p.skills, [k]: v } }))} />
               ))}
+              <SpokenLanguagesEditor id="pf-spoken" values={profile.spoken} onChange={(v) => update((p) => ({ ...p, spoken: v }))} />
             </div>
           </section>
         </form>

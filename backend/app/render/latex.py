@@ -11,7 +11,7 @@ is XeTeX-based and emits Unicode text natively (ATS-readable, PDF-4).
 import re
 from urllib.parse import quote, urlparse
 
-from app.domain.cv import CvContent, ExperienceItem, Link, ProjectItem
+from app.domain.cv import CvContent, ExperienceItem, Link, ProjectItem, SpokenLanguage
 from app.domain.markup import parse
 
 _ESCAPES = str.maketrans({
@@ -111,6 +111,8 @@ class LatexRenderer:
             parts.append(self._projects(cv.projects))
         if any(getattr(cv.skills, c) for c in ("languages", "frameworks", "tools")):
             parts.append(self._skills(cv))
+        if cv.spoken_languages:
+            parts.append(self._spoken(cv.spoken_languages))
         parts.append(r"\end{document}")
         return "\n".join(parts) + "\n"
 
@@ -158,7 +160,11 @@ class LatexRenderer:
         rows: list[str] = []
         for p in items:
             tech = escape(", ".join(p.tech))
-            title = rf"\textbf{{{escape(p.name)}}}" + (rf" $|$ \emph{{{tech}}}" if tech else "")
+            title = rf"\textbf{{{escape(p.name)}}}"
+            if p.link:
+                title += rf" $|$ \href{{{escape_url(p.link)}}}{{\underline{{Click here}}}}"
+            if tech:
+                title += rf" $|$ \emph{{{tech}}}"
             rows.append(rf"    \resumeProjectHeading{{{title}}}{{{escape(p.date)}}}")
             rows += self._bullets(p)
         return "\n".join([r"\section{Projects}", r"  \resumeSubHeadingListStart", *rows,
@@ -176,5 +182,17 @@ class LatexRenderer:
             r"    \small{\item{",
             " \\\\\n".join(lines),
             r"    }}",
+            r" \end{itemize}",
+        ])
+
+    @staticmethod
+    def _spoken(languages: list[SpokenLanguage]) -> str:
+        """Human languages, e.g. "English (Native), French (Professional)"."""
+        text = ", ".join(escape(s.name) + (f" ({s.level.value.capitalize()})" if s.level else "")
+                         for s in languages)
+        return "\n".join([
+            r"\section{Languages}",
+            r" \begin{itemize}[leftmargin=0.15in, label={}]",
+            rf"    \small{{\item{{{text}}}}}",
             r" \end{itemize}",
         ])

@@ -5,10 +5,13 @@ Limits that Day_1 B11 fixed have defaults equal to the approved values.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 from pydantic import Field, HttpUrl, PostgresDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -67,13 +70,25 @@ class Settings(BaseSettings):
     # Tailor job (B9: stale job)
     tailor_job_timeout_s: int = Field(default=180, ge=30)
 
-    # Entitlements and quotas (B11 #8, PLAN-1/2)
+    # Entitlements (PLAN-1). Usage limits per plan live in the limits file, not env.
     beta_free_tailoring: bool = True
-    quota_full_tailor_per_day: int = Field(default=20, ge=0)
-    quota_bullet_tailor_per_day: int = Field(default=150, ge=0)
-    quota_pdf_per_day: int = Field(default=40, ge=0)
-    quota_analysis_per_day: int = Field(default=40, ge=0)
-    quota_upload_per_day: int = Field(default=20, ge=0)
+    limits_file: Path = BACKEND_DIR / "config" / "limits.yaml"
+
+    # Custom agents + chat (Day 3). Text lengths are fixed by the DB checks, not here.
+    chat_turns_max: int = Field(default=25, ge=2, le=100)              # 50 messages
+    chat_long_warn_turns: int = Field(default=20, ge=1, le=100)        # "getting long" banner
+    chat_history_turns: int = Field(default=25, ge=1, le=50)           # turns sent: whole chat
+    agent_state_pool_max: int = Field(default=4, ge=1, le=32)          # AgentStateStore
+    chat_list_max: int = Field(default=50, ge=1, le=500)
+    chat_concurrent_turns_max: int = Field(default=4, ge=1, le=32)     # per process
+    agent_tool_rounds_max: int = Field(default=4, ge=1, le=10)
+    agent_tool_calls_max: int = Field(default=6, ge=1, le=20)
+    agent_tool_timeout_s: int = Field(default=10, ge=1, le=60)
+    agent_tool_text_max_chars: int = Field(default=6000, ge=500, le=50000)
+    agent_llm_timeout_s: int = Field(default=30, ge=5, le=120)         # per model call
+    agent_llm_max_retries: int = Field(default=1, ge=0, le=5)
+    agent_temperature: float = Field(default=0.3, ge=0, le=1)
+    agent_max_output_tokens: int = Field(default=4096, ge=256, le=32768)
 
     # Application Database (Day 2 §4). The one place the number of days lives: reads hide
     # older rows at once and the daily clean-up deletes them. Changing it needs no migration.
@@ -101,10 +116,27 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
+    def _chat_limits_consistent(self) -> "Settings":
+        if self.chat_long_warn_turns > self.chat_turns_max:
+            raise ValueError("CHAT_LONG_WARN_TURNS must not exceed CHAT_TURNS_MAX")
+        return self
+
+    @model_validator(mode="after")
     def _tracing_needs_key(self) -> "Settings":
         if self.langsmith_tracing and self.langsmith_api_key is None:
             raise ValueError("LANGSMITH_TRACING=true needs LANGSMITH_API_KEY")
         return self
+
+    @property
+    def chat_turn_timeout_s(self) -> int:
+        """A running turn older than this is dead (Render restart/sleep): marked failed on
+        read, like the tailor job's stale_job (B9). Worst case: every round uses every retry
+        with its backoff sleeps, every tool call hits its timeout, plus 60s for step writes."""
+        retries = self.agent_llm_max_retries
+        backoff = self.llm_backoff_base_s * (2 ** retries - 1)
+        per_call = self.agent_llm_timeout_s * (retries + 1) + backoff
+        tools = self.agent_tool_calls_max * self.agent_tool_timeout_s
+        return int((self.agent_tool_rounds_max + 1) * per_call + tools + 60)
 
     @property
     def jwt_issuer(self) -> str:

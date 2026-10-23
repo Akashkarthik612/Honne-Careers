@@ -15,6 +15,13 @@ class AccountRepository:
             "insert into app.user_accounts (user_id) values (%s) on conflict do nothing",
             (user_id,))
 
+    async def plan_of(self, user_id: UUID) -> str | None:
+        """The account's plan (limits per plan). One primary-key read."""
+        cur = await self._conn.execute(
+            "select plan from app.user_accounts where user_id = %s", (user_id,))
+        row = await cur.fetchone()
+        return row["plan"] if row else None
+
     async def get(self, user_id: UUID) -> AccountRow | None:
         cur = await self._conn.execute(
             """select a.user_id, a.plan,

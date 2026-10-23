@@ -6,10 +6,12 @@ from app.domain.cv import (
     EducationItem,
     ExperienceItem,
     Header,
+    LanguageLevel,
     Origin,
     ProjectItem,
     SkillItem,
     Skills,
+    SpokenLanguage,
 )
 
 
@@ -47,6 +49,7 @@ def sample_cv() -> CvContent:
         projects=[
             ProjectItem(id="ll", name="Ledger-lite",
                         tech=["Java", "Spring Boot", "PostgreSQL", "Docker"], date="2023",
+                        link="https://ledger-lite.example.dev",
                         bullets=[b("ll1", "Built a double-entry ledger that sustained 1,000 TPS "
                                           "in load tests, measured with k6")]),
         ],
@@ -56,6 +59,8 @@ def sample_cv() -> CvContent:
         skills=Skills(languages=s("Java", "Python", "SQL"),
                       frameworks=s("Spring Boot", "Kafka Streams", "JUnit"),
                       tools=s("AWS", "Docker", "Git", "Grafana")),
+        spoken_languages=[SpokenLanguage(name="English", level=LanguageLevel.PROFESSIONAL),
+                          SpokenLanguage(name="Tamil", level=LanguageLevel.NATIVE)],
     )
 
 

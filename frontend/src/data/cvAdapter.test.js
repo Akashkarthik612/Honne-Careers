@@ -195,3 +195,38 @@ describe('helpers', () => {
     expect(timeAgo('2026-10-18T10:00:00Z', now)).toBe('Updated yesterday');
   });
 });
+
+describe('spoken languages and project links', () => {
+  const raw = response('profile.json').content;
+
+  it('round-trips spoken languages and the project link, with no client ids sent', () => {
+    const doc = contentToDoc(raw);
+    expect(doc.spoken.map((l) => [l.name, l.level])).toEqual([['English', 'professional'], ['Tamil', 'native']]);
+    const body = docToContentIn(doc);
+    expect(body.spoken_languages).toEqual(raw.spoken_languages);
+    expect(body.projects[0].link).toBe(raw.projects[0].link);
+  });
+
+  it('sends no level as null and drops a language without a name', () => {
+    const doc = { ...contentToDoc(raw), spoken: [{ id: 'a', name: ' French ', level: '' }, { id: 'b', name: ' ', level: 'native' }] };
+    expect(sectionPatch(doc, 'spoken_languages', 4).change).toEqual({ section: 'spoken_languages', value: [{ name: 'French', level: null }] });
+  });
+
+  it('prints "Click here" links and a Languages line in the preview', () => {
+    const cv = docToCv(contentToDoc(raw));
+    expect(cv.projects[0].link).toBe(raw.projects[0].link);
+    expect(cv.languages).toBe('English (Professional), Tamil (Native)');
+    expect(docToCv({ ...contentToDoc(raw), spoken: [] }).languages).toBe('');
+  });
+
+  it('flags a project link without https://', () => {
+    const doc = contentToDoc(raw);
+    const bad = { ...doc, projects: [{ ...doc.projects[0], link: 'ledger.dev' }] };
+    expect(validateDoc(bad, ['projects'])).toEqual({ [`${doc.projects[0].id}.link`]: 'Paste the full link, starting with https://' });
+  });
+
+  it('a removed last entry leaves the section empty', () => {
+    const doc = contentToDoc(raw);
+    expect(sectionPatch({ ...doc, projects: [] }, 'projects', 4).change.value).toEqual([]);
+  });
+});

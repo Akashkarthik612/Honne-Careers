@@ -10,7 +10,8 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints
 
-from app.domain.cv import BulletText, ItemId, Model, Short, SkillName
+from app.domain.career import CareerStage
+from app.domain.cv import BulletText, ItemId, Model, Short, SkillName, SpokenLanguages
 
 JdText = Annotated[str, StringConstraints(min_length=1, max_length=20000)]
 
@@ -40,6 +41,7 @@ class SkillsView(Model):
 class TailorInput(Model):
     jd_text: JdText
     scope: Literal["all", "experience_projects"]
+    career_stage: CareerStage   # computed in Python from dates (app/domain/career.py)
     items: list[ItemView] = Field(max_length=30)
     skills: SkillsView
 
@@ -69,6 +71,7 @@ class BulletTailorInput(Model):
     item_context: Short
     item_facts: list[BulletText] = Field(default_factory=list, max_length=12)  # siblings
     bullet_text: BulletText
+    career_stage: CareerStage
 
 
 class BulletTailorOutput(Model):
@@ -119,6 +122,7 @@ class ParsedCv(Model):
     projects: list[ParsedProject] = Field(default_factory=list, max_length=15)
     education: list[ParsedEducation] = Field(default_factory=list, max_length=10)
     skills: SkillsView
+    spoken_languages: SpokenLanguages = Field(default_factory=list)  # cv_parser v2
 
 
 # ---------- upload pre-fill (stored in cv_uploads.parsed) ----------
@@ -151,3 +155,4 @@ class PrefillCv(Model):
     projects: list[PrefillProject] = Field(default_factory=list, max_length=15)
     education: list[PrefillEducation] = Field(default_factory=list, max_length=10)
     skills: SkillsView
+    spoken_languages: SpokenLanguages = Field(default_factory=list)

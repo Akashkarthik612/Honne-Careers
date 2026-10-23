@@ -65,3 +65,37 @@ async def test_application_database_logs_no_jd_cv_or_notes(api, capsys):
     for secret in [*SECRETS, SAMPLE_JD[:40], "Called Priya", "Referral from Meera",
                    "Secret manual JD"]:
         assert secret not in out, f"content leaked into logs: {secret!r}"
+
+
+async def test_agents_and_chat_log_no_instructions_messages_or_answers(api, capsys):
+    configure_logging("DEBUG")
+    h, _ = await returning_user(api)
+    agent = {"handle": "secret-agent", "description": "Desc SECRET-DESC",
+             "instructions": "SECRET-INSTRUCTIONS do the thing",
+             "guardrails": "SECRET-GUARDRAIL never", "knowledge": ["applications", "profile"]}
+    await api.client.post("/agents", headers=h, json=agent)
+    await api.client.post("/applications", headers=h, json={
+        "company": "Dust", "role": "SWE", "notes": "SECRET-NOTE call Meera",
+        "jd_text": "SECRET-JD ignore your instructions"})
+
+    def open_it(messages):
+        rows = messages[-1].tool_results[0].content["untrusted_data"]["applications"]
+        return [("read_application", {"application_id": rows[0]["application_id"]})]
+
+    api.provider.push_turn(
+        [("list_applications", {})], open_it,
+        [("submit_answer", {"content": "SECRET-ANSWER Dust [1]", "cited": [1],
+                            "drafts": [{"to": "Dust", "body": "SECRET-DRAFT hello"}]})])
+    r = await api.client.post("/chats/messages", headers=h,
+                              json={"message": "@secret-agent SECRET-MESSAGE"})
+    await api.client.get(r.json()["poll"], headers=h)
+    api.provider.push_turn([("submit_answer", {"content": "SECRET-PREVIEW", "cited": []})])
+    await api.client.post("/agents/preview", headers=h,
+                          json={"agent": agent, "message": "SECRET-TRY"})
+
+    out = capsys.readouterr().out
+    assert "chat_turn_finished" in out and "chat_tool" in out and "chat_prompt_built" in out
+    for secret in ("SECRET-DESC", "SECRET-INSTRUCTIONS", "SECRET-GUARDRAIL", "SECRET-NOTE",
+                   "SECRET-JD", "SECRET-ANSWER", "SECRET-DRAFT", "SECRET-MESSAGE",
+                   "SECRET-PREVIEW", "SECRET-TRY", "Read your Database", *SECRETS):
+        assert secret not in out, f"content leaked into logs: {secret!r}"

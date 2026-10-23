@@ -1,11 +1,14 @@
 """Day 2: the application Database. Save on download (SAVE-1/3), the screens' endpoints
 (IQ-1/2/3), retention (hidden at once, deleted by the daily clean-up) and isolation."""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
+from uuid import UUID
 
 import psycopg
 import pytest
 
+from app.domain.applications import ApplicationFilter
+from app.domain.auth import AuthUser
 from tests.fixtures import SAMPLE_JD
 from tests.integration.test_tailoring_api import returning_user
 
@@ -222,6 +225,30 @@ async def test_list_filters_by_status_and_search(api):
     assert names(await api.client.get("/applications?q=backend", headers=h)) == ["Razorpay"]
     assert names(await api.client.get("/applications?q=100%25_", headers=h)) == ["Zoho"]
     assert (await api.client.get("/applications?status=bogus", headers=h)).status_code == 422
+
+
+async def test_agent_filters_run_in_sql_before_the_row_cap(api):
+    """Referral and sent-date filters (used by the agents' list_applications tool) are SQL
+    filters, so a match older than the newest `limit` rows is still found."""
+    h = api.new_user()
+    today = date.today()
+    for company, referral, days_ago in [("Old", None, 9), ("Mid", "yes", 5), ("New", None, 1)]:
+        await api.client.post("/applications", headers=h, json={
+            "company": company, "role": "SDE", "referral": referral,
+            "applied_on": (today - timedelta(days=days_ago)).isoformat()})
+    user = AuthUser(id=UUID(uid(h)), email=None, provider=None, access_token=h["Authorization"])
+    repo_limit = 1
+    async with api.container.uow(user.id) as uow:
+        def names(flt):
+            return uow.applications.list_summaries(
+                user.id, datetime.now(UTC) - timedelta(days=20), flt, repo_limit)
+        old = await names(ApplicationFilter(referral="none",
+                                            sent_before=today - timedelta(days=7)))
+        mid = await names(ApplicationFilter(referral="yes"))
+        none = await names(ApplicationFilter(sent_after=today, sent_before=today))
+    assert [s.company for s in old] == ["Old"]
+    assert [s.company for s in mid] == ["Mid"]
+    assert none == []
 
 
 async def test_delete_removes_row_history_pdf_and_unused_jd(api):

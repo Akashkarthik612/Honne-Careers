@@ -1,8 +1,9 @@
 """Agent-layer data classes (Day_1 B3). An agent is data, not a class."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -42,6 +43,72 @@ class LlmResult:
     output_tokens: int | None
 
 
+# ---------- function calling (Day 3 chat agents), provider-neutral ----------
+
+@dataclass(frozen=True, slots=True)
+class ToolDecl:
+    """A tool the model may call: name, what it does, JSON schema of its arguments."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCall:
+    id: str | None
+    name: str
+    args: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class ToolResult:
+    call_id: str | None
+    name: str
+    content: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class LlmMessage:
+    """One turn sent to the model. `raw` is the provider's own copy of a model turn, sent
+    back unchanged (Gemini needs its thought signatures returned with the function calls)."""
+
+    role: Literal["user", "model", "tool"]
+    text: str | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
+    tool_results: tuple[ToolResult, ...] = ()
+    raw: Any = None
+
+    def to_wire(self, raw_to_wire: Callable[[Any], Any]) -> dict[str, Any]:
+        """JSON form, for the run's checkpoint. `raw` goes through the provider, which alone
+        knows its type (Gemini: a Content with bytes thought signatures)."""
+        return {"role": self.role, "text": self.text,
+                "tool_calls": [{"id": c.id, "name": c.name, "args": c.args}
+                               for c in self.tool_calls],
+                "tool_results": [{"call_id": r.call_id, "name": r.name, "content": r.content}
+                                 for r in self.tool_results],
+                "raw": None if self.raw is None else raw_to_wire(self.raw)}
+
+    @classmethod
+    def from_wire(cls, data: dict[str, Any], raw_from_wire: Callable[[Any], Any]
+                  ) -> "LlmMessage":
+        return cls(role=data["role"], text=data["text"],
+                   tool_calls=tuple(ToolCall(**c) for c in data["tool_calls"]),
+                   tool_results=tuple(ToolResult(**r) for r in data["tool_results"]),
+                   raw=None if data["raw"] is None else raw_from_wire(data["raw"]))
+
+
+@dataclass(frozen=True, slots=True)
+class ToolTurn:
+    """Raw reply of one function-calling round. Validated by ToolLoop, not the provider."""
+
+    tool_calls: tuple[ToolCall, ...]
+    text: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    raw: Any = None
+
+
 @dataclass(frozen=True, slots=True)
 class AgentRunRecord:
     """Mirror of app.agent_runs. No prompt, input or output content (guardrails §4)."""
@@ -59,3 +126,5 @@ class AgentRunRecord:
     error_code: str | None
     entity_id: UUID | None
     correlation_id: str | None
+    tool_calls: int | None = None             # chat turns only (Day_3 §3.1)
+    tool_names: tuple[str, ...] | None = None  # names only, never arguments

@@ -1,5 +1,8 @@
 // Bounded, configured client limits (guardrails §3: no unbounded or hard-coded-in-place retries).
 
+// Longest JD the API accepts (TAIL-1). Home and the JD page check it before anything is sent.
+export const MAX_JD_WORDS = 1000;
+
 // Tailor job polling (TAIL-3). 100 polls × 2 s = 200 s, just past the backend's tailor_job_timeout_s
 // (180 s), after which the backend itself marks the job failed/stale_job.
 export const TAILOR_POLL_MS = 2000;
@@ -14,3 +17,10 @@ export const BULLET_TAILOR_CONCURRENCY = 3;
 export const RECORD_RETRY_ATTEMPTS = 5;
 export const RECORD_RETRY_BASE_MS = 2000;
 export const PENDING_SAVE_MAX_VISITS = 10;
+
+// Chat turns (Day 3) run in the background and are polled. 260 polls × 1.5 s = 390 s, just past the
+// backend's chat_turn_timeout_s (360 s), after which it marks the turn failed/stale_job itself.
+export const CHAT_POLL_MS = 1500;
+export const CHAT_POLL_MAX = 260;
+// Recent chats shown in the sidebar.
+export const SIDEBAR_CHATS = 3;

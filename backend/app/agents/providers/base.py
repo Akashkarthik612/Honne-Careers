@@ -7,7 +7,7 @@ themselves; AgentRunner owns the bounded retry policy (guardrails §3).
 
 from typing import Any, Protocol
 
-from app.domain.agents import LlmResult
+from app.domain.agents import LlmMessage, LlmResult, ToolDecl, ToolTurn
 
 
 class LlmTransientError(Exception):
@@ -23,3 +23,18 @@ class LlmProvider(Protocol):
 
     async def generate(self, *, system: str, user: str, schema: dict[str, Any], model: str,
                        temperature: float, max_output_tokens: int) -> LlmResult: ...
+
+    async def generate_with_tools(self, *, system: str, messages: list[LlmMessage],
+                                  tools: list[ToolDecl], model: str, temperature: float,
+                                  max_output_tokens: int) -> ToolTurn:
+        """One function-calling round (Day 3 chat agents). The model must call a tool
+        (mode ANY); a plain-text reply comes back as ToolTurn.text and is TurnGraph's call."""
+        ...
+
+    def raw_to_wire(self, raw: Any) -> Any:
+        """ToolTurn.raw -> JSON, so a running turn can be checkpointed."""
+        ...
+
+    def raw_from_wire(self, data: Any) -> Any:
+        """The inverse of raw_to_wire: what generate_with_tools accepts back as LlmMessage.raw."""
+        ...

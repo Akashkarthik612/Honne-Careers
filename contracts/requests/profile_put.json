@@ -61,6 +61,7 @@
           "Docker"
         ],
         "date": "2023",
+        "link": "https://ledger-lite.example.dev",
         "bullets": [
           {
             "id": "ll1",
@@ -95,6 +96,16 @@
         "Git",
         "Grafana"
       ]
-    }
+    },
+    "spoken_languages": [
+      {
+        "name": "English",
+        "level": "professional"
+      },
+      {
+        "name": "Tamil",
+        "level": "native"
+      }
+    ]
   }
 }

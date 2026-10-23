@@ -1,0 +1,17 @@
+# Generous limits for the test suite (the pre-beta defaults), so tests that aren't about
+# limits are never throttled. Tests of the beta limits use config/limits.yaml itself.
+version: 1
+default_plan: test
+use_account_plan: false
+plans:
+  test:
+    daily:
+      full_tailor: 20
+      chat_start: 1000
+      chat_message: 50
+      bullet_tailor: 150
+      pdf: 40
+      analysis: 40
+      upload: 20
+    total:
+      custom_agents: 10

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, FileText } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import SetupSteps from '@/components/SetupSteps';
 import { CvThumb } from '@/components/CvDoc';
-import { profileToCv } from '@/data/cvModel';
+import { countWords, profileToCv } from '@/data/cvModel';
 import { PREVIEW_PROFILE } from '@/data/templatePreview';
 import { TEMPLATES } from '@/data/templates';
 import useResource from '@/hooks/useResource';
@@ -15,6 +15,7 @@ import elegantTemplate from '@/assets/elegant-template.png';
 
 // Step 1 of new-resume setup (design: TemplatePicker.dc.html). Which templates are live comes from
 // GET /templates (Jake's Resume in the beta); the others show as "Coming soon".
+// With a JD pasted on Home (draft.jdFromHome) the Mode step is skipped: Continue goes to the JD page.
 
 const SAMPLE = profileToCv(PREVIEW_PROFILE);
 const tileName = (muted) => ({ fontSize: 18, fontWeight: 700, color: muted ? 'var(--hc-ink-muted)' : 'var(--hc-ink)' });
@@ -65,6 +66,8 @@ export default function TemplatePage() {
   const [picked, setPicked] = useState(draft.template === 'jake');
   const templates = useResource(listTemplates);
   const live = new Set((templates.data ?? []).map((t) => t.id));
+  const fromHome = draft.jdFromHome && Boolean(draft.jd.trim());
+  const jdTitle = [draft.role, draft.company].filter(Boolean).join(' · ') || 'Your job description';
 
   function toggle() {
     setPicked((p) => !p);
@@ -73,7 +76,14 @@ export default function TemplatePage() {
 
   return (
     <main className="hc-wrap">
-      <SetupSteps current={0} />
+      <SetupSteps current={0} jdFromHome={fromHome} />
+      {fromHome && (
+        <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1px solid var(--hc-hairline)', borderRadius: 14, padding: '10px 12px 10px 14px', maxWidth: 720 }}>
+          <span style={{ flex: 'none', width: 32, height: 32, borderRadius: 10, background: '#E8F5EC', color: 'var(--hc-success)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><FileText size={16} aria-hidden="true" /></span>
+          <span style={{ flex: '1 1 240px', minWidth: 0, fontSize: 14 }}><strong>JD added:</strong> {jdTitle} <span className="hc-mono" style={{ fontSize: 11.5, color: 'var(--hc-ink-muted)' }}>· {countWords(draft.jd).toLocaleString('en-US')} words</span></span>
+          <Link to="/home" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 6px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>Change</Link>
+        </div>
+      )}
       <PageTitle before="Pick a" accent="template" style={{ marginTop: 24 }} />
       <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Every template is built for ATS. You can switch later.</p>
 
@@ -110,9 +120,9 @@ export default function TemplatePage() {
       )}
 
       <div style={{ marginTop: 28, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Link className="hc-back" to="/resumes"><ArrowLeft size={16} aria-hidden="true" />Back to resumes</Link>
+        <Link className="hc-back" to={fromHome ? '/home' : '/resumes'}><ArrowLeft size={16} aria-hidden="true" />{fromHome ? 'Back to Home' : 'Back to resumes'}</Link>
         {picked && live.has('jake')
-          ? <Link className="hc-btn-p is-lg" to="/new/mode">Continue with Jake’s Resume<ArrowRight size={16} aria-hidden="true" /></Link>
+          ? <Link className="hc-btn-p is-lg" to={fromHome ? '/new/jd' : '/new/mode'}>Continue with Jake’s Resume<ArrowRight size={16} aria-hidden="true" /></Link>
           : <span className="hc-btn-off" aria-disabled="true">Pick a template to continue</span>}
       </div>
     </main>
