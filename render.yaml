@@ -65,6 +65,10 @@ services:
       # enough, on top of DB_POOL_MAX. Keep it equal to CHAT_CONCURRENT_TURNS_MAX.
       - key: AGENT_STATE_POOL_MAX
         value: "2"
+      # Per model call in a chat turn. gemini-3.8-flash (strong tier) takes ~32-35s per call
+      # in production, so the 30s default timed out every chat (23 Oct 2026). Max allowed: 120.
+      - key: AGENT_LLM_TIMEOUT_S
+        value: "120"
 
   - type: web
     name: honne-careers
