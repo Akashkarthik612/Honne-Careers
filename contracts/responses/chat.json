@@ -1,0 +1,75 @@
+{
+  "id": "55555555-5555-4555-8555-555555555555",
+  "title": "Follow-ups this week",
+  "turn_count": 1,
+  "last_message_at": "2026-10-19T09:30:00+00:00",
+  "created_at": "2026-10-19T09:30:00+00:00",
+  "running": false,
+  "turns_max": 25,
+  "long_warn_turns": 20,
+  "deletes_on": "2026-11-08",
+  "messages": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "seq": 1,
+      "role": "user",
+      "status": "ok",
+      "content": "@follow-up who hasn't replied?",
+      "agent": null,
+      "sources": [],
+      "drafts": [],
+      "steps": [],
+      "error_code": null,
+      "created_at": "2026-10-19T09:30:00+00:00",
+      "finished_at": null
+    },
+    {
+      "id": "66666666-6666-4666-8666-666666666666",
+      "seq": 2,
+      "role": "assistant",
+      "status": "ok",
+      "content": "Freshworks hasn't replied in 14 days [1]. A short nudge usually works.",
+      "agent": {
+        "handle": "follow-up",
+        "kind": "user"
+      },
+      "sources": [
+        {
+          "ref": 1,
+          "kind": "application",
+          "id": "33333333-3333-4333-8333-333333333333",
+          "label": "Freshworks · SDE-2 Backend",
+          "meta": {
+            "company": "Freshworks",
+            "role": "SDE-2 Backend",
+            "status": "applied",
+            "referral": null,
+            "sent": "2026-10-08"
+          }
+        }
+      ],
+      "drafts": [
+        {
+          "to": "Recruiting team, Freshworks",
+          "subject": "Following up: SDE-2 Backend",
+          "body": "Hi there,\n\nI applied for the SDE-2 Backend role on 8 October."
+        }
+      ],
+      "steps": [
+        {
+          "tool": "list_applications",
+          "label": "Read your Database · 6 applications",
+          "count": 6
+        },
+        {
+          "tool": "read_application",
+          "label": "Opened Freshworks · SDE-2 Backend",
+          "count": 1
+        }
+      ],
+      "error_code": null,
+      "created_at": "2026-10-19T09:30:00+00:00",
+      "finished_at": "2026-10-19T09:30:00+00:00"
+    }
+  ]
+}

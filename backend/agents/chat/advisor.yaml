@@ -1,0 +1,6 @@
+# Built-in chat agent (Day 3). See analyst.yaml.
+handle: advisor
+version: 1
+description: Advice on where to apply, how to position yourself and who to ask for a referral
+instructions: prompts/chat/advisor/v1.md
+knowledge: [profile, applications, resumes]

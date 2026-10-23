@@ -1,10 +1,10 @@
 id: bullet_tailor
-version: 3
+version: 4
 description: Rewrites one bullet in the JD's terms using only its own facts
 model_tier: strong
 temperature: 0.2
 max_output_tokens: 2000   # v3: 512 left no room after the strong model's thinking tokens (empty reply, MAX_TOKENS)
-instructions: prompts/bullet_tailor/v2.md
+instructions: prompts/bullet_tailor/v3.md   # v3: career stage (fresher rewrite, TAIL-8)
 input_schema: BulletTailorInput
 output_schema: BulletTailorOutput
 tools: []

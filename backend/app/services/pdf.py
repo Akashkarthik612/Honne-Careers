@@ -10,6 +10,7 @@ from app.core.errors import NotFound
 from app.core.logging import get_logger
 from app.db.unit_of_work import UnitOfWorkFactory
 from app.domain.auth import AuthUser
+from app.policy.limits import DailyAction
 from app.policy.quota import QuotaGuard
 from app.render.compiler import LatexCompiler
 from app.render.inspector import PdfInspector
@@ -49,7 +50,7 @@ class PdfService:
                 reuse = True
             else:
                 reuse = False
-                await self._quota.consume(uow, user.id, "pdf")
+                await self._quota.consume(uow, user.id, DailyAction.PDF)
         if reuse:
             log.info("pdf_reused", resume_id=resume_id)
             return PdfResult(await self._files.signed_url(user, row.pdf_path),

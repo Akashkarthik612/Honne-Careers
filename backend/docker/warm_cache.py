@@ -21,20 +21,30 @@ from app.domain.cv import (  # noqa: E402
     ProjectItem,
     SkillItem,
     Skills,
+    SpokenLanguage,
 )
 from app.render.latex import LatexRenderer  # noqa: E402
 
 B = [Bullet(id="b1", text="Cut latency by 38% & shipped – “quoted” text", origin=Origin.USER,
             locked=True)]
+# Bold next to plain words and an italic kerned "Te": the PDF text layer must keep them
+# apart (smoke_compile.py reads it back).
+BOLD = Bullet(id="b2", text="Cut ticket validation **toil** by 90% through **Python automation**",
+              origin=Origin.USER, locked=True)
 CV = CvContent(
     header=Header(name="Warm Cache", location="Chennai, India", email="a@b.co",
                   phone="+91 1", links=[Link(label="site", url="https://example.com")]),
-    experience=[ExperienceItem(id="e", role="Engineer", company="Co", start="2021",
-                               end="Present", bullets=B)],
-    projects=[ProjectItem(id="p", name="Proj", tech=["Python"], date="2023", bullets=B)],
+    experience=[ExperienceItem(id="e", role="Engineer", company="Cognizant Technology Solutions",
+                               start="2021", end="Present", bullets=[*B, BOLD])],
+    projects=[ProjectItem(id="p", name="Proj", tech=["Python"], date="2023",
+                          link="https://example.com/app", bullets=B)],
     education=[EducationItem(id="u", school="Uni", degree="B.E.", years="2016 – 2020")],
     skills=Skills(languages=[SkillItem(name="Python", origin=Origin.USER)]),
+    spoken_languages=[SpokenLanguage(name="French", level="professional")],
 )
+# What the read-back must contain, word for word.
+EXPECTED_TEXT = ("validation toil by 90% through Python automation",
+                 "Cognizant Technology Solutions", "Click here", "French (Professional)")
 
 
 def main() -> None:

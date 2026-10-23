@@ -8,6 +8,7 @@ const json = (method, body) => ({ method, body });
 // ── account (AUTH-1, AUTH-3) ───────────────────────────────────────────────
 export const fetchMe = () => apiRequest('/me');                        // also creates the account row
 export const deleteMe = () => apiRequest('/me', { method: 'DELETE' }); // files, sign-in and every row
+export const getUsage = () => apiRequest('/me/usage');                  // today's usage vs the beta limits
 
 export const getSettings = () => apiRequest('/settings');
 export const saveSettings = (settings) => apiRequest('/settings', json('PUT', settings));
@@ -73,3 +74,26 @@ export const addApplication = (body) => apiRequest('/applications', json('POST',
 export const patchApplication = (id, body) => apiRequest(`/applications/${id}`, json('PATCH', body));
 export const applicationPdf = (id) => apiRequest(`/applications/${id}/pdf`);
 export const deleteApplication = (id) => apiRequest(`/applications/${id}`, { method: 'DELETE' });
+
+// ── agents and chat (Day 3: CUST-1…4) ───────────────────────────────────────
+// { mine: [agent], builtin: [agent], limit, count }. Shapes are mapped in src/data/agentsAdapter.js.
+export const listAgents = () => apiRequest('/agents');
+export const getAgent = (id) => apiRequest(`/agents/${id}`);
+export const createAgent = (body) => apiRequest('/agents', json('POST', body));
+// The whole agent again + expected_version; the server keeps every version. 409 stale_version.
+export const updateAgent = (id, body) => apiRequest(`/agents/${id}`, json('PUT', body));
+export const deleteAgent = (id) => apiRequest(`/agents/${id}`, { method: 'DELETE' });
+// Try it (CUST-3): one answer from an unsaved agent. Nothing is saved.
+export const previewAgent = (agent, message) => apiRequest('/agents/preview', json('POST', { agent, message }));
+
+export const listChats = (limit) => apiRequest(`/chats${limit ? `?limit=${limit}` : ''}`);
+export const getChat = (id) => apiRequest(`/chats/${id}`);
+// A turn runs in the background: 202 { chat, user_message, assistant_message (running), poll }.
+// `agent` is the @handle picked in the composer; omitted = the agent that answered last in this chat.
+export function sendChatMessage(chatId, { message, agent }) {
+  const body = agent ? { message, agent } : { message };
+  return apiRequest(chatId ? `/chats/${chatId}/messages` : '/chats/messages', json('POST', body));
+}
+export const getChatMessage = (chatId, messageId) => apiRequest(`/chats/${chatId}/messages/${messageId}`); // the poll
+export const retryChatTurn = (chatId) => apiRequest(`/chats/${chatId}/retry`, { method: 'POST' });
+export const deleteChat = (id) => apiRequest(`/chats/${id}`, { method: 'DELETE' });

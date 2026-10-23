@@ -1,0 +1,32 @@
+{
+  "content": "Freshworks [1] is waiting on you.",
+  "note": null,
+  "sources": [
+    {
+      "ref": 1,
+      "kind": "application",
+      "id": "33333333-3333-4333-8333-333333333333",
+      "label": "Freshworks · SDE-2 Backend",
+      "meta": {
+        "company": "Freshworks",
+        "role": "SDE-2 Backend",
+        "status": "applied",
+        "referral": null,
+        "sent": "2026-10-08"
+      }
+    }
+  ],
+  "drafts": [],
+  "steps": [
+    {
+      "tool": "list_applications",
+      "label": "Read your Database · 6 applications",
+      "count": 6
+    },
+    {
+      "tool": "read_application",
+      "label": "Opened Freshworks · SDE-2 Backend",
+      "count": 1
+    }
+  ]
+}

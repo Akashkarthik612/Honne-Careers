@@ -76,7 +76,14 @@ export default function CvDoc({ cv, template = 'jake', focus = null }) {
           <div style={s.head}>Projects</div>
           {cv.projects.map((p, i) => (
             <div key={i} style={{ marginTop: 4 }}>
-              <div style={row}><span><b>{p.name}</b>{p.tech && <> | <span style={{ fontStyle: 'italic' }}>{p.tech}</span></>}</span><span>{p.year}</span></div>
+              <div style={row}>
+                <span>
+                  <b>{p.name}</b>
+                  {p.link && <> | <a href={p.link} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Click here</a></>}
+                  {p.tech && <> | <span style={{ fontStyle: 'italic' }}>{p.tech}</span></>}
+                </span>
+                <span>{p.year}</span>
+              </div>
               {p.bullets.length > 0 && <ul style={list}>{p.bullets.map((b, j) => <li key={j} style={{ margin: '1px 0' }}><BulletText text={b} /></li>)}</ul>}
             </div>
           ))}
@@ -101,6 +108,13 @@ export default function CvDoc({ cv, template = 'jake', focus = null }) {
           <div style={{ marginTop: 4 }}>
             {cv.skills.map(([label, value]) => <div key={label}><b>{label}:</b> {value}</div>)}
           </div>
+        </Section>
+      )}
+
+      {cv.languages && (
+        <Section id="skills" focus={focus}>
+          <div style={s.head}>Languages</div>
+          <div style={{ marginTop: 4 }}>{cv.languages}</div>
         </Section>
       )}
     </div>

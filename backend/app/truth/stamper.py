@@ -29,6 +29,7 @@ from app.domain.cv import (
     Skills,
     SkillsIn,
     SkillsPatch,
+    SpokenLanguagesPatch,
 )
 
 
@@ -51,6 +52,8 @@ class EditStamper:
             case SkillsPatch():
                 updated = content.model_copy(update={
                     "skills": self._skills(patch.value, content.skills)})
+            case SpokenLanguagesPatch():
+                updated = content.model_copy(update={"spoken_languages": patch.value})
         check_unique_ids(updated)
         return updated
 
@@ -62,6 +65,7 @@ class EditStamper:
             projects=self._projects(incoming.projects, previous),
             education=incoming.education,
             skills=self._skills(incoming.skills, previous.skills),
+            spoken_languages=incoming.spoken_languages,
         )
         check_unique_ids(content)
         return content

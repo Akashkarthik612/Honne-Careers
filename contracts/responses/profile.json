@@ -85,6 +85,7 @@
           "Docker"
         ],
         "date": "2023",
+        "link": "https://ledger-lite.example.dev",
         "bullets": [
           {
             "id": "ll1",
@@ -154,7 +155,17 @@
           "origin": "profile"
         }
       ]
-    }
+    },
+    "spoken_languages": [
+      {
+        "name": "English",
+        "level": "professional"
+      },
+      {
+        "name": "Tamil",
+        "level": "native"
+      }
+    ]
   },
   "row_version": 3,
   "updated_at": "2026-10-19T09:30:00+00:00"

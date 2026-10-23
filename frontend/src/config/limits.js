@@ -17,3 +17,10 @@ export const BULLET_TAILOR_CONCURRENCY = 3;
 export const RECORD_RETRY_ATTEMPTS = 5;
 export const RECORD_RETRY_BASE_MS = 2000;
 export const PENDING_SAVE_MAX_VISITS = 10;
+
+// Chat turns (Day 3) run in the background and are polled. 260 polls × 1.5 s = 390 s, just past the
+// backend's chat_turn_timeout_s (360 s), after which it marks the turn failed/stale_job itself.
+export const CHAT_POLL_MS = 1500;
+export const CHAT_POLL_MAX = 260;
+// Recent chats shown in the sidebar.
+export const SIDEBAR_CHATS = 3;

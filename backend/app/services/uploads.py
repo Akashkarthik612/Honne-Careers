@@ -22,6 +22,7 @@ from app.domain.tailoring import (
     PrefillProject,
 )
 from app.ingest.extractors import Extracted, TextExtractor
+from app.policy.limits import DailyAction
 from app.policy.quota import QuotaGuard
 from app.storage.file_store import UPLOAD_EXTENSIONS, upload_path
 
@@ -55,6 +56,7 @@ def to_prefill(parsed: ParsedCv) -> PrefillCv:
                                  bullets=bullets(p.bullets)) for p in parsed.projects],
         education=[PrefillEducation(**e.model_dump(), id=_new_id()) for e in parsed.education],
         skills=parsed.skills,
+        spoken_languages=parsed.spoken_languages,
     )
 
 
@@ -71,7 +73,7 @@ class UploadService:
                      source_type: str | None = None) -> UploadResult:
         extracted = await self._extractor.extract(data, source_type)  # fails before quota
         async with self._uow(user.id) as uow:
-            await self._quota.consume(uow, user.id, "upload")
+            await self._quota.consume(uow, user.id, DailyAction.UPLOAD)
 
         upload_id = uuid.uuid4()
         run = await self._runner.run("cv_parser", ParserInput(text=extracted.text[:40000]),

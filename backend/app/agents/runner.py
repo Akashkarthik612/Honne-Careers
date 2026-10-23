@@ -5,10 +5,9 @@ validate output -> record the run (always, success or failure). Each run is one 
 span carrying the same metadata as the agent_runs row, never the prompt or output.
 
 Fallbacks (B9, approved): retry only transient errors, max_retries times, exponential
-backoff, each retry logged at WARNING. Schema-invalid output fails at once.
+backoff, each retry logged at WARNING (RetryingCall). Schema-invalid output fails at once.
 """
 
-import asyncio
 import json
 import time
 from typing import Protocol, TypeVar
@@ -16,8 +15,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
 
-from app.agents.providers.base import LlmPermanentError, LlmTransientError
 from app.agents.registry import AgentRegistry, ModelResolver, ProviderFactory
+from app.agents.retry import Attempts, RetryingCall
 from app.agents.tracing import Span, Tracer
 from app.core import context
 from app.core.errors import LlmOutputInvalid, LlmUnavailable
@@ -55,7 +54,7 @@ class AgentRunner:
         self._resolver = resolver
         self._providers = providers
         self._recorder = recorder
-        self._backoff_base_s = backoff_base_s
+        self._retrying = RetryingCall(backoff_base_s)
 
     async def run(self, agent_id: str, payload: BaseModel, output_type: type[Out], *,
                   user_id: UUID, entity_id: UUID | None = None) -> AgentRun[Out]:
@@ -75,37 +74,22 @@ class AgentRunner:
                                                    ensure_ascii=False)
 
         started = time.monotonic()
-        attempts = 0
+        attempts = Attempts()
         result: LlmResult | None = None
         error_code: str | None = None
         output: Out | None = None
         try:
-            while True:
-                attempts += 1
-                try:
-                    async with asyncio.timeout(cfg.timeout_s):
-                        result = await provider.generate(
-                            system=agent.instructions, user=user_message,
-                            schema=agent.output_json_schema, model=spec.model_id,
-                            temperature=cfg.temperature,
-                            max_output_tokens=cfg.max_output_tokens)
-                    break
-                except (LlmTransientError, TimeoutError) as exc:
-                    if attempts > cfg.max_retries:
-                        error_code = "llm_unavailable"
-                        log.error("agent_call_failed", agent=agent_id, attempts=attempts,
-                                  cause=str(exc) or type(exc).__name__, entity_id=entity_id)
-                        raise LlmUnavailable from exc
-                    delay = self._backoff_base_s * 2 ** (attempts - 1)
-                    log.warning("agent_call_retry", agent=agent_id, attempt=attempts,
-                                delay_s=delay, cause=str(exc) or type(exc).__name__,
-                                entity_id=entity_id)
-                    await asyncio.sleep(delay)
-                except LlmPermanentError as exc:
-                    error_code = "llm_unavailable"
-                    log.error("agent_call_rejected", agent=agent_id, cause=str(exc),
-                              entity_id=entity_id)
-                    raise LlmUnavailable from exc
+            try:
+                result = await self._retrying(
+                    lambda: provider.generate(
+                        system=agent.instructions, user=user_message,
+                        schema=agent.output_json_schema, model=spec.model_id,
+                        temperature=cfg.temperature, max_output_tokens=cfg.max_output_tokens),
+                    timeout_s=cfg.timeout_s, max_retries=cfg.max_retries, attempts=attempts,
+                    agent=agent_id, entity_id=entity_id)
+            except LlmUnavailable:
+                error_code = "llm_unavailable"
+                raise
 
             try:
                 output = output_type.model_validate_json(result.text)
@@ -120,19 +104,19 @@ class AgentRunner:
             run_id = await self._recorder.record(AgentRunRecord(
                 user_id=user_id, agent_id=cfg.id, agent_version=cfg.version,
                 provider=spec.provider, model=spec.model_id,
-                status="succeeded" if output is not None else "failed", attempts=attempts,
+                status="succeeded" if output is not None else "failed", attempts=attempts.n,
                 input_tokens=result.input_tokens if result else None,
                 output_tokens=result.output_tokens if result else None,
                 latency_ms=latency_ms, error_code=error_code, entity_id=entity_id,
                 correlation_id=context.correlation_id.get()))
             span.update(agent_version=cfg.version, provider=spec.provider, model=spec.model_id,
                         status="succeeded" if output is not None else "failed",
-                        attempts=attempts, latency_ms=latency_ms, error_code=error_code,
+                        attempts=attempts.n, latency_ms=latency_ms, error_code=error_code,
                         input_tokens=result.input_tokens if result else None,
                         output_tokens=result.output_tokens if result else None, run_id=run_id)
             log.info("agent_run", agent=cfg.id, version=cfg.version, model=spec.model_id,
                      status="succeeded" if output is not None else "failed",
-                     attempts=attempts, latency_ms=latency_ms, entity_id=entity_id,
+                     attempts=attempts.n, latency_ms=latency_ms, entity_id=entity_id,
                      input_tokens=result.input_tokens if result else None,
                      output_tokens=result.output_tokens if result else None)
         return AgentRun(output, run_id)

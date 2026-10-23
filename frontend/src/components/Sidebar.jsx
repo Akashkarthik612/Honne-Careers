@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Bot, Database, FileText, House, LogOut, Plus, Settings, Table2, User } from 'lucide-react';
+import { SIDEBAR_CHATS } from '@/config/limits';
+import { toChatSummary } from '@/data/chatAdapter';
+import { listChats } from '@/services/api';
+import { errorText } from '@/services/apiClient';
 import { HonneTile, Wordmark } from '@/components/HonneMark';
 import useSignOut from '@/hooks/useSignOut';
 import { useAppStore } from '@/state/appStore';
 import { useAuth } from '@/state/auth';
 
 // Collapsible app sidebar (design: Sidebar.dc.html). Open 248px / collapsed 76px, remembered per browser.
-// Below 760px it stays a 76px rail and opens as an overlay.
+// Below 760px it stays a 76px rail and opens as an overlay. Recent chats (Day 3) reload on every navigation.
 
 const STORAGE_KEY = 'honne-sidebar';
 const NARROW = '(max-width: 759px)';
@@ -26,6 +30,8 @@ function activeSection(pathname) {
   if (pathname.startsWith('/profile')) return 'profile';
   if (pathname.startsWith('/settings')) return 'settings';
   if (pathname.startsWith('/database')) return 'database';
+  if (pathname.startsWith('/agents')) return 'agents';
+  if (pathname.startsWith('/chat')) return 'chat';
   return 'resumes';
 }
 
@@ -45,6 +51,16 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW).matches);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [chats, setChats] = useState({ items: null, error: null });
+
+  useEffect(() => {
+    let live = true;
+    listChats(SIDEBAR_CHATS).then(
+      (r) => { if (live) setChats({ items: r.items.map(toChatSummary), error: null }); },
+      (error) => { if (live) setChats((c) => ({ ...c, error })); },
+    );
+    return () => { live = false; };
+  }, [pathname]);
 
   useEffect(() => {
     const mq = window.matchMedia(NARROW);
@@ -129,9 +145,28 @@ export default function Sidebar() {
           {navItem('/resumes', 'resumes', 'Resumes', FileText)}
           {navItem('/profile', 'profile', 'Profile', User)}
           {navItem('/database', 'database', 'Database', Table2)}
-          {soon('Agents', Bot)}
+          {navItem('/agents', 'agents', 'Agents', Bot)}
           {soon('Honne IQ', Database)}
         </nav>
+
+        {open && (chats.items?.length > 0 || chats.error) && (
+          <div style={{ padding: '14px 12px 4px' }}>
+            <div className="hc-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', color: 'var(--hc-ink-muted)', padding: '0 12px 6px' }}>RECENT CHATS</div>
+            {chats.error && <div title={errorText(chats.error)} style={{ padding: '0 12px', fontSize: 12.5, color: 'var(--hc-warm)' }}>Couldn’t load your chats.</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {chats.items?.map((c) => {
+                const on = pathname === `/chat/${c.id}`;
+                return (
+                  <NavLink key={c.id} to={`/chat/${c.id}`} title={c.title} aria-current={on ? 'page' : undefined}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 38, padding: '0 12px', borderRadius: 10, textDecoration: 'none', fontSize: 13.5, fontWeight: on ? 600 : 500, color: on ? 'var(--hc-ink)' : '#3D4357', background: on ? '#F3F4F8' : 'transparent' }}>
+                    <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.title}</span>
+                    {c.running && <span className="hc-dot" title="Answering…" style={{ flex: 'none', width: 7, height: 7, borderRadius: 99, background: 'var(--hc-brand)' }} />}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div style={{ flex: 1 }} />
 

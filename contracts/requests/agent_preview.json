@@ -1,0 +1,13 @@
+{
+  "agent": {
+    "handle": "interview-prep",
+    "description": "Interview prep",
+    "instructions": "Give me 10 likely questions.",
+    "guardrails": "Never invent experience, skills, numbers or dates.\nNever contact anyone or send anything without my approval.\nNever share my data outside Honne.",
+    "knowledge": [
+      "applications",
+      "resumes"
+    ]
+  },
+  "message": "Prep me for Freshworks"
+}

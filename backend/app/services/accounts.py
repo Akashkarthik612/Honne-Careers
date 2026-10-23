@@ -10,6 +10,7 @@ from app.core.errors import StorageFailed, Unauthorized
 from app.core.logging import get_logger
 from app.db.unit_of_work import UnitOfWorkFactory
 from app.domain.auth import AuthUser
+from app.policy.quota import QuotaGuard, Usage
 from app.storage.file_store import CvFileStore
 
 log = get_logger(__name__)
@@ -48,10 +49,12 @@ class SupabaseAdmin:
 class AccountService:
     _ENSURED_MAX = 10_000
 
-    def __init__(self, uow: UnitOfWorkFactory, files: CvFileStore, admin: SupabaseAdmin) -> None:
+    def __init__(self, uow: UnitOfWorkFactory, files: CvFileStore, admin: SupabaseAdmin,
+                 quota: QuotaGuard) -> None:
         self._uow = uow
         self._files = files
         self._admin = admin
+        self._quota = quota
         self._ensured: OrderedDict[str, None] = OrderedDict()  # bounded LRU of known users
 
     async def ensure(self, user: AuthUser) -> None:
@@ -76,6 +79,10 @@ class AccountService:
         if account is None:  # the dependency ensured it, so absence = deleted meanwhile
             raise Unauthorized(reason="user_deleted")
         return MeView(str(user.id), user.email, user.provider, account.plan, account.has_profile)
+
+    async def usage(self, user: AuthUser) -> Usage:
+        async with self._uow(user.id) as uow:
+            return await self._quota.usage(uow, user.id)
 
     async def delete(self, user: AuthUser) -> None:
         """AUTH-3. Order: storage files -> auth user (DB rows cascade from auth.users).

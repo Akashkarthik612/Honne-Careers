@@ -87,6 +87,59 @@ class LlmOutputInvalid(AppError):
     status_code, code, message = 502, "llm_output_invalid", "Couldn't reach the AI, try again."
 
 
+class AgentNotFound(NotFound):
+    # Unknown handle, another user's agent, or one the user deleted (Day 3).
+    code, message = "agent_not_found", "No agent with that name. Type @ to pick one."
+
+
+class AgentGone(NotFound):
+    # A follow-up or Retry for an agent the user deleted after it answered here (Day 3).
+    code = "agent_gone"
+    message = "The agent that answered here was deleted. Type @ to pick another."
+
+
+class AgentRequired(AppError):
+    status_code, code, message = 422, "agent_required", "Type @ to pick an agent."
+
+
+class HandleTaken(AppError):
+    status_code, code, message = 409, "handle_taken", "You already have an agent with that name."
+
+
+class HandleReserved(AppError):
+    status_code, code, message = 422, "handle_reserved", "That name belongs to a Honne agent."
+
+
+class AgentLimitReached(AppError):
+    # CUST-4. The limit is in details so the UI can say it.
+    status_code, code = 409, "agent_limit_reached"
+    message = "You've reached the agent limit. Delete one to make another."
+
+
+class ChatLimitReached(AppError):
+    status_code, code = 409, "chat_limit_reached"
+    message = "This chat is full. Start a new chat; your profile and Database come with you."
+
+
+class ChatBusy(AppError):
+    # One running turn per chat (partial unique index); another tab is waiting on an answer.
+    status_code, code, message = 409, "chat_busy", "Wait for the answer before sending again."
+
+
+class NothingToRetry(AppError):
+    status_code, code, message = 409, "nothing_to_retry", "There's nothing to retry here."
+
+
+class AgentToolFailed(AppError):
+    # A data tool timed out mid-turn (DB slow). Not handed to the model: the turn fails.
+    status_code, code, message = 503, "agent_tool_failed", "Couldn't read your data, try again."
+
+
+class AgentsBusy(AppError):
+    # Per-process cap on running chat turns (free Render CPU). Fail loudly, never queue.
+    status_code, code, message = 429, "agents_busy", "Agents are busy, try again in a minute."
+
+
 class RenderFailed(AppError):
     status_code, code = 500, "render_failed"
     message = "Couldn't build the PDF. Your edits are saved."

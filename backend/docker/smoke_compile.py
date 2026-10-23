@@ -9,15 +9,19 @@ import resource
 import subprocess  # noqa: S404
 import sys
 import tempfile
+from io import BytesIO
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from pypdf import PdfReader  # noqa: E402
+
 from app.core.errors import RenderFailed  # noqa: E402
+from app.ingest.extractors import PdfExtractor  # noqa: E402
 from app.render.compiler import CompileQueue, TectonicCompiler  # noqa: E402
 from app.render.inspector import PdfInspector  # noqa: E402
 from app.render.latex import LatexRenderer  # noqa: E402
-from docker.warm_cache import CV  # noqa: E402
+from docker.warm_cache import CV, EXPECTED_TEXT  # noqa: E402
 
 
 def diagnose(tex: str) -> None:
@@ -60,6 +64,22 @@ async def main() -> None:
     print(f"offline compile OK: pages={pages} bytes={len(pdf)} tectonic_peak_rss_mb={peak_mb:.0f}")
     if pages != 1:
         sys.exit("expected a one-page PDF")
+    check_text_layer(pdf)
+
+
+def check_text_layer(pdf: bytes) -> None:
+    """PDF-4: words must come back apart. Our own upload extractor must read them (else
+    a re-uploaded CV gets "validationtoil"); pypdf's default mode is a rough ATS proxy, so
+    a miss there is a warning annotation, not a failure."""
+    ours = PdfExtractor(2).extract(pdf)
+    missing = [t for t in EXPECTED_TEXT if t not in ours]
+    if missing:
+        sys.exit(f"text layer read back without {missing!r}")
+    plain = " ".join(PdfReader(BytesIO(pdf)).pages[0].extract_text().split())
+    rough = [t for t in EXPECTED_TEXT if t not in plain]
+    if rough:
+        print(f"::warning title=PDF text layer::default pypdf extraction misses {rough!r}")
+    print("text layer OK")
 
 
 if __name__ == "__main__":

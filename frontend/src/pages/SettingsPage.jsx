@@ -1,24 +1,54 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, CreditCard, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { GitHubIcon, GoogleIcon } from '@/components/BrandIcons';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { templateName } from '@/data/templates';
+import { resetTime, toUsage } from '@/data/usage';
 import useResource from '@/hooks/useResource';
 import useSignOut from '@/hooks/useSignOut';
-import { deleteMe, getApplication, getProfile, getSettings, listApplications, listResumes, saveSettings } from '@/services/api';
+import { deleteMe, getApplication, getChat, getProfile, getSettings, getUsage, listAgents, listApplications, listChats, listResumes, saveSettings } from '@/services/api';
 import { ApiError, errorText } from '@/services/apiClient';
 import { signOut as forgetSession } from '@/services/authService';
 import { useAuth } from '@/state/auth';
 
-// Settings (design: Settings.dc.html): account, subscription & billing, preferences, data & privacy.
+// Settings (design: Settings.dc.html): account, beta limits, preferences, data & privacy.
 // Preferences live in GET/PUT /settings and save as they change (no row yet = the defaults).
-// Billing is out of scope until after user testing, so that section only states the free beta plan;
-// nothing on it takes payment details.
+// Beta limits show today's usage from GET /me/usage (limits: backend/config/limits.yaml). There are
+// no plans, prices or payment details in the beta, so nothing here mentions them.
 
-const BENEFITS = ['Unlimited resumes', 'Tailor to a job description', 'Analysis on every CV'];
-const offBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, padding: '0 16px', borderRadius: 999, border: '1px solid var(--hc-hairline)', background: 'var(--hc-app-ground)', color: 'var(--hc-ink-muted)', fontSize: 14, fontWeight: 600 };
 const h2 = { margin: '0 0 14px', fontSize: 20, fontWeight: 800 };
+
+function BetaLimits() {
+  const load = useCallback(() => getUsage().then(toUsage), []);
+  const res = useResource(load);
+  return (
+    <section id="st-limits" className="hc-card hc-sec" aria-labelledby="h-limits">
+      <h2 id="h-limits" className="hc-disp" style={h2}>Beta limits</h2>
+      <p style={{ margin: '0 0 14px', fontSize: 14.5, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>Everyone gets the same limits while we test with real users.</p>
+      {res.loading && <PageLoading label="Loading your usage…" />}
+      <ErrorBanner error={res.error} style={{ marginTop: 0 }} action={{ label: 'Retry', onClick: res.reload }} />
+      {res.data && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+            {res.data.rows.map((r) => (
+              <div key={r.key} style={{ border: `1px solid ${r.full ? '#F2C4B8' : 'var(--hc-hairline)'}`, background: r.full ? '#FDF3F0' : 'var(--hc-ground)', borderRadius: 14, padding: '14px 16px' }}>
+                <div className="hc-lbl">{r.label}</div>
+                <div style={{ marginTop: 6, fontSize: 22, fontWeight: 800 }}>
+                  {r.used} <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--hc-ink-muted)' }}>/ {r.limit}{r.unit ? ` ${r.unit}` : ''}</span>
+                </div>
+                <div role="meter" aria-label={r.label} aria-valuemin={0} aria-valuemax={r.limit} aria-valuenow={r.used} style={{ marginTop: 10, height: 6, borderRadius: 99, background: '#E4E6EE', overflow: 'hidden' }}>
+                  <div style={{ width: `${r.limit ? Math.min(100, (100 * r.used) / r.limit) : 100}%`, height: '100%', background: r.full ? 'var(--hc-warm)' : 'var(--hc-brand)' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--hc-ink-muted)' }}>Daily limits start again at {resetTime(res.data.resetsAt)} your time. Deleting an agent frees a place for a new one.</p>
+        </>
+      )}
+    </section>
+  );
+}
 
 function Switch({ id, label, help, on, onFlip }) {
   return (
@@ -50,6 +80,7 @@ function SettingsForm({ initial }) {
   const [nameInput, setNameInput] = useState(initial.display_name ?? '');
   const [prefError, setPrefError] = useState(null);
   const [exportError, setExportError] = useState(null);
+  const [exportNote, setExportNote] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
@@ -76,18 +107,28 @@ function SettingsForm({ initial }) {
     if (name !== settings.display_name) setSettings({ display_name: name });
   }
 
-  // AUTH-3 / data export: the saved profile, every resume (with content) and every application in the
-  // Database (with its JD, CV sent and notes), as the API returns them.
+  // AUTH-3 / data export: the saved profile, every resume (with content), every application in the
+  // Database (with its JD, CV sent and notes), the user's agents and every chat, as the API returns them.
   async function downloadData() {
     setExportError(null);
+    setExportNote(null);
     let data;
     try {
-      const [profile, resumes, list] = await Promise.all([getProfile(), listResumes(), listApplications()]);
-      const applications = [];
-      for (let i = 0; i < list.items.length; i += 5) { // 5 at a time: bounded load on the API
-        applications.push(...await Promise.all(list.items.slice(i, i + 5).map((a) => getApplication(a.id))));
-      }
-      data = { exported_at: new Date().toISOString(), profile, resumes, applications, settings };
+      const [profile, resumes, list, agentList, chatList] = await Promise.all([getProfile(), listResumes(), listApplications(), listAgents(), listChats()]);
+      const inBatches = async (items, get) => { // 5 at a time: bounded load on the API
+        const out = [];
+        for (let i = 0; i < items.length; i += 5) out.push(...await Promise.all(items.slice(i, i + 5).map(get)));
+        return out;
+      };
+      const applications = await inBatches(list.items, (a) => getApplication(a.id));
+      const chats = await inBatches(chatList.items, (c) => getChat(c.id));
+      // The chat list stops at the server's cap: say so in the file and on screen, never cut silently.
+      const chatsCapped = chatList.items.length >= chatList.limit;
+      data = {
+        exported_at: new Date().toISOString(), profile, resumes, applications, agents: agentList.mine, chats, settings,
+        ...(chatsCapped ? { note: `Only your latest ${chatList.limit} chats are included.` } : {}),
+      };
+      setExportNote(chatsCapped ? `Downloaded. Only your latest ${chatList.limit} chats are included.` : null);
     } catch (e) {
       setExportError(e);
       return;
@@ -122,10 +163,10 @@ function SettingsForm({ initial }) {
       <h1 className="hc-disp" style={{ margin: 0, fontSize: 'clamp(30px,3.4vw,42px)', lineHeight: 1.05, fontWeight: 800, letterSpacing: '-0.035em' }}>
         <span className="hc-serif" style={{ color: 'var(--hc-brand)', fontSize: '1.1em' }}>Settings</span>
       </h1>
-      <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Your account, subscription and preferences.</p>
+      <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Your account, beta limits and preferences.</p>
 
       <nav aria-label="Settings sections" style={{ marginTop: 16, display: 'flex', gap: 2, overflowX: 'auto', background: '#EEF0F5', borderRadius: 999, padding: 4, width: 'fit-content', maxWidth: '100%' }}>
-        <a className="hc-jump" href="#st-account">Account</a><a className="hc-jump" href="#st-billing">Subscription &amp; billing</a><a className="hc-jump" href="#st-prefs">Preferences</a><a className="hc-jump" href="#st-data">Data &amp; privacy</a>
+        <a className="hc-jump" href="#st-account">Account</a><a className="hc-jump" href="#st-limits">Beta limits</a><a className="hc-jump" href="#st-prefs">Preferences</a><a className="hc-jump" href="#st-data">Data &amp; privacy</a>
       </nav>
 
       <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -159,47 +200,7 @@ function SettingsForm({ initial }) {
           </div>
         </section>
 
-        <section id="st-billing" className="hc-card hc-sec" aria-labelledby="h-bill">
-          <h2 id="h-bill" className="hc-disp" style={h2}>Subscription &amp; billing</h2>
-          <div style={{ border: '1.5px solid #C9D3F7', background: '#F7F8FD', borderRadius: 16, padding: 18, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <div style={{ flex: '1 1 300px', minWidth: 0 }}>
-              <div className="hc-lbl" style={{ color: 'var(--hc-brand)' }}>Current plan</div>
-              <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-                <span className="hc-disp" style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em' }}>Beta</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--hc-success)', background: '#E8F5EC', borderRadius: 999, padding: '5px 10px' }}>Free</span>
-              </div>
-              <p style={{ margin: '8px 0 0', fontSize: 14.5, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>Everything is free while we test with real users. Paid plans come later — we’ll tell you before anything changes, and nothing is charged without your OK.</p>
-              <ul style={{ margin: '12px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14 }}>
-                {BENEFITS.map((b) => <li key={b} style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Check size={15} strokeWidth={2.6} color="var(--hc-brand)" aria-hidden="true" />{b}</li>)}
-              </ul>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-              <span style={offBtn} aria-disabled="true">Change plan</span>
-              <span style={{ fontSize: 12, color: 'var(--hc-ink-muted)' }}>Plans open after the beta</span>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 18 }}>
-            <div className="hc-lbl" style={{ marginBottom: 6 }}>Payment method</div>
-            <div className="hc-row">
-              <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14.5 }}>
-                <span aria-hidden="true" style={{ width: 44, height: 30, borderRadius: 6, border: '1px dashed #C9CDD9', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hc-ink-muted)' }}><CreditCard size={18} /></span>
-                <span><strong>No payment method</strong><br /><span style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>None needed during the beta.</span></span>
-              </span>
-              <span style={offBtn} aria-disabled="true">Add payment method</span>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 18 }}>
-            <div className="hc-lbl" style={{ marginBottom: 6 }}>Billing history</div>
-            <div style={{ border: '1px solid var(--hc-hairline)', borderRadius: 14, overflow: 'hidden' }}>
-              <div className="hc-mono" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 80px', gap: 10, padding: '10px 14px', background: 'var(--hc-ground)', borderBottom: '1px solid var(--hc-hairline)', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: 'var(--hc-ink-muted)' }}>
-                <span>DATE</span><span>PLAN</span><span>AMOUNT</span><span>INVOICE</span>
-              </div>
-              <div style={{ padding: '22px 14px', textAlign: 'center', fontSize: 14, color: 'var(--hc-ink-muted)' }}>No invoices yet.</div>
-            </div>
-          </div>
-        </section>
+        <BetaLimits />
 
         <section id="st-prefs" className="hc-card hc-sec" aria-labelledby="h-prefs">
           <h2 id="h-prefs" className="hc-disp" style={{ ...h2, marginBottom: 6 }}>Preferences</h2>
@@ -219,6 +220,7 @@ function SettingsForm({ initial }) {
             <button type="button" className="hc-btn-s" onClick={downloadData}>Download</button>
           </div>
           <ErrorBanner error={exportError} />
+          {exportNote && <div role="status" style={{ marginTop: 6, fontSize: 13, color: 'var(--hc-ink-muted)' }}>{exportNote}</div>}
           <div className="hc-row">
             <div><div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--hc-warm)' }}>Delete account</div><div style={{ fontSize: 13, color: 'var(--hc-ink-muted)' }}>Removes your profile, resumes and sign-in. This can’t be undone.</div></div>
             <button type="button" className="hc-btn-s" onClick={() => setConfirmDelete(true)} style={{ color: 'var(--hc-warm)', borderColor: '#F3C7B3' }}>Delete account</button>

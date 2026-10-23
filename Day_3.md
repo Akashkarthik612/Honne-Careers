@@ -191,12 +191,68 @@ flowchart LR
 4. An agent never reads another user's data (tests), never writes, and every turn is recorded.
 5. Limits are enforced with a clear message; no instructions or chat text in logs.
 
-## 6. Open questions for Akash
+## 6. Decisions (22 Oct 2026)
 
-| # | Question | Suggestion |
+| # | Question | Decided |
 | :---- | :---- | :---- |
-| 1 | Read-only agents in this build, or should they also act (update status, add notes, create a tailored CV)? | Read-only; actions later, each confirmed by the user |
-| 2 | How long are chats kept? | 20 days, the same setting as the Database, so a chat never holds a JD after its row is deleted |
-| 3 | Can the user pick the model per agent? | No, one fixed strong model for now |
-| 4 | Design the three screens on the canvas first, or build them straight from the design system? | Quick canvas pass first |
-| 5 | Agent limit in the beta (free for now) | 10, from a setting |
+| 1 | Read-only or acting agents? | **Read-only.** Actions (approval cards in the design) come later, each confirmed by the user |
+| 2 | How long are chats kept? | **20 days**, `APPLICATION_RETENTION_DAYS`, counted from when the chat was **created** (so a chat never keeps a JD longer than the Database) |
+| 3 | Model per agent? | **No**, one fixed strong model (`LLM_STRONG`) |
+| 4 | Canvas first? | The canvas already had the screens (`Agents.dc.html`, `Chat.dc.html` + 9 frames, `Home.dc.html`, `Sidebar.dc.html`); built from it |
+| 5 | Agent limit | **10** (`CUSTOM_AGENTS_MAX`) |
+| 6 | How does the loop call Gemini? | **Natively** (google-genai function calling, mode ANY) through our provider port. No LangChain; Honne AI's loop was ported, not imported |
+| 7 | Sync or async turns? | **Background job + polling**, like the tailor job: the user can tailor a CV while an agent works, and steps show live. Try it stays synchronous (one short turn, nothing saved) |
+| 8 | Built-in agents? | Same mechanism, as config files: **@analyst** and **@advisor** now; **@cv-writer** links to the tailor flow; @strategist later |
+| 9 | Answer panels | **Table** (rows the answer cited) and **Doc** (drafts, Copy) now; Report panel and PDF/DOCX export later (Markdown export now) |
+| 10 | Things the design doesn't show | Added in its style: one-line **Description**, **Try it** drawer, the **/agents** list, and **SOON** tags on connectors, uploaded files, Auto and attachments |
+| 11 | Chat memory (23 Oct) | **As Dust**: one chat, any agent via @, every agent sees the whole chat. **50 messages** per chat (25 turns), then "start a new chat" (chosen over Dust's token pruning + compaction: simpler). The first @ in a message answers; no @ = the agent that answered last |
+| 12 | Loop engine (23 Oct) | **LangGraph** (`TurnGraph`) + **AsyncPostgresSaver**, ready for the tools coming next. No Temporal. The model is still called natively through our provider port (no LangChain models) |
+
+## 7. As built
+
+- **Data** (migration `20261023000001`): `chat_agents` + immutable `chat_agent_versions` (Dust's agent / agent_configuration split), `chats`, `chat_messages` (the assistant message is the turn job). RLS forced on all four; deleting the account cascades.
+- **Prompt stack** (`ChatPromptBuilder`): platform rules → context (date, handle) → user guardrails → user instructions → tool guide → output contract. User text is escaped; JD, notes and CVs only ever arrive as tool results marked `untrusted_data`.
+- **Tools** (read-only): `read_profile`, `list_resumes`, `read_resume`, `list_applications` (status, referral, company, dates), `read_application` (JD, CV sent, notes, history). Granted per agent by its knowledge.
+- **Limits** (settings): 10 agents, 50 chat messages/day incl. Try it (⚠ Q10 still open), 25 turns = 50 messages per chat (banner from 20 turns), 4 tool rounds + 6 tool calls per turn, per-process cap on running turns (2 on Render free).
+- **Approved fallbacks**: F1 forced answer at the round cap; F2 expected tool errors go back to the model; F3 a citation that matches no row is dropped; F4 Retry with no usable checkpoint starts fresh; F5 the janitor sweeps orphan run state. Everything else fails the turn with a code and Retry.
+- **Not yet**: an agent's own earlier tool results are not replayed (Dust does; we keep only answer text, so no second copy of JD/notes), TRUTH checks on drafted prose (drafts are labelled "check before sending"), Auto routing, connectors, attachments, Report panel, PDF/DOCX export, approval cards (writes).
+
+## 8. Shared memory + LangGraph (23 Oct 2026)
+
+| Piece | What it does |
+| :---- | :---- |
+| Memory | `app.chat_messages` stays the only chat memory (RLS, 20-day retention, `DELETE /me`). `history_of` renders it as Dust does: the answering agent's own answers are its model turns; other agents' answers are `<other_agent handle="@x">` notes in the user's turn (escaped, final answer only); consecutive user turns are merged so roles alternate (Gemini). Prompt builder `chat-v2` adds one platform rule on how to read those notes and on per-turn refs (review #7) |
+| Who answers | `@handle` at the start, else the last agent that answered, found by **identity** (`Speaker`: built-in handle or user agent id), not handle. Rename keeps chats; a new agent reusing a handle never takes them over; deleted → 404 `agent_gone` (review #2) |
+| Loop | `TurnGraph` (`app/agents/chat/graph.py`): START → model → (tools → model)* → END. Same F1–F3, call cap, timeouts and `RetryingCall` as the old ToolLoop. State is JSON (`TurnState`); provider raw replies go through `raw_to_wire`/`raw_from_wire` (Gemini thought signatures survive) |
+| Run state | `AgentStateStore` (`state_store.py`): AsyncPostgresSaver on its own autocommit pool, schema `agent_state` (migration `20261024000001`, the saver's tables copied, `setup()` never run; startup fails if the installed saver needs a newer schema). Thread = assistant message id. A trigger drops a turn's checkpoints when it turns `ok` or is deleted; `app.janitor_purge_agent_state` sweeps orphans (F5) |
+| Retry | Resumes from the checkpoint (finished tool calls are not run again, their steps stay); no checkpoint, a finished run or a changed agent version → fresh run (F4, WARNING `chat_retry_fresh`) |
+| Privacy | LangGraph runs inside `langsmith.tracing_context(enabled=False)`: no automatic LangSmith trace of node inputs. Our `Tracer` span (metadata only) is the trace |
+| Cost | ≤ rounds+1 model calls per turn (unchanged). Checkpoint writes: one per graph step (≤ ~11 small upserts, `durability="sync"`). History O(messages ≤ 50); late in a chat the prompt carries ~24 answers |
+
+## 9. CV fixes: stuck words, remove entries, spoken languages, project links (23 Oct 2026)
+
+| Piece | What it does |
+| :---- | :---- |
+| Stuck words (PDF-4, TRUTH-1) | "validationtoil", "throughPython", "T echnology" came from upload extraction, not the model: pypdf's default mode drops the space at a bold/italic font switch and splits kerned pairs, and `cv_parser` copies verbatim. `PdfExtractor` now reads in layout mode (positions) and `_tidy` collapses the column padding. CVs already saved with stuck words are not repaired: re-upload or edit them (PROF-4) |
+| Our own PDFs | `docker/smoke_compile.py` reads the compiled fixture CV (bold next to plain words, italic "Technology", link, language) back through `PdfExtractor`; a miss fails the Docker job. A miss in pypdf's default mode (rough ATS proxy) is a warning annotation |
+| Remove an entry | Wizard: each role / project / education card has Remove (asks first when it has content). Removing the last card leaves the section empty, so the PDF omits it |
+| Spoken languages | `CvContent.spoken_languages`: `{name, level}`, level ∈ beginner/intermediate/professional/native or null (dropdown). Edited on the Skills step (saved as its own `spoken_languages` patch, so no new wizard step and no migration) and on the Profile page. PDF: `\section{Languages}` after Technical Skills, "French (Professional), Tamil (Native)". Not a skill: never in `FactSet` |
+| Project link | `ProjectItem.link` (optional http(s), checked on both sides). PDF and preview: `Name \| Click here \| tech` |
+| cv_parser v2 | Extracts spoken languages; sets a level only when the CV states one that clearly maps to the four, else null |
+
+## 10. Beta usage limits (23 Oct 2026)
+
+Supersedes the agent limit in §6 #5 and the message limit in §7. Numbers live only in `backend/config/limits.yaml`.
+
+| Limit | Beta | Counts |
+| :---- | :---- | :---- |
+| CVs | 3 / day | each "Tailor my CV" run (`full_tailor`), Retry included |
+| AI chats | 5 / day | each new chat (`chat_start`); each Try it message counts too. Messages inside an open chat don't use one |
+| Custom agents | 2 per user | active agents; deleting one frees a place. Users already above 2 keep theirs |
+| Safety caps | per day | 125 chat answers, 150 bullet rewrites, 40 PDFs, 40 analyses, 20 uploads |
+
+- **Design**: `LimitsConfig` (YAML, validated at startup) → `LimitPolicy` port → `ConfiguredLimitPolicy` → `QuotaGuard` (services name a `DailyAction` / `TotalLimit`, never a number). Days reset at 00:00 UTC (05:30 IST); every attempt counts, failed ones too.
+- **Later plans**: add `free`/`plus`/`pro`/`pro_plus` blocks and set `use_account_plan: true`; startup fails if any DB plan value has no block. No code change.
+- **UI**: Settings "Beta limits" panel (`GET /me/usage`) replaces the subscription/billing box; no prices or paid-plan wording anywhere. The limit messages come from the server.
+- **Migration** `20261025000001`: `usage_events.action` gains `chat_start`. Apply before deploying the API.
+- **Known gap**: the wizard's per-bullet "Tailor all" uses `bullet_tailor` (150/day), not the 3-CV limit. Lower it in the YAML if needed.

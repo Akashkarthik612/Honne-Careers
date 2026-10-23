@@ -15,6 +15,9 @@ import CvReadyPage from './pages/cv/CvReadyPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import DatabasePage from './pages/DatabasePage';
+import AgentsPage from './pages/agents/AgentsPage';
+import AgentBuilderPage from './pages/agents/AgentBuilderPage';
+import ChatPage from './pages/chat/ChatPage';
 
 // Landing, sign-in and the OAuth callback are public; every app screen needs a signed-in user (AUTH-1).
 export default function App() {
@@ -35,6 +38,11 @@ export default function App() {
         <Route path="/profile"      element={<ProfilePage />} />
         <Route path="/database"     element={<DatabasePage />} />
         <Route path="/settings"     element={<SettingsPage />} />
+        <Route path="/agents"       element={<AgentsPage />} />
+        <Route path="/agents/new"   element={<AgentBuilderPage />} />
+        <Route path="/agents/:id/edit" element={<AgentBuilderPage />} />
+        <Route path="/chat"         element={<ChatPage />} />
+        <Route path="/chat/:id"     element={<ChatPage />} />
       </Route>
       <Route path="*"     element={<Navigate to="/" replace />} />
     </Routes>
