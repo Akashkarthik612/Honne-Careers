@@ -130,7 +130,7 @@ Auth (AUTH-1, beta = Google only):
 - `src/services/apiClient.js` — `apiRequest` for every backend call: Bearer token + `X-Correlation-Id`, backend error JSON → `ApiError` (`code`, `message`, `details`, `correlationId`), a 401 forgets the session. No retries. `errorText(e)` = the backend's user-facing message + reference.
 
 Styling has two separate layers — keep them separate:
-- **Landing** (`src/pages/landing/`): `LandingView.jsx` is markup machine-converted from the design's `Main.dc.html`; `LandingPage.jsx` owns state (the rotating hero word). Its CSS in `landing.css` is scoped under `.hc-landing`, and its keyframes are prefixed `lp-`, because its class names (`.br`, `.rise`, `.dot`…) are generic. Hex colours are inline literals, as in the design.
+- **Landing** (`src/pages/landing/`), ported from the design's `Landing.dc.html` ("Landing v4 · Stripe direction"): `LandingPage.jsx` composes `sections/*` (each owns its own state, so the hero demo loop and the scroll-driven scenes re-render only themselves) and runs **Lenis** smooth scrolling (off with reduced motion); every in-page jump goes through `useScrollTo`/`useJump` (`landingHooks.js`). Sample content and the pure maths (card sorting, loop ring, gap note) live in `landingData.js`, tested in `landingData.test.js`. Its CSS in `landing.css` is scoped under `.hc-landing`, and its keyframes are prefixed `lp-`, because its class names (`.h`, `.rise`, `.card`…) are generic. Hex colours are inline literals, as in the design.
 - **App screens**: shared `hc-` prefixed classes and `--hc-*` design tokens in `src/index.css` (tokens come from the design system's `tokens.json`). Use the tokens rather than new hex values.
 
 Data (all from the API; nothing seeded):
