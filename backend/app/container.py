@@ -37,7 +37,6 @@ from app.policy.quota import QuotaGuard
 from app.policy.slots import TurnSlots
 from app.render.compiler import CompileQueue, LatexCompiler, TectonicCompiler
 from app.render.inspector import PdfInspector
-from app.render.latex import LatexRenderer
 from app.render.templates import TemplateRegistry
 from app.services.accounts import AccountService, SupabaseAdmin
 from app.services.analysis import AnalysisService
@@ -180,7 +179,7 @@ def build_container(settings: Settings, *, providers: dict[str, LlmProvider] | N
         tailor=TailorService(uow, runner, quota, entitlements, settings.tailor_job_timeout_s,
                              tracer),
         quota=quota, entitlements=entitlements,
-        pdf=PdfService(uow, LatexRenderer(), latex, PdfInspector(), file_store, quota),
+        pdf=PdfService(uow, templates, latex, PdfInspector(), file_store, quota),
         uploads=UploadService(
             uow, TextExtractor(settings.upload_max_bytes, settings.upload_max_pages,
                                settings.docx_max_uncompressed_bytes, settings.parse_timeout_s),
@@ -188,7 +187,7 @@ def build_container(settings: Settings, *, providers: dict[str, LlmProvider] | N
         analysis=AnalysisService(uow, runner, ScoreCalculator(), quota),
         user_settings=SettingsService(uow),
         applications=applications,
-        recorder=ApplicationRecorder(uow, file_store, window),
+        recorder=ApplicationRecorder(uow, file_store, window, templates),
         janitor=janitor,
         janitor_loop=JanitorLoop(janitor, settings.janitor_tick_s, settings.janitor_start_delay_s),
         custom_agents=CustomAgentService(uow, catalog, chat_runner, quota, slots),

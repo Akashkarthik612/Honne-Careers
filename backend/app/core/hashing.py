@@ -14,3 +14,10 @@ def content_hash(model: BaseModel) -> str:
 
 def text_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def render_key(chash: str, template: str, revision: int, order: tuple[str, ...]) -> str:
+    """PDF cache key: everything that changes the PDF. Switching template or section order,
+    or a template revision bump, gives a new key, so an old PDF is never served (PDF-1)."""
+    parts = json.dumps([chash, template, revision, list(order)], separators=(",", ":"))
+    return hashlib.sha256(parts.encode("utf-8")).hexdigest()

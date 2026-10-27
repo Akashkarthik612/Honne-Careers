@@ -99,3 +99,6 @@ export function sendChatMessage(chatId, { message, agent }) {
 export const getChatMessage = (chatId, messageId) => apiRequest(`/chats/${chatId}/messages/${messageId}`); // the poll
 export const retryChatTurn = (chatId) => apiRequest(`/chats/${chatId}/retry`, { method: 'POST' });
 export const deleteChat = (id) => apiRequest(`/chats/${id}`, { method: 'DELETE' });
+
+// PDF-1: template + section order. order null = the template's default. 409 stale_version → reload.
+export const setLayout = (id, body) => apiRequest(`/resumes/${id}/layout`, json('PATCH', body));

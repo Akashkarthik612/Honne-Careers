@@ -4,14 +4,16 @@ import { AlertCircle, Check, ChevronDown, Database, Download, ExternalLink, Maxi
 import CvDoc, { BulletText } from '@/components/CvDoc';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { shortDate } from '@/data/applications';
-import { SKILL_API_CATEGORY, bulletToDoc, openSuggestions, sectionPatch, toResume } from '@/data/cvAdapter';
+import { SKILL_API_CATEGORY, bulletToDoc, layoutRequest, openSuggestions, sectionPatch, toResume } from '@/data/cvAdapter';
 import { SKILL_GROUPS, docChanges, docToCv } from '@/data/cvModel';
-import { templateName } from '@/data/templates';
+import { sectionOrderOf, templateName } from '@/data/templates';
 import useResource from '@/hooks/useResource';
-import { buildPdf, confirmSkill, getProfile, getResume, getSettings, patchResume, saveResumeToProfile, settleBullet, startTailor } from '@/services/api';
+import { buildPdf, confirmSkill, getProfile, getResume, getSettings, listTemplates, patchResume, saveResumeToProfile, setLayout, settleBullet, startTailor } from '@/services/api';
 import { errorText } from '@/services/apiClient';
 import { clearPending, isRetryable, markPending, saveWithRetry } from '@/services/applicationSaver';
 import AnalysisSection from './AnalysisSection';
+import LayoutPanel from './LayoutPanel';
+import PdfPreview from './PdfPreview';
 
 // "Your CV is ready" (design: Preview.dc.html): download, what changed, full screen, analysis.
 // Download = POST /resumes/{id}/pdf (LaTeX, reused when the content is unchanged) → a short-lived signed
@@ -22,6 +24,8 @@ import AnalysisSection from './AnalysisSection';
 // V4.1: skills the tailor added from the user's own experience can be removed here; JD skills the CV doesn't
 // show are only suggestions until the user says "I have this" (POST skills/confirm, this CV only), and
 // non-skill gaps (degree, years, language) are listed, never confirmable.
+// PDF-1: the template and section order can be changed here (LayoutPanel, no AI call). Jake's preview is the
+// HTML CvDoc; Honne Professional's is the real PDF (PdfPreview), since HTML can't match its LaTeX layout.
 
 const GAP_LABEL = { qualification: 'Qualification', experience: 'Experience', language: 'Language' };
 
@@ -38,18 +42,18 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 export default function CvReadyPage() {
   const { id } = useParams();
   const load = useCallback(async () => {
-    const [resume, settings] = await Promise.all([getResume(id), getSettings()]);
-    return { resume: toResume(resume), settings };
+    const [resume, settings, templates] = await Promise.all([getResume(id), getSettings(), listTemplates()]);
+    return { resume: toResume(resume), settings, templates };
   }, [id]);
   const res = useResource(load);
 
   const wrap = (children) => <main style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px 80px' }}>{children}</main>;
   if (res.loading) return wrap(<PageLoading label="Loading your CV…" />);
   if (res.error) return wrap(<ErrorBanner error={res.error} action={{ label: 'Retry', onClick: res.reload }} />);
-  const { resume, settings } = res.data;
+  const { resume, settings, templates } = res.data;
   if (resume.state === 'tailoring') return <Navigate to={`/tailoring/${id}`} replace />;
   if (resume.state === 'draft') return <Navigate to={`/new/details?resume=${id}&step=${resume.wizardStep}`} replace />;
-  return <CvReady key={resume.rowVersion} initial={resume} askSave={settings.ask_before_save} />;
+  return <CvReady key={resume.rowVersion} initial={resume} askSave={settings.ask_before_save} templates={templates} />;
 }
 
 function replaceBullet(doc, bullet) {
@@ -57,7 +61,7 @@ function replaceBullet(doc, bullet) {
   return { ...doc, roles: swap(doc.roles), projects: swap(doc.projects) };
 }
 
-function CvReady({ initial, askSave }) {
+function CvReady({ initial, askSave, templates }) {
   const navigate = useNavigate();
   const [resume, setResume] = useState(initial);
   const [dl, setDl] = useState({ phase: 'idle' }); // idle | busy | done {url, pages} | fail {error}
@@ -71,6 +75,8 @@ function CvReady({ initial, askSave }) {
   const [category, setCategory] = useState({}); // suggestion -> chosen UI group (default Cloud & tools)
   const [changesOpen, setChangesOpen] = useState(true);
   const [full, setFull] = useState(false);
+  const [layoutBusy, setLayoutBusy] = useState(false);
+  const [layoutError, setLayoutError] = useState(null);
 
   const cv = docToCv(resume.doc);
   const changes = docChanges(resume.doc);
@@ -78,6 +84,8 @@ function CvReady({ initial, askSave }) {
   const added = resume.addedSkills; // added by the tailor because the user's experience shows them
   const suggestions = openSuggestions(resume.missingSkills, resume.doc.skills);
   const meta = [resume.title, templateName(resume.template)].join(' · ');
+  const order = sectionOrderOf(resume, templates);
+  const exactPdf = resume.template !== 'jake'; // the HTML preview matches only Jake's layout closely enough
 
   // PDF-2, then (unless the user unticked it) save to profile. Each step reports its own failure: a
   // profile save that fails doesn't hide a PDF that was built.
@@ -159,6 +167,23 @@ function CvReady({ initial, askSave }) {
     }
   }
 
+  // PDF-1: a new template or order. A switch of template keeps the user's own order (null = keep using the
+  // template default); the PDF already built is for the old layout, so the button goes back to "Download PDF".
+  async function changeLayout(template, newOrder) {
+    setLayoutError(null);
+    setLayoutBusy(true);
+    const custom = template !== resume.template ? resume.sectionOrder : newOrder;
+    try {
+      const r = await setLayout(resume.id, layoutRequest(template, custom, resume.rowVersion));
+      setResume((cur) => ({ ...toResume(r), jd: cur.jd }));
+      setDl({ phase: 'idle' });
+    } catch (e) {
+      setLayoutError(e);
+    } finally {
+      setLayoutBusy(false);
+    }
+  }
+
   async function retryTailor() {
     setRetryError(null);
     try {
@@ -229,9 +254,14 @@ function CvReady({ initial, askSave }) {
             <Maximize2 size={14} aria-hidden="true" />Full screen
           </button>
           <div style={{ maxWidth: 794, margin: '0 auto', boxShadow: '0 2px 4px rgba(22,26,43,.06), 0 18px 44px rgba(22,26,43,.14)', borderRadius: 3, overflow: 'hidden', background: '#FFFFFF' }}>
-            <CvDoc cv={cv} template={resume.template} />
+            {exactPdf
+              ? <PdfPreview resumeId={resume.id} layoutKey={`${resume.rowVersion}|${resume.template}|${order.join(',')}`} cv={cv} template={resume.template} order={order} />
+              : <CvDoc cv={cv} template={resume.template} order={order} />}
           </div>
         </div>
+
+        <ErrorBanner error={layoutError} action={layoutError?.code === 'stale_version' ? { label: 'Reload', onClick: () => window.location.reload() } : undefined} />
+        <LayoutPanel templates={templates} template={resume.template} order={order} busy={layoutBusy} onChange={changeLayout} />
 
         {(changes.length > 0 || added.length > 0) && (
           <section className="hc-card" style={{ marginTop: 20 }}>
@@ -320,7 +350,7 @@ function CvReady({ initial, askSave }) {
               <button type="button" className="hc-btn-s" onClick={() => setFull(false)} aria-label="Close full screen" autoFocus><X size={16} aria-hidden="true" />Close</button>
             </div>
             <div style={{ boxShadow: '0 30px 80px rgba(14,18,38,.35)', borderRadius: 3, overflow: 'hidden', background: '#FFFFFF' }}>
-              <CvDoc cv={cv} template={resume.template} />
+              <CvDoc cv={cv} template={resume.template} order={order} />
             </div>
           </div>
         </div>

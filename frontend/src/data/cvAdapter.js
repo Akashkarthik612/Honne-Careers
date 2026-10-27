@@ -68,6 +68,8 @@ export function contentToDoc(c) {
     skills: Object.fromEntries(SKILL_KEYS.map(([ui, api]) => [ui, (c.skills?.[api] ?? []).map((s) => (typeof s === 'string' ? s : s.name))])),
     // Spoken languages carry no server id: `id` is a React key only and is never sent.
     spoken: (c.spoken_languages ?? []).map((l, i) => ({ id: `sl${i}`, name: l.name ?? '', level: l.level ?? '' })),
+    // Certifications, too: `id` is a React key only.
+    certs: (c.certifications ?? []).map((x, i) => ({ id: `ce${i}`, name: x.name ?? '', issuer: x.issuer ?? '', date: x.date ?? '' })),
   };
 }
 
@@ -80,20 +82,26 @@ const SECTION_IN = {
   education: (d) => d.education.map((e) => ({ id: e.id, school: trim(e.school), degree: trim(e.degree), years: trim(e.years), location: trim(e.city) })),
   skills: (d) => Object.fromEntries(SKILL_KEYS.map(([ui, api]) => [api, d.skills[ui].map(trim).filter(Boolean)])),
   spoken_languages: (d) => d.spoken.map((l) => ({ name: trim(l.name), level: l.level || null })),
+  certifications: (d) => d.certs.map((c) => ({ name: trim(c.name), issuer: trim(c.issuer), date: trim(c.date) })),
 };
 
-// The sections each wizard step saves. Spoken languages are edited on the Skills step.
-export const STEP_SECTIONS = { personal: ['personal'], experience: ['experience'], projects: ['projects'], education: ['education'], skills: ['skills', 'spoken_languages'] };
+// The sections each wizard step saves. Spoken languages and certifications are edited on the Skills step.
+export const STEP_SECTIONS = { personal: ['personal'], experience: ['experience'], projects: ['projects'], education: ['education'], skills: ['skills', 'spoken_languages', 'certifications'] };
 
 // Empty entries and bullets are dropped first, as the wizard's "Preview" always did.
 export function docToContentIn(doc) {
   const d = pruneDoc(doc);
-  return { header: SECTION_IN.personal(d), experience: SECTION_IN.experience(d), projects: SECTION_IN.projects(d), education: SECTION_IN.education(d), skills: SECTION_IN.skills(d), spoken_languages: SECTION_IN.spoken_languages(d) };
+  return { header: SECTION_IN.personal(d), experience: SECTION_IN.experience(d), projects: SECTION_IN.projects(d), education: SECTION_IN.education(d), skills: SECTION_IN.skills(d), spoken_languages: SECTION_IN.spoken_languages(d), certifications: SECTION_IN.certifications(d) };
 }
 
 // PATCH /resumes/{id} body for one wizard step.
 export function sectionPatch(doc, section, expectedVersion, wizardStep = null) {
   return { expected_version: expectedVersion, change: { section, value: SECTION_IN[section](pruneDoc(doc)) }, wizard_step: wizardStep };
+}
+
+// PATCH /resumes/{id}/layout body (PDF-1). `order` null = the template's default order.
+export function layoutRequest(template, order, expectedVersion) {
+  return { expected_version: expectedVersion, template, section_order: order };
 }
 
 // ── the profile page's shape: bullets are { id, text } facts (cvModel.js) ──
@@ -121,6 +129,7 @@ export function mergePrefill(doc, pre) {
     education: doc.education.length ? doc.education : pre.education,
     skills: hasSkills ? doc.skills : pre.skills,
     spoken: doc.spoken.length ? doc.spoken : pre.spoken,
+    certs: doc.certs.length ? doc.certs : pre.certs,
   };
 }
 
@@ -152,6 +161,9 @@ export function validateDoc(doc, sections = WIZARD_ORDER) {
   if (sections.includes('education')) {
     for (const e of d.education) if (!filled(e.school)) errors[`${e.id}.school`] = 'Add the school.';
   }
+  if (sections.includes('skills')) {
+    for (const c of d.certs) if (!filled(c.name)) errors[`${c.id}.name`] = 'Add the certification name.';
+  }
   return errors;
 }
 
@@ -168,6 +180,7 @@ const stepNo = (wizardStep) => Math.max(1, WIZARD_ORDER.indexOf(wizardStep) + 1)
 export function toResume(r) {
   return {
     id: r.id, title: r.title, template: r.template, mode: r.mode,
+    sectionOrder: r.section_order ?? null, // null = the template's default order (templates.js sectionOrderOf)
     state: resumeState(r.status, r.wizard_step), jobStep: r.job_step ?? null, errorCode: r.error_code ?? null,
     wizardStep: r.wizard_step, stepNo: stepNo(r.wizard_step), rowVersion: r.row_version,
     doc: contentToDoc(r.content), missingSkills: r.missing_skills ?? [],
@@ -186,7 +199,8 @@ function aiSkills(c) {
 
 export function toSummary(s) {
   return {
-    id: s.id, title: s.title, template: s.template, mode: s.mode, state: resumeState(s.status, s.wizard_step),
+    id: s.id, title: s.title, template: s.template, mode: s.mode, sectionOrder: s.section_order ?? null,
+    state: resumeState(s.status, s.wizard_step),
     wizardStep: s.wizard_step, stepNo: stepNo(s.wizard_step), company: s.company ?? '', role: s.role ?? '',
     doc: contentToDoc(s.content), updatedAt: s.updated_at,
   };

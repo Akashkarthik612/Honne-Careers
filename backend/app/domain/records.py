@@ -6,6 +6,7 @@ from typing import Literal
 from uuid import UUID
 
 from app.domain.cv import CvContent
+from app.domain.layout import SectionOrder
 from app.domain.tailoring import PrefillCv
 
 ResumeStatus = Literal["draft", "tailoring", "ready", "failed"]
@@ -50,6 +51,7 @@ class ResumeSummary:
     role: str | None
     updated_at: datetime
     content: CvContent  # dashboard thumbnails; one query, no per-card fetch
+    section_order: SectionOrder | None  # None = the template's default order
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,10 +72,11 @@ class ResumeRow:
     row_version: int
     content_hash: str
     pdf_path: str | None
-    pdf_content_hash: str | None
+    pdf_render_key: str | None  # render_key of the stored PDF (core/hashing.py)
     page_count: int | None
     error_code: str | None
     updated_at: datetime
+    section_order: SectionOrder | None  # None = the template's default order
 
 
 @dataclass(frozen=True, slots=True)

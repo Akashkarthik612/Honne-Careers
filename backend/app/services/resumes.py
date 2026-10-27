@@ -10,6 +10,7 @@ from app.core.logging import get_logger
 from app.db.unit_of_work import UnitOfWorkFactory
 from app.domain.auth import AuthUser
 from app.domain.cv import CvContent, Origin, ResumePatch, SkillItem
+from app.domain.layout import LayoutPatch
 from app.domain.records import JdRow, ResumeMode, ResumeRow, ResumeSummary
 from app.render.templates import TemplateRegistry
 from app.truth.copying import as_origin
@@ -82,6 +83,28 @@ class ResumeService:
         log.info("resume_autosaved", resume_id=resume_id, section=patch.change.section,
                  row_version=version)
         return version, chash
+
+    async def set_layout(self, user: AuthUser, resume_id: UUID, patch: LayoutPatch
+                         ) -> ResumeRow:
+        """Template + section order (PDF-1). 0 LLM calls; content and content_hash are
+        untouched, the PDF cache key changes. Unknown template -> 422; stale -> 409."""
+        self._templates.require(patch.template)
+        async with self._uow(user.id) as uow:
+            row = await uow.resumes.get(user.id, resume_id, for_update=True)
+            if row is None:
+                raise NotFound(reason="resume")
+            if row.status == "tailoring":
+                raise JobAlreadyRunning(reason="layout_during_tailor")
+            if row.row_version != patch.expected_version:
+                raise StaleVersion(reason="resume", current_version=row.row_version)
+            version = await uow.resumes.set_layout(user.id, resume_id, patch.template,
+                                                   patch.section_order, patch.expected_version)
+            if version is None:  # row is locked FOR UPDATE, so this means a logic bug
+                raise StaleVersion(reason="resume")
+            updated = await uow.resumes.get(user.id, resume_id)
+        log.info("resume_layout_set", resume_id=resume_id, template=patch.template,
+                 custom_order=patch.section_order is not None, row_version=version)
+        return updated
 
     async def confirm_skill(self, user: AuthUser, resume_id: UUID, name: str, category: str,
                             expected_version: int) -> ResumeRow:

@@ -7,21 +7,33 @@ from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
 from app.domain.cv import CvContent
+from app.domain.layout import SectionKey, SectionOrder, checked_order
 from app.domain.records import JobStep, ResumeMode, ResumeRow, ResumeSummary
 
 # Constant column list interpolated into SQL (S608/B608 suppressed); values are bound params.
 _COLUMNS = """id, title, template, mode, jd_id, content, missing_skills, jd_gaps, tailor_report,
               wizard_step, status, job_step,
-              job_started_at, row_version, content_hash, pdf_path, pdf_content_hash,
-              page_count, error_code, updated_at"""
+              job_started_at, row_version, content_hash, pdf_path, pdf_render_key,
+              page_count, error_code, updated_at, section_order"""
+
+
+def _order(stored: list[str] | None) -> SectionOrder | None:
+    """text[] -> SectionOrder. The API validated it on write; a bad stored value raises."""
+    return checked_order(tuple(SectionKey(k) for k in stored)) if stored else None
+
+
+def _db_order(order: SectionOrder | None) -> list[str] | None:
+    return [k.value for k in order] if order else None  # values, never enum names
 
 
 def _row(row: dict[str, Any]) -> ResumeRow:
-    return ResumeRow(**{**row, "content": CvContent.model_validate(row["content"])})
+    return ResumeRow(**{**row, "content": CvContent.model_validate(row["content"]),
+                        "section_order": _order(row["section_order"])})
 
 
 def _summary(row: dict[str, Any]) -> ResumeSummary:
-    return ResumeSummary(**{**row, "content": CvContent.model_validate(row["content"])})
+    return ResumeSummary(**{**row, "content": CvContent.model_validate(row["content"]),
+                            "section_order": _order(row["section_order"])})
 
 
 def _json(content: CvContent) -> Jsonb:
@@ -37,7 +49,7 @@ class ResumeRepository:
         Space O(resumes x content), capped at 200 rows x 256 KB by the table checks."""
         cur = await self._conn.execute(
             """select r.id, r.title, r.template, r.mode, r.status, r.wizard_step,
-                      j.company, j.role, r.updated_at, r.content
+                      j.company, j.role, r.updated_at, r.content, r.section_order
                  from app.resumes r
                  left join app.job_descriptions j
                    on j.user_id = r.user_id and j.id = r.jd_id
@@ -71,9 +83,9 @@ class ResumeRepository:
         cur = await self._conn.execute(
             f"""insert into app.resumes
                     (user_id, title, template, mode, jd_id, content, missing_skills,
-                     jd_gaps, wizard_step, content_hash)
+                     jd_gaps, wizard_step, content_hash, section_order)
                 select user_id, %s, template, mode, jd_id, content, missing_skills,
-                       jd_gaps, wizard_step, content_hash
+                       jd_gaps, wizard_step, content_hash, section_order
                   from app.resumes where user_id = %s and id = %s
                 returning {_COLUMNS}""",  # noqa: S608  # nosec B608
             (title, user_id, resume_id))
@@ -186,14 +198,35 @@ class ResumeRepository:
             (user_id, resume_id, timeout_s))
         return cur.rowcount == 1
 
-    async def set_pdf(self, user_id: UUID, resume_id: UUID, pdf_path: str, pdf_hash: str,
-                      page_count: int) -> bool:
+    async def set_pdf(self, user_id: UUID, resume_id: UUID, pdf_path: str, key: str,
+                      page_count: int, built_from: ResumeRow) -> bool:
+        """Records the PDF only if content, template and order are still what it was built
+        from. False = edited or re-laid-out while compiling (the PDF is not current)."""
+        order = _db_order(built_from.section_order)
         cur = await self._conn.execute(
             """update app.resumes
-                  set pdf_path = %s, pdf_content_hash = %s, page_count = %s
-                where user_id = %s and id = %s and content_hash = %s""",
-            (pdf_path, pdf_hash, page_count, user_id, resume_id, pdf_hash))
+                  set pdf_path = %s, pdf_render_key = %s, page_count = %s
+                where user_id = %s and id = %s and content_hash = %s and template = %s
+                  and section_order is not distinct from %s::text[]""",
+            (pdf_path, key, page_count, user_id, resume_id, built_from.content_hash,
+             built_from.template, order))
         return cur.rowcount == 1
+
+    async def set_layout(self, user_id: UUID, resume_id: UUID, template: str,
+                         section_order: SectionOrder | None, expected_version: int
+                         ) -> int | None:
+        """Template + section order (PDF-1). Content is untouched, so content_hash stays.
+        None = stale version or a tailor job is running."""
+        cur = await self._conn.execute(
+            """update app.resumes
+                  set template = %s, section_order = %s::text[], row_version = row_version + 1
+                where user_id = %s and id = %s and row_version = %s
+                  and status <> 'tailoring'
+            returning row_version""",
+            (template, _db_order(section_order), user_id, resume_id,
+             expected_version))
+        row = await cur.fetchone()
+        return row["row_version"] if row else None
 
     async def delete(self, user_id: UUID, resume_id: UUID) -> bool:
         cur = await self._conn.execute(

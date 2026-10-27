@@ -10,6 +10,7 @@ export const SKILL_GROUPS = [['lang', 'Languages'], ['fw', 'Frameworks'], ['tool
 // Spoken languages (not programming ones). Same values as the backend's LanguageLevel; '' = no level.
 export const LANGUAGE_LEVELS = [['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['professional', 'Professional'], ['native', 'Native']];
 export const SPOKEN_LANGUAGES_MAX = 10; // the API's cap (cv.py SpokenLanguages)
+export const CERTIFICATIONS_MAX = 15; // the API's cap (cv.py Certifications)
 
 let seq = 0;
 export const newId = (prefix) => `${prefix}${Date.now().toString(36)}${(seq += 1)}`;
@@ -18,6 +19,7 @@ export const blankRole = () => ({ id: newId('r'), role: '', company: '', start: 
 export const blankProject = () => ({ id: newId('p'), name: '', tech: '', year: '', link: '', bullets: [] });
 export const blankEducation = () => ({ id: newId('e'), school: '', degree: '', years: '', city: '' });
 export const blankLanguage = () => ({ id: newId('l'), name: '', level: '' });
+export const blankCertification = () => ({ id: newId('c'), name: '', issuer: '', date: '' });
 
 export function emptyProfile() {
   return {
@@ -25,6 +27,7 @@ export function emptyProfile() {
     roles: [], projects: [], education: [],
     skills: { lang: [], fw: [], tools: [] },
     spoken: [],
+    certs: [],
   };
 }
 
@@ -40,6 +43,7 @@ export function toDoc(profile) {
     education: profile.education.map((e) => ({ ...e })),
     skills: { lang: [...profile.skills.lang], fw: [...profile.skills.fw], tools: [...profile.skills.tools] },
     spoken: profile.spoken.map((l) => ({ ...l })),
+    certs: profile.certs.map((c) => ({ ...c })),
   };
 }
 
@@ -53,6 +57,7 @@ export function docToProfile(doc) {
     education: doc.education.map((e) => ({ ...e })),
     skills: { ...doc.skills },
     spoken: doc.spoken.map((l) => ({ ...l })),
+    certs: doc.certs.map((c) => ({ ...c })),
   };
 }
 
@@ -97,6 +102,11 @@ export function languageText(l) {
   return level ? `${l.name.trim()} (${level[1]})` : l.name.trim();
 }
 
+// "AWS Certified Developer – Amazon – 2024": how a certification prints, as in the LaTeX templates.
+export function certificationText(c) {
+  return [c.name, c.issuer, c.date].filter(filled).map((s) => s.trim()).join(' – ');
+}
+
 // doc → cv. Empty fields and entries are dropped so the live preview never shows blank rows.
 export function docToCv(doc) {
   const texts = (bullets) => bullets.map((b) => b.text).filter(filled);
@@ -118,6 +128,7 @@ export function docToCv(doc) {
       .map((e) => ({ school: e.school, location: e.city, degree: e.degree, years: e.years })),
     skills: SKILL_GROUPS.filter(([k]) => doc.skills[k].length).map(([k, label]) => [label, doc.skills[k].join(', ')]),
     languages: doc.spoken.filter((l) => filled(l.name)).map(languageText).join(', '),
+    certifications: doc.certs.filter((c) => filled(c.name)).map(certificationText),
   };
 }
 
@@ -153,6 +164,7 @@ export function pruneDoc(doc) {
     projects: keep(doc.projects, ['name', 'tech', 'link']),
     education: keep(doc.education, ['school', 'degree', 'years', 'city']),
     spoken: doc.spoken.filter((l) => filled(l.name)),
+    certs: doc.certs.filter((c) => ['name', 'issuer', 'date'].some((k) => filled(c[k]))),
   };
 }
 

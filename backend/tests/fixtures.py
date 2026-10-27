@@ -14,6 +14,15 @@ from app.domain.cv import (
     SpokenLanguage,
 )
 
+TEMPLATE_IDS = ("jake", "honne_professional")
+
+
+def render(cv: CvContent, template: str = "jake", order=None) -> str:
+    """.tex of `cv` in a registered template, in its default order unless `order` is given."""
+    from app.render.templates import TemplateRegistry
+    info = TemplateRegistry().require(template)
+    return info.renderer.render(cv, order or info.default_order)
+
 
 def b(bid: str, text: str, origin: Origin = Origin.PROFILE, locked: bool = False) -> Bullet:
     return Bullet(id=bid, text=text, origin=origin, locked=locked)

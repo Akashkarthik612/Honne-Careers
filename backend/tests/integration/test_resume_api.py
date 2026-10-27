@@ -127,4 +127,4 @@ async def test_profile_create_update_and_returning_user_prefill(api):
 
 async def test_templates_list(api):
     r = await api.client.get("/templates")
-    assert [t["id"] for t in r.json()] == ["jake"]
+    assert [t["id"] for t in r.json()] == ["jake", "honne_professional"]

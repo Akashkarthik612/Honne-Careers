@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import SkillChips from '@/components/SkillChips';
 import SpokenLanguagesEditor from '@/components/SpokenLanguagesEditor';
+import CertificationsEditor from '@/components/CertificationsEditor';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { contentToProfile, profileToContentIn, timeAgo, validateDoc } from '@/data/cvAdapter';
 import { SKILL_GROUPS, blankEducation, blankProject, blankRole, emptyProfile, newId, profileSections, toDoc } from '@/data/cvModel';
@@ -215,6 +216,7 @@ function ProfileForm({ initial, onReload }) {
                 <SkillChips key={k} id={`pf-sk-${k}`} label={label} values={profile.skills[k]} onChange={(v) => update((p) => ({ ...p, skills: { ...p.skills, [k]: v } }))} />
               ))}
               <SpokenLanguagesEditor id="pf-spoken" values={profile.spoken} onChange={(v) => update((p) => ({ ...p, spoken: v }))} />
+              <CertificationsEditor id="pf-certs" values={profile.certs} errors={errors} onChange={(v) => update((p) => ({ ...p, certs: v }))} />
             </div>
           </section>
         </form>

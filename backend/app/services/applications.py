@@ -27,6 +27,7 @@ from app.db.unit_of_work import UnitOfWorkFactory
 from app.domain.applications import ApplicationFilter, RecordResult, RetentionWindow
 from app.domain.auth import AuthUser
 from app.domain.records import ApplicationDetail, ApplicationSummary
+from app.render.templates import TemplateRegistry
 from app.services.resumes import checked_jd
 from app.storage.file_store import application_pdf_path, application_prefix
 
@@ -42,10 +43,12 @@ class ApplicationRecorder:
     the same CV again only restarts the 20-day clock; a changed CV replaces CV + PDF and the
     old PDF is deleted. Status, referral and notes are never touched here."""
 
-    def __init__(self, uow: UnitOfWorkFactory, files, window: RetentionWindow) -> None:
+    def __init__(self, uow: UnitOfWorkFactory, files, window: RetentionWindow,
+                 templates: TemplateRegistry) -> None:
         self._uow = uow
         self._files = files
         self._window = window
+        self._templates = templates
 
     async def record(self, user: AuthUser, resume_id: UUID) -> RecordResult:
         async with self._uow(user.id) as uow:
@@ -55,7 +58,7 @@ class ApplicationRecorder:
             if resume.jd_id is None:  # built from scratch: no job to attach it to (Day 2 Q1)
                 log.info("application_not_saved", resume_id=resume_id, reason="no_jd")
                 return RecordResult(saved=False, reason="no_jd")
-            if resume.pdf_path is None or resume.pdf_content_hash != resume.content_hash:
+            if not self._templates.pdf_is_current(resume):
                 raise PdfOutdated(resume_id=str(resume_id))
             jd = await uow.jds.get(user.id, resume.jd_id)
             existing = await uow.applications.get_row_by_jd(user.id, resume.jd_id)
@@ -66,7 +69,8 @@ class ApplicationRecorder:
         cutoff = self._window.cutoff(now)
         live = existing if existing and existing.last_sent_at >= cutoff else None
         app_id = live.id if live else uuid4()
-        dest = application_pdf_path(user.id, app_id, resume.content_hash)
+        # Keyed like the resume's PDF: the same content in another template is another file.
+        dest = application_pdf_path(user.id, app_id, resume.pdf_render_key)
         if live is None or live.pdf_path != dest:
             await self._files.copy(user, resume.pdf_path, dest)  # inside storage, no bytes here
 

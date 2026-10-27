@@ -106,6 +106,18 @@
         "name": "Tamil",
         "level": "native"
       }
+    ],
+    "certifications": [
+      {
+        "name": "AWS Certified Developer",
+        "issuer": "Amazon Web Services",
+        "date": "2024"
+      },
+      {
+        "name": "Smart India Hackathon finalist",
+        "issuer": "",
+        "date": ""
+      }
     ]
   }
 }

@@ -114,4 +114,4 @@ services:
         value: max-age=63072000; includeSubDomains
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://honne-careers-api.onrender.com https://*.supabase.co; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        value: "default-src 'self'; connect-src 'self' https://honne-careers-api.onrender.com https://*.supabase.co; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"

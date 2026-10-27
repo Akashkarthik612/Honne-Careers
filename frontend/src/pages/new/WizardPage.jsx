@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles, Trash2 } from 'luc
 import CvDoc from '@/components/CvDoc';
 import SkillChips from '@/components/SkillChips';
 import SpokenLanguagesEditor from '@/components/SpokenLanguagesEditor';
+import CertificationsEditor from '@/components/CertificationsEditor';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { BULLET_TAILOR_CONCURRENCY } from '@/config/limits';
 import {
@@ -12,7 +13,7 @@ import {
 import {
   SKILL_GROUPS, blankBullet, blankEducation, blankProject, blankRole, docToCv, ensureEntries, settleDoc,
 } from '@/data/cvModel';
-import { templateName } from '@/data/templates';
+import { sectionOrderOf, templateName } from '@/data/templates';
 import useResource from '@/hooks/useResource';
 import { getProfile, getResume, patchResume, saveResumeToProfile, settleBullet, tailorBullet } from '@/services/api';
 import { ApiError, errorText } from '@/services/apiClient';
@@ -400,6 +401,7 @@ function WizardForm({ resume, stepParam, onReload }) {
               <div key="skills" className="hc-rise" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {SKILL_GROUPS.map(([k, label]) => <SkillChips key={k} id={`sk-${k}`} label={label} values={doc.skills[k]} onChange={(v) => setSkills(k, v)} />)}
                 <SpokenLanguagesEditor id="sk-spoken" values={doc.spoken} disabled={saving} onChange={(v) => edit((d) => ({ ...d, spoken: v }))} />
+                <CertificationsEditor id="sk-certs" values={doc.certs} errors={fieldErrors} disabled={saving} onChange={(v) => edit((d) => ({ ...d, certs: v }))} />
                 {tailoring && resume.missingSkills.length > 0 && (
                   // TAIL-6: JD skills the profile lacks are offered, never added automatically.
                   <div style={{ background: '#F7F8FD', border: '1px solid #C9D3F7', borderRadius: 14, padding: '14px 16px' }}>
@@ -431,11 +433,11 @@ function WizardForm({ resume, stepParam, onReload }) {
           <div className="hc-card hc-prevcol" style={{ padding: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '2px 4px 12px' }}>
               <span className="hc-disp" style={{ fontSize: 16, fontWeight: 700 }}>Live preview</span>
-              <span className="hc-mono" style={{ fontSize: 11.5, color: 'var(--hc-ink-muted)' }}>{templateName(meta.template).toUpperCase()} · 1 PAGE</span>
+              <span className="hc-mono" style={{ fontSize: 11.5, color: 'var(--hc-ink-muted)' }}>{templateName(meta.template).toUpperCase()} · {meta.template === 'jake' ? '1 PAGE' : 'APPROXIMATE PREVIEW'}</span>
             </div>
             <div style={{ background: '#EEF0F5', borderRadius: 14, padding: 14, maxHeight: 'calc(100vh - 120px)', overflow: 'auto' }}>
               <div style={{ boxShadow: '0 12px 30px rgba(22,26,43,.10)', borderRadius: 3, overflow: 'hidden' }}>
-                <CvDoc cv={docToCv(doc)} template={meta.template} focus={step} />
+                <CvDoc cv={docToCv(doc)} template={meta.template} order={sectionOrderOf(resume)} focus={step} />
               </div>
             </div>
           </div>

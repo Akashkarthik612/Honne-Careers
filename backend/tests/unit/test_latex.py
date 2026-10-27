@@ -10,8 +10,8 @@ from app.core.errors import RenderBusy
 from app.domain.cv import Header, Link
 from app.render.compiler import CompileQueue, TectonicCompiler
 from app.render.inspector import PdfInspector
-from app.render.latex import LatexRenderer, escape, escape_url
-from tests.fixtures import sample_cv
+from app.render.latex import escape, escape_url
+from tests.fixtures import TEMPLATE_IDS, render, sample_cv
 
 ATTACKS = [r"\input{/etc/passwd}", r"\immediate\write18{rm -rf /}", r"$\x$", "}{\\end{document}",
            "#1 & 100% ~ ^ _ <>|", "\x00\x1bbad"]
@@ -34,19 +34,22 @@ def test_url_is_percent_encoded():
         r"https://x.test/a\%20b?q=1\&p=50\%25\%23f"
 
 
-def test_render_has_no_raw_user_commands():
+@pytest.mark.parametrize("template", TEMPLATE_IDS)
+def test_render_has_no_raw_user_commands(template):
     cv = sample_cv().model_copy(update={"header": Header(
         name=ATTACKS[1], links=[Link(label=ATTACKS[0], url="https://ok.test")])})
-    tex = LatexRenderer().render(cv)
+    tex = render(cv, template)
     assert r"\immediate\write18" not in tex
     assert r"\input{/etc/passwd}" not in tex
     assert tex.count(r"\begin{document}") == 1 and tex.count(r"\end{document}") == 1
 
 
-def test_empty_cv_renders_without_empty_lists():
+@pytest.mark.parametrize("template", TEMPLATE_IDS)
+def test_empty_cv_renders_without_empty_lists(template):
     from app.domain.cv import CvContent
-    body = LatexRenderer().render(CvContent()).split(r"\begin{document}")[1]
-    assert r"\resumeItemListStart" not in body
+    body = render(CvContent(), template).split(r"\begin{document}")[1]
+    assert r"\resumeItemListStart" not in body and r"\cvbullets" not in body
+    assert r"\section" not in body  # no empty sections
 
 
 async def test_queue_rejects_when_full():
@@ -81,7 +84,8 @@ TECTONIC = os.environ.get("TECTONIC_BIN") or shutil.which("tectonic")
 
 @pytest.mark.latex
 @pytest.mark.skipif(not TECTONIC, reason="tectonic not installed; runs in the Docker CI job")
-async def test_real_compile_offline_one_page():
+@pytest.mark.parametrize("template", TEMPLATE_IDS)
+async def test_real_compile_offline_one_page(template):
     compiler = TectonicCompiler(TECTONIC, 60, 4096, CompileQueue(1, 1, 60),
                                 os.environ.get("TECTONIC_CACHE_DIR"))
     cv = sample_cv()
@@ -91,7 +95,7 @@ async def test_real_compile_offline_one_page():
         "header": Header(name=ATTACKS[0]),
         "experience": [exp.model_copy(update={"bullets": [bold, *exp.bullets[1:]]}),
                        *cv.experience[1:]]})
-    pdf = await compiler.compile(LatexRenderer().render(cv))
+    pdf = await compiler.compile(render(cv, template))
     assert PdfInspector().page_count(pdf) == 1
     from io import BytesIO
 
