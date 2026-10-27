@@ -41,6 +41,11 @@ def sql(api, query, params=()):
         return cur.fetchall() if cur.description else cur.rowcount
 
 
+def past_window(api, extra=1) -> int:
+    """Days old enough to be past the retention window (APPLICATION_RETENTION_DAYS)."""
+    return api.container.applications.window.days + extra
+
+
 def backdate(api, app_id, days):
     sql(api, "update app.applications set last_sent_at = now() - make_interval(days => %s)"
              " where id = %s", (days, app_id))
@@ -50,17 +55,21 @@ def app_pdfs(api, h):
     return sorted(p for p in api.files.objects if p.startswith(f"{uid(h)}/applications/"))
 
 
+def deletes_on(api) -> str:
+    return (date.today() + timedelta(days=api.container.applications.window.days)).isoformat()
+
+
 # ---------- save on download ----------
 
 async def test_download_saves_one_row_with_jd_cv_and_pdf(api):
     h, rid = await returning_user(api)
     saved = await download(api, h, rid)
     assert saved["saved"] is True
-    assert saved["deletes_on"] == (date.today() + timedelta(days=20)).isoformat()
+    assert saved["deletes_on"] == deletes_on(api)
     aid = saved["application_id"]
 
     listing = (await api.client.get("/applications", headers=h)).json()
-    assert listing["retention_days"] == 20
+    assert listing["retention_days"] == api.container.applications.window.days == 40
     [row] = listing["items"]
     assert row["id"] == aid and row["status"] == "applied" and row["source"] == "honne"
     assert (row["has_jd"], row["has_pdf"], row["referral"]) == (True, True, None)
@@ -85,7 +94,7 @@ async def test_same_cv_again_keeps_one_row_and_restarts_the_clock(api):
     again = await download(api, h, rid)
     assert again["application_id"] == first["application_id"]
     [row] = (await api.client.get("/applications", headers=h)).json()["items"]
-    assert row["deletes_on"] == (date.today() + timedelta(days=20)).isoformat()
+    assert row["deletes_on"] == deletes_on(api)
     assert len(app_pdfs(api, h)) == 1  # no second copy for the same CV
 
 
@@ -241,7 +250,7 @@ async def test_agent_filters_run_in_sql_before_the_row_cap(api):
     async with api.container.uow(user.id) as uow:
         def names(flt):
             return uow.applications.list_summaries(
-                user.id, datetime.now(UTC) - timedelta(days=20), flt, repo_limit)
+                user.id, datetime.now(UTC) - timedelta(days=past_window(api, 0)), flt, repo_limit)
         old = await names(ApplicationFilter(referral="none",
                                             sent_before=today - timedelta(days=7)))
         mid = await names(ApplicationFilter(referral="yes"))
@@ -291,7 +300,7 @@ async def test_another_user_gets_404_everywhere(api):
 async def test_rows_past_the_cutoff_are_hidden_at_once(api):
     h, rid = await returning_user(api)
     aid = (await download(api, h, rid))["application_id"]
-    backdate(api, aid, 21)
+    backdate(api, aid, past_window(api))
     assert (await api.client.get("/applications", headers=h)).json()["items"] == []
     assert (await api.client.get(f"/applications/{aid}", headers=h)).status_code == 404
     r = await api.client.patch(f"/applications/{aid}", headers=h,
@@ -304,7 +313,7 @@ async def test_redownload_after_expiry_starts_a_fresh_row(api):
     old = (await download(api, h, rid))["application_id"]
     await api.client.patch(f"/applications/{old}", headers=h,
                            json={"expected_version": 1, "notes": "old notes"})
-    backdate(api, old, 21)
+    backdate(api, old, past_window(api))
     new = (await download(api, h, rid))["application_id"]
     assert new != old
     detail = (await api.client.get(f"/applications/{new}", headers=h)).json()
@@ -318,8 +327,8 @@ async def test_cleanup_deletes_expired_rows_files_and_jds_but_not_fresh_ones(api
         "company": "Zoho", "role": "MTS", "jd_text": "Old JD text for an old job"})).json()
     fresh = (await api.client.post("/applications", headers=h, json={
         "company": "Dust", "role": "SWE"})).json()
-    backdate(api, expired, 25)
-    backdate(api, manual["id"], 25)
+    backdate(api, expired, past_window(api, 5))
+    backdate(api, manual["id"], past_window(api, 5))
     [(m_jd,)] = sql(api, "select jd_id from app.applications where id = %s", (manual["id"],))
     [(r_jd,)] = sql(api, "select jd_id from app.applications where id = %s", (expired,))
 
@@ -339,7 +348,7 @@ async def test_cleanup_deletes_expired_rows_files_and_jds_but_not_fresh_ones(api
 async def test_cleanup_keeps_rows_when_files_cannot_be_deleted(api):
     h, rid = await returning_user(api)
     aid = (await download(api, h, rid))["application_id"]
-    backdate(api, aid, 25)
+    backdate(api, aid, past_window(api, 5))
     api.storage_admin.fail = True
     result = await api.container.janitor.run_once()
     assert result.failed_batches == [0]

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { response } from '@/test/contracts';
 import {
-  contentToDoc, contentToProfile, docToContentIn, mergePrefill, openSuggestions, prefillToDoc, profileToContentIn,
+  contentToDoc, contentToProfile, docToContentIn, layoutRequest, mergePrefill, openSuggestions, prefillToDoc, profileToContentIn,
   sectionPatch, timeAgo, toAnalysis, toResume, toSummary, validateDoc,
 } from './cvAdapter';
 import { boldParts, docToCv, emptyProfile, plainText, pruneDoc } from './cvModel';
@@ -134,7 +134,7 @@ describe('UI → client input shapes (B5: ids + text only)', () => {
     const body = docToContentIn(contentToDoc(raw));
     expect(body.experience.map((e) => e.id)).toEqual(raw.experience.map((e) => e.id));
     expect(body.projects[0].tech).toEqual(raw.projects[0].tech);
-    expect(body.skills).toEqual({ languages: ['Java', 'Python', 'SQL'], frameworks: ['Spring Boot', 'Kafka Streams', 'JUnit'], tools: ['AWS', 'Docker', 'Git', 'Grafana'] });
+    expect(body.skills).toEqual({ languages: ['Java', 'Python', 'SQL'], frameworks: ['Spring Boot', 'Kafka Streams', 'JUnit'], tools: ['PostgreSQL', 'AWS', 'Docker', 'Git', 'Grafana'] });
   });
 
   it('drops empty entries and bullets before sending', () => {
@@ -184,6 +184,14 @@ describe('helpers', () => {
     expect(merged.education).toBe(pre.education);
   });
 
+  it('toResume exposes tailor-added skills and non-skill gaps (V4.1)', () => {
+    const resume = toResume(response('resume.json'));
+    expect(resume.addedSkills).toEqual(['PostgreSQL']);
+    expect(resume.doc.skills.tools[0]).toBe('PostgreSQL');
+    expect(resume.gaps).toEqual([{ kind: 'experience', text: '5+ years of backend experience' }, { kind: 'language', text: 'Fluent Kannada' }]);
+    expect(toResume({ ...response('resume.json'), gaps: undefined }).gaps).toEqual([]);
+  });
+
   it('openSuggestions drops skills the user already added (case-insensitive)', () => {
     expect(openSuggestions(['Kubernetes', 'Docker'], { lang: [], fw: [], tools: ['docker'] })).toEqual(['Kubernetes']);
   });
@@ -228,5 +236,45 @@ describe('spoken languages and project links', () => {
   it('a removed last entry leaves the section empty', () => {
     const doc = contentToDoc(raw);
     expect(sectionPatch({ ...doc, projects: [] }, 'projects', 4).change.value).toEqual([]);
+  });
+});
+
+describe('certifications (typed by the user, shown in both templates)', () => {
+  const raw = response('profile.json').content;
+
+  it('round-trips certifications with no client ids sent', () => {
+    const doc = contentToDoc(raw);
+    expect(doc.certs.map((c) => c.name)).toEqual(['AWS Certified Developer', 'Smart India Hackathon finalist']);
+    expect(docToContentIn(doc).certifications).toEqual(raw.certifications);
+    expect(contentToProfile(raw).certs).toHaveLength(2);
+    expect(profileToContentIn(contentToProfile(raw)).certifications).toEqual(raw.certifications);
+  });
+
+  it('drops an empty row, flags a row without a name, and saves with the Skills step', () => {
+    const doc = { ...contentToDoc(raw), certs: [{ id: 'a', name: ' AWS ', issuer: '', date: ' 2024 ' }, { id: 'b', name: '', issuer: '', date: '' }, { id: 'c', name: '', issuer: 'Google', date: '' }] };
+    expect(validateDoc(doc, ['skills'])).toEqual({ 'c.name': 'Add the certification name.' });
+    const ok = { ...doc, certs: doc.certs.slice(0, 2) };
+    expect(sectionPatch(ok, 'certifications', 4).change).toEqual({ section: 'certifications', value: [{ name: 'AWS', issuer: '', date: '2024' }] });
+  });
+
+  it('prints name – issuer – year in the preview', () => {
+    expect(docToCv(contentToDoc(raw)).certifications).toEqual(['AWS Certified Developer – Amazon Web Services – 2024', 'Smart India Hackathon finalist']);
+    expect(emptyProfile().certs).toEqual([]);
+  });
+
+  it('mergePrefill keeps the resume\'s own certifications', () => {
+    const doc = contentToDoc(raw);
+    expect(mergePrefill(doc, { ...doc, certs: [] }).certs).toBe(doc.certs);
+  });
+});
+
+describe('layout (PDF-1)', () => {
+  it('toResume / toSummary carry the stored section order (null = template default)', () => {
+    expect(toResume(response('resume.json')).sectionOrder).toEqual(['experience', 'projects', 'skills', 'certifications', 'languages', 'education']);
+    expect(toSummary(response('resume_summary.json')).sectionOrder).toBeNull();
+  });
+
+  it('layoutRequest sends ids only', () => {
+    expect(layoutRequest('jake', null, 3)).toEqual({ expected_version: 3, template: 'jake', section_order: null });
   });
 });

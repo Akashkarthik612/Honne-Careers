@@ -1,5 +1,6 @@
-"""Build-time only: compile the real Jake template once so every package it needs lands in
-TECTONIC_CACHE_DIR. Then prove an offline (--only-cached) compile works, or fail the build.
+"""Build-time only: compile every registered template once so every package they need lands
+in TECTONIC_CACHE_DIR. Then prove an offline (--only-cached) compile works, or fail the build.
+A new template in TemplateRegistry is warmed here with no change to this file.
 """
 
 import os
@@ -12,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.domain.cv import (  # noqa: E402
     Bullet,
+    Certification,
     CvContent,
     EducationItem,
     ExperienceItem,
@@ -23,7 +25,7 @@ from app.domain.cv import (  # noqa: E402
     Skills,
     SpokenLanguage,
 )
-from app.render.latex import LatexRenderer  # noqa: E402
+from app.render.templates import TemplateRegistry  # noqa: E402
 
 B = [Bullet(id="b1", text="Cut latency by 38% & shipped – “quoted” text", origin=Origin.USER,
             locked=True)]
@@ -41,24 +43,31 @@ CV = CvContent(
     education=[EducationItem(id="u", school="Uni", degree="B.E.", years="2016 – 2020")],
     skills=Skills(languages=[SkillItem(name="Python", origin=Origin.USER)]),
     spoken_languages=[SpokenLanguage(name="French", level="professional")],
+    certifications=[Certification(name="AWS Certified Solutions Architect", date="2024")],
 )
-# What the read-back must contain, word for word.
+# What every template's read-back must contain, word for word ("fi": no ligature glyph).
 EXPECTED_TEXT = ("validation toil by 90% through Python automation",
-                 "Cognizant Technology Solutions", "Click here", "French (Professional)")
+                 "Cognizant Technology Solutions", "AWS Certified Solutions Architect", "French")
+
+
+def render_all() -> dict[str, str]:
+    """template id -> .tex of the fixture CV, for every registered template."""
+    return {t.id: t.renderer.render(CV, t.default_order) for t in TemplateRegistry().all()}
 
 
 def main() -> None:
-    work = Path(tempfile.mkdtemp())
-    (work / "resume.tex").write_text(LatexRenderer().render(CV), encoding="utf-8")
-    base = ["tectonic", "--untrusted", "--chatter", "minimal", "--outdir", str(work),
-            str(work / "resume.tex")]
     env = {**os.environ}
-    subprocess.run(base, check=True, env=env)  # noqa: S603 - downloads packages
-    (work / "resume.pdf").unlink()
-    subprocess.run([*base[:2], "--only-cached", *base[2:]], check=True, env=env)  # noqa: S603
-    if not (work / "resume.pdf").is_file():
-        sys.exit("offline compile produced no PDF")
-    print("tectonic cache warm; offline compile OK")
+    for template_id, tex in render_all().items():
+        work = Path(tempfile.mkdtemp())
+        (work / "resume.tex").write_text(tex, encoding="utf-8")
+        base = ["tectonic", "--untrusted", "--chatter", "minimal", "--outdir", str(work),
+                str(work / "resume.tex")]
+        subprocess.run(base, check=True, env=env)  # noqa: S603 - downloads packages
+        (work / "resume.pdf").unlink()
+        subprocess.run([*base[:2], "--only-cached", *base[2:]], check=True, env=env)  # noqa: S603
+        if not (work / "resume.pdf").is_file():
+            sys.exit(f"offline compile produced no PDF for template {template_id}")
+        print(f"tectonic cache warm; offline compile OK: {template_id}")
 
 
 if __name__ == "__main__":

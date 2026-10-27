@@ -1,0 +1,19 @@
+{
+  "expected_version": 7,
+  "change": {
+    "section": "certifications",
+    "value": [
+      {
+        "name": "AWS Certified Developer",
+        "issuer": "Amazon Web Services",
+        "date": "2024"
+      },
+      {
+        "name": "Smart India Hackathon finalist",
+        "issuer": "",
+        "date": ""
+      }
+    ]
+  },
+  "wizard_step": "done"
+}

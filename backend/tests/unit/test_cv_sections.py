@@ -12,11 +12,10 @@ from app.domain.cv import (
     SpokenLanguage,
 )
 from app.ingest.extractors import PdfExtractor, _tidy
-from app.render.latex import LatexRenderer
 from app.truth.copying import as_origin, facts_only
 from app.truth.stamper import EditStamper
 from tests.docs import text_pdf
-from tests.fixtures import sample_cv
+from tests.fixtures import render, sample_cv
 
 FRENCH = SpokenLanguage(name="French", level=LanguageLevel.PROFESSIONAL)
 
@@ -61,18 +60,18 @@ def test_project_link_is_optional():
 def test_project_link_renders_as_click_here():
     cv = sample_cv()
     project = cv.projects[0].model_copy(update={"link": "https://x.test/a b?q=1&p=2"})
-    tex = LatexRenderer().render(cv.model_copy(update={"projects": [project]}))
+    tex = render(cv.model_copy(update={"projects": [project]}))
     assert r"\href{https://x.test/a\%20b?q=1\&p=2}{\underline{Click here}}" in tex
 
 
 def test_spoken_languages_section():
     cv = sample_cv().model_copy(update={"spoken_languages": [
         FRENCH, SpokenLanguage(name="Tamil & English")]})
-    tex = LatexRenderer().render(cv)
+    tex = render(cv)
     assert r"\section{Languages}" in tex
     assert r"French (Professional), Tamil \& English" in tex
     none = sample_cv().model_copy(update={"spoken_languages": []})
-    assert r"\section{Languages}" not in LatexRenderer().render(none)
+    assert r"\section{Languages}" not in render(none)
 
 
 def test_layout_text_is_tidied():

@@ -152,6 +152,17 @@ class SpokenLanguage(Model):
 SpokenLanguages = Annotated[list[SpokenLanguage], Field(max_length=10)]
 
 
+class Certification(Model):
+    """A certification or award the user holds. Typed by the user, so it is a fact and the
+    AI never writes it (merger and tailor copy it through). Same shape in and out."""
+    name: Required
+    issuer: Short = ""
+    date: DateText = ""
+
+
+Certifications = Annotated[list[Certification], Field(max_length=15)]
+
+
 class CvContent(Model):
     header: Header = Field(default_factory=Header)
     experience: list[ExperienceItem] = Field(default_factory=list, max_length=15)
@@ -159,6 +170,7 @@ class CvContent(Model):
     education: list[EducationItem] = Field(default_factory=list, max_length=10)
     skills: Skills = Field(default_factory=Skills)
     spoken_languages: SpokenLanguages = Field(default_factory=list)
+    certifications: Certifications = Field(default_factory=list)
 
     def bullet_owners(self) -> dict[str, ExperienceItem | ProjectItem]:
         """bullet id -> the experience/project item that holds it."""
@@ -208,6 +220,7 @@ class CvContentIn(Model):
     education: list[EducationItem] = Field(default_factory=list, max_length=10)
     skills: SkillsIn = Field(default_factory=SkillsIn)
     spoken_languages: SpokenLanguages = Field(default_factory=list)
+    certifications: Certifications = Field(default_factory=list)
 
 
 # ---------- autosave unit (one wizard step) ----------
@@ -242,9 +255,14 @@ class SpokenLanguagesPatch(Model):
     value: SpokenLanguages
 
 
+class CertificationsPatch(Model):
+    section: Literal["certifications"]  # saved with the Skills step
+    value: Certifications
+
+
 SectionPatch = Annotated[
     PersonalPatch | ExperiencePatch | ProjectsPatch | EducationPatch | SkillsPatch
-    | SpokenLanguagesPatch,
+    | SpokenLanguagesPatch | CertificationsPatch,
     Field(discriminator="section"),
 ]
 

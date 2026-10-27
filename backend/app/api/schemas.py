@@ -23,6 +23,7 @@ from app.domain.chat_agents import (
     TurnResult,
 )
 from app.domain.cv import CvContentIn, Model
+from app.domain.layout import SectionOrder, TemplateId
 from app.domain.records import (
     AnalysisRow,
     ApplicationDetail,
@@ -34,10 +35,11 @@ from app.domain.records import (
     SettingsRow,
 )
 from app.policy.quota import Usage
+from app.render.templates import TemplateInfo
 
 
 class CreateResume(Model):
-    template: Literal["jake"]
+    template: TemplateId  # checked against TemplateRegistry by ResumeService (422)
     mode: Literal["tailored", "scratch"]
     title: Annotated[str, StringConstraints(min_length=1, max_length=120)] | None = None
 
@@ -55,6 +57,14 @@ class SetJd(Model):
     # SAVE-2: the user's correction wins over the first-line heuristic. Omitted = detect.
     company: JdMeta | None = None
     role: JdMeta | None = None
+
+
+class ConfirmSkill(Model):
+    """V4.1: confirm a JD skill from the resume's missing_skills. Name + category only; the
+    server sets origin=user."""
+    expected_version: int = Field(ge=1)
+    name: Annotated[str, StringConstraints(min_length=1, max_length=60)]
+    category: Literal["languages", "frameworks", "tools"]
 
 
 class SaveSettings(Model):
@@ -110,7 +120,17 @@ def summary_view(s: ResumeSummary) -> dict[str, Any]:
     return {"id": str(s.id), "title": s.title, "template": s.template, "mode": s.mode,
             "status": s.status, "wizard_step": s.wizard_step, "company": s.company,
             "role": s.role, "updated_at": s.updated_at.isoformat(),
-            "content": s.content.model_dump(mode="json")}
+            "content": s.content.model_dump(mode="json"),
+            "section_order": _order_view(s.section_order)}
+
+
+def _order_view(order: SectionOrder | None) -> list[str] | None:
+    return [k.value for k in order] if order else None
+
+
+def template_view(t: TemplateInfo) -> dict[str, Any]:
+    return {"id": t.id, "name": t.name, "description": t.description,
+            "default_order": [k.value for k in t.default_order]}
 
 
 def jd_view(jd: JdRow | None) -> dict[str, Any] | None:
@@ -120,16 +140,19 @@ def jd_view(jd: JdRow | None) -> dict[str, Any] | None:
             "word_count": jd.word_count, "text": jd.text}
 
 
-def resume_view(r: ResumeRow, jd: JdRow | None = None) -> dict[str, Any]:
+def resume_view(r: ResumeRow, jd: JdRow | None = None, *, pdf_current: bool
+                ) -> dict[str, Any]:
+    """pdf_current: TemplateRegistry.pdf_is_current(r), the one freshness check."""
     return {
         "id": str(r.id), "title": r.title, "template": r.template, "mode": r.mode,
+        "section_order": _order_view(r.section_order),
         "status": r.status, "job_step": r.job_step, "error_code": r.error_code,
         "wizard_step": r.wizard_step,
         "row_version": r.row_version, "content_hash": r.content_hash,
         "content": r.content.model_dump(mode="json"), "missing_skills": r.missing_skills,
-        "tailor_report": r.tailor_report,
+        "gaps": r.jd_gaps, "tailor_report": r.tailor_report,
         "jd": jd_view(jd),
-        "pdf": {"up_to_date": r.pdf_content_hash == r.content_hash,
+        "pdf": {"up_to_date": pdf_current,
                 "page_count": r.page_count} if r.pdf_path else None,
         "updated_at": r.updated_at.isoformat(),
     }

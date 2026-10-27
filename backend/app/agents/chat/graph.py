@@ -70,7 +70,8 @@ class LoopLimits:
     llm_timeout_s: int
     llm_max_retries: int
     temperature: float
-    max_output_tokens: int
+    max_output_tokens: int     # writing cap
+    thinking_budget: int       # thinking cap, on top of the writing cap
 
 
 @dataclass
@@ -80,6 +81,7 @@ class Usage:
     attempts: Attempts = field(default_factory=Attempts)
     input_tokens: int = 0
     output_tokens: int = 0
+    thinking_tokens: int = 0
     tool_names: list[str] = field(default_factory=list)
 
 
@@ -257,11 +259,13 @@ class TurnGraph:
         turn = await self._retrying(
             lambda: ctx.provider.generate_with_tools(
                 system=ctx.system, messages=messages, tools=decls, model=ctx.model,
-                temperature=lim.temperature, max_output_tokens=lim.max_output_tokens),
+                temperature=lim.temperature, max_output_tokens=lim.max_output_tokens,
+                thinking_budget=lim.thinking_budget),
             timeout_s=lim.llm_timeout_s, max_retries=lim.llm_max_retries,
             attempts=ctx.usage.attempts, agent=ctx.agent, entity_id=ctx.entity_id)
         ctx.usage.input_tokens += turn.input_tokens or 0
         ctx.usage.output_tokens += turn.output_tokens or 0
+        ctx.usage.thinking_tokens += turn.thinking_tokens or 0
         return turn
 
     async def _execute(self, ctx: TurnContext, tc: ToolCall, book: SourceBook

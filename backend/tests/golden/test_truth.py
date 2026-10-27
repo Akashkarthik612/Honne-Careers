@@ -8,7 +8,7 @@ from app.domain.tailoring import BulletOut, ItemOut, SkillsView, TailorOutput
 from app.domain.truth import Rule
 from app.truth.checker import TruthChecker
 from app.truth.copying import fact_text, facts_only
-from app.truth.facts import FactSetBuilder
+from app.truth.facts import FactSetBuilder, evidenced
 from app.truth.merger import ResumeMerger, keep, propose, revert
 from tests.fixtures import b, sample_cv
 
@@ -154,14 +154,81 @@ def test_full_tailor_keeps_violating_bullet_and_applies_the_rest():
     assert (result.changed, result.kept_original) == (1, 1)
 
 
-def test_added_skill_rejected_and_skills_left_alone():
-    out = _output(skills=SkillsView(languages=["Java", "Python", "Go"],
-                                    frameworks=["Spring Boot", "Kafka Streams", "JUnit"],
-                                    tools=["AWS", "Docker", "Git", "Grafana"]))
-    report = CHECK.check_tailor(CV, out, [], "all")
-    assert Rule.SKILL_SET_CHANGED in {v.rule for v in report.violations}
-    merged = ResumeMerger().merge_tailor(CV, out, report, "all").content
-    assert [s.name for s in merged.skills.languages] == ["Java", "Python", "SQL"]
+# ---------- Skills (V4.1): evidenced additions only, nothing removed ----------
+
+LANGS = ["Java", "Python", "SQL"]
+FRAMEWORKS = ["Spring Boot", "Kafka Streams", "JUnit"]
+TOOLS = ["AWS", "Docker", "Git", "Grafana"]
+
+
+def _skills(languages=LANGS, frameworks=FRAMEWORKS, tools=TOOLS) -> SkillsView:
+    return SkillsView(languages=languages, frameworks=frameworks, tools=tools)
+
+
+def _skill_merge(skills: SkillsView, missing: list[str] | None = None, scope: str = "all"):
+    out = _output(skills=skills)
+    report = CHECK.check_tailor(CV, out, missing or [], scope)
+    return report, ResumeMerger().merge_tailor(CV, out, report, scope)
+
+
+def test_skill_from_project_tech_or_bullet_is_added():
+    # PostgreSQL is in Ledger-lite's tech list, k6 in its bullet; neither is in Skills.
+    report, result = _skill_merge(_skills(tools=["PostgreSQL", "k6", *TOOLS]))
+    assert not [v for v in report.violations if v.field_path.startswith("skills")]
+    tools = result.content.skills.tools
+    assert [s.name for s in tools] == ["PostgreSQL", "k6", *TOOLS]
+    assert [s.origin for s in tools[:2]] == [Origin.AI, Origin.AI]   # added, not a fact
+    assert {s.origin for s in tools[2:]} == {Origin.PROFILE}         # existing keep origin
+    assert result.added_skills == 2
+
+
+def test_jd_only_skill_is_dropped_and_the_rest_applied():
+    report, result = _skill_merge(_skills(tools=["Kubernetes", "PostgreSQL", *TOOLS]),
+                                  missing=["Kubernetes"])
+    assert {(v.field_path, v.rule) for v in report.violations
+            if v.field_path.startswith("skills")} == {
+        ("skills.tools[Kubernetes]", Rule.UNKNOWN_SKILL)}
+    assert [s.name for s in result.content.skills.tools] == ["PostgreSQL", *TOOLS]
+    assert result.added_skills == 1
+
+
+def test_unevidenced_skill_is_dropped_even_if_not_listed_missing():
+    report, result = _skill_merge(_skills(languages=[*LANGS, "Go"]))
+    assert Rule.UNKNOWN_SKILL in {v.rule for v in report.violations}
+    assert [s.name for s in result.content.skills.languages] == LANGS
+
+
+def test_removed_skill_rejects_the_category():
+    report, result = _skill_merge(_skills(languages=["Java", "Python", "PostgreSQL"]))
+    assert ("skills.languages", Rule.SKILL_REMOVED) in {
+        (v.field_path, v.rule) for v in report.violations}
+    assert [s.name for s in result.content.skills.languages] == LANGS  # SQL kept, no add
+
+
+def test_alias_or_cross_category_duplicate_is_not_added_twice():
+    # "Postgres" is PostgreSQL; Docker already sits in tools.
+    report, result = _skill_merge(_skills(frameworks=[*FRAMEWORKS, "Docker"],
+                                          tools=["Postgres", "PostgreSQL", *TOOLS]))
+    assert ("skills.frameworks[Docker]", Rule.UNKNOWN_SKILL) in {
+        (v.field_path, v.rule) for v in report.violations}
+    assert [s.name for s in result.content.skills.frameworks] == FRAMEWORKS
+    assert [s.name for s in result.content.skills.tools] == ["Postgres", *TOOLS]
+
+
+def test_experience_projects_scope_leaves_skills_unchanged():
+    report, result = _skill_merge(_skills(languages=["SQL"], tools=["PostgreSQL", *TOOLS]),
+                                  scope="experience_projects")
+    assert not [v for v in report.violations if v.field_path.startswith("skills")]
+    assert result.content.skills == CV.skills
+    assert result.added_skills == 0
+
+
+def test_short_skill_needs_a_case_sensitive_mention():
+    facts = FactSetBuilder().build([], CV.model_copy(update={"projects": [
+        CV.projects[0].model_copy(update={"bullets": [
+            b("ll1", "Wrote the go-to-market dashboard for the ledger")]})]}))
+    assert not evidenced(facts, "Go")
+    assert evidenced(facts, "PostgreSQL")
 
 
 def test_dropped_bullet_rejects_the_whole_item():

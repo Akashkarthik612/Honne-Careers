@@ -9,11 +9,13 @@ from app.core.hashing import content_hash, text_hash
 from app.core.logging import get_logger
 from app.db.unit_of_work import UnitOfWorkFactory
 from app.domain.auth import AuthUser
-from app.domain.cv import CvContent, Origin, ResumePatch
+from app.domain.cv import CvContent, Origin, ResumePatch, SkillItem
+from app.domain.layout import LayoutPatch
 from app.domain.records import JdRow, ResumeMode, ResumeRow, ResumeSummary
 from app.render.templates import TemplateRegistry
 from app.truth.copying import as_origin
 from app.truth.stamper import EditStamper
+from app.truth.text import norm_skill, skill_keys
 
 log = get_logger(__name__)
 
@@ -70,13 +72,76 @@ class ResumeService:
                 raise StaleVersion(reason="resume", current_version=row.row_version)
             content = self._stamper.apply_patch(row.content, patch.change)
             chash = content_hash(content)
+            # A JD suggestion the user typed into Skills (wizard "+ add") is no longer missing.
+            missing = (_still_missing(row.missing_skills, content)
+                       if patch.change.section == "skills" else None)
             version = await uow.resumes.update_content(
-                user.id, resume_id, content, chash, patch.expected_version, patch.wizard_step)
+                user.id, resume_id, content, chash, patch.expected_version, patch.wizard_step,
+                missing_skills=missing)
             if version is None:  # row is locked FOR UPDATE, so this means a logic bug
                 raise StaleVersion(reason="resume")
         log.info("resume_autosaved", resume_id=resume_id, section=patch.change.section,
                  row_version=version)
         return version, chash
+
+    async def set_layout(self, user: AuthUser, resume_id: UUID, patch: LayoutPatch
+                         ) -> ResumeRow:
+        """Template + section order (PDF-1). 0 LLM calls; content and content_hash are
+        untouched, the PDF cache key changes. Unknown template -> 422; stale -> 409."""
+        self._templates.require(patch.template)
+        async with self._uow(user.id) as uow:
+            row = await uow.resumes.get(user.id, resume_id, for_update=True)
+            if row is None:
+                raise NotFound(reason="resume")
+            if row.status == "tailoring":
+                raise JobAlreadyRunning(reason="layout_during_tailor")
+            if row.row_version != patch.expected_version:
+                raise StaleVersion(reason="resume", current_version=row.row_version)
+            version = await uow.resumes.set_layout(user.id, resume_id, patch.template,
+                                                   patch.section_order, patch.expected_version)
+            if version is None:  # row is locked FOR UPDATE, so this means a logic bug
+                raise StaleVersion(reason="resume")
+            updated = await uow.resumes.get(user.id, resume_id)
+        log.info("resume_layout_set", resume_id=resume_id, template=patch.template,
+                 custom_order=patch.section_order is not None, row_version=version)
+        return updated
+
+    async def confirm_skill(self, user: AuthUser, resume_id: UUID, name: str, category: str,
+                            expected_version: int) -> ResumeRow:
+        """V4.1: the user says they have a JD skill we listed as missing. It joins this CV's
+        Skills as their own fact (origin=user; resume only, not the profile) and leaves the
+        suggestions. Only a listed suggestion can be confirmed, so nothing reaches Skills from
+        the JD without the user. 0 LLM calls; O(skills)."""
+        async with self._uow(user.id) as uow:
+            row = await uow.resumes.get(user.id, resume_id, for_update=True)
+            if row is None:
+                raise NotFound(reason="resume")
+            if row.status == "tailoring":
+                raise JobAlreadyRunning(reason="confirm_during_tailor")
+            if row.row_version != expected_version:
+                raise StaleVersion(reason="resume", current_version=row.row_version)
+            key = norm_skill(name)
+            listed = next((s for s in row.missing_skills if norm_skill(s) == key), None)
+            if listed is None:
+                log.warning("skill_confirm_rejected", resume_id=resume_id,
+                            reason="not_a_suggestion")
+                raise InvalidInput("Only a skill from the job description's list can be "
+                                   "confirmed here.", reason="not_a_suggestion")
+            content = row.content
+            if key not in skill_keys(content):
+                items = [*getattr(content.skills, category),
+                         SkillItem(name=listed, origin=Origin.USER)]
+                content = content.model_copy(update={
+                    "skills": content.skills.model_copy(update={category: items})})
+            missing = [s for s in row.missing_skills if norm_skill(s) != key]
+            version = await uow.resumes.update_skills(
+                user.id, resume_id, content, content_hash(content), missing, expected_version)
+            if version is None:
+                raise StaleVersion(reason="resume")
+            updated = await uow.resumes.get(user.id, resume_id)
+        log.info("skill_confirmed", resume_id=resume_id, category=category,
+                 row_version=version)
+        return updated
 
     async def duplicate(self, user: AuthUser, resume_id: UUID) -> ResumeRow:
         async with self._uow(user.id) as uow:
@@ -118,6 +183,11 @@ class ResumeService:
                 raise JobAlreadyRunning(reason="set_jd_during_tailor")
         log.info("resume_jd_set", resume_id=resume_id, jd_id=jd.id, word_count=words)
         return jd
+
+
+def _still_missing(missing: list[str], content: CvContent) -> list[str]:
+    have = skill_keys(content)
+    return [s for s in missing if norm_skill(s) not in have]
 
 
 def checked_jd(text: str) -> tuple[str, int]:

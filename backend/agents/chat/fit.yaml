@@ -1,0 +1,7 @@
+# Built-in chat agent (launch, 25 Oct 2026): an honest fit check of a JD against what the user
+# has really done, not a keyword match. See analyst.yaml.
+handle: fit
+version: 1
+description: Honest JD fit - what you meet, what's partial, what's missing, and whether to apply
+instructions: prompts/chat/fit/v1.md
+knowledge: [profile, applications, resumes]

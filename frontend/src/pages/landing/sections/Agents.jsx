@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { ADVISOR_RECS, AGENTS, AGENT_POS, ANALYST_ROWS, STRATEGIST_BARS } from '../landingData';
+import { ADVISOR_RECS, AGENTS, AGENT_HUB as HUB, ANALYST_ROWS, FIT_ROWS, OUTREACH_ASKS, STRATEGIST_BARS, agentPos } from '../landingData';
 import { useJump } from '../landingHooks';
 import { Icon2, Reveal } from './parts';
-
-const HUB = [260, 205];
 
 // 03 — your AI team: a list of agents (sticky on desktop, a tab strip on phones), the
 // orchestration diagram and a sample of the picked agent's work.
@@ -57,6 +55,8 @@ export default function Agents() {
                 </div>
                 <div style={{ flex: 1, padding: 18, background: '#FCFCFB' }}>
                   {agent === 'writer' && <WriterPanel />}
+                  {agent === 'fit' && <FitPanel />}
+                  {agent === 'outreach' && <OutreachPanel />}
                   {agent === 'analyst' && <AnalystPanel />}
                   {agent === 'advisor' && <AdvisorPanel />}
                   {agent === 'strategist' && <StrategistPanel />}
@@ -76,7 +76,7 @@ function Diagram({ agent, curName, onPick }) {
     <svg viewBox="0 0 520 420" style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label={`Five agents connected to Honne IQ. ${curName} is selected.`}>
       {AGENTS.map((a, i) => {
         const on = a.id === agent;
-        const [x, y] = AGENT_POS[i];
+        const [x, y] = agentPos(i, AGENTS.length);
         return (
           <line key={a.id} x1={HUB[0]} y1={HUB[1]} x2={x} y2={y} className={on ? 'flow' : ''}
             style={on ? { stroke: a.c, strokeWidth: 2.5, strokeDasharray: '6 8', strokeLinecap: 'round' } : { stroke: '#E8E6E3', strokeWidth: 1.5 }}></line>
@@ -88,11 +88,11 @@ function Diagram({ agent, curName, onPick }) {
       <text x="260" y="219" textAnchor="middle" style={{ fontFamily: 'Inter,Arial,sans-serif', fontSize: 10.5, fill: '#F3F1FF' }}>shared context</text>
       {AGENTS.map((a, i) => {
         const on = a.id === agent;
-        const [x, y] = AGENT_POS[i];
-        const ty = y + (y < HUB[1] ? (i === 0 ? -44 : 52) : 54);
+        const [x, y] = agentPos(i, AGENTS.length);
+        const ty = i === 0 ? y - 40 : y + 48; // label above the top node, below the rest
         return (
           <g key={a.id} onClick={() => onPick(a.id)} style={{ cursor: 'pointer' }}>
-            <circle cx={x} cy={y} r={on ? 34 : 28} style={{ fill: on ? a.bg : '#FFFFFF', stroke: on ? a.c : '#E8E6E3', strokeWidth: on ? 2 : 1.5, transition: 'all .25s ease' }}></circle>
+            <circle cx={x} cy={y} r={on ? 32 : 26} style={{ fill: on ? a.bg : '#FFFFFF', stroke: on ? a.c : '#E8E6E3', strokeWidth: on ? 2 : 1.5, transition: 'all .25s ease' }}></circle>
             <g transform={`translate(${x - 12} ${y - 12})`} style={{ fill: 'none', stroke: on ? a.c : '#6E6B78', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' }}><path d={a.d1}></path><path d={a.d2}></path></g>
             <text x={x} y={ty} textAnchor="middle" style={{ fontFamily: 'Inter,Arial,sans-serif', fontSize: 13, fontWeight: on ? 700 : 500, fill: on ? '#171717' : '#666666' }}>{a.name}</text>
           </g>
@@ -107,7 +107,7 @@ const jdPill = { background: '#F0EDFF', color: '#5847D6' };
 function WriterPanel() {
   return (
     <div className="rise" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontSize: 13, color: '#666666' }}>Tailoring for <strong style={{ color: '#171717' }}>SDE-2, Backend · Freshworks</strong></div>
+      <div style={{ fontSize: 13, color: '#666666' }}>Tailoring for <strong style={{ color: '#171717' }}>SDE-2, Backend · Company 1</strong></div>
       <div className="card" style={{ padding: '14px 16px' }}>
         <div className="mono" style={{ fontSize: 10.5, color: '#6E6B78' }}>BEFORE</div>
         <div style={{ marginTop: 4, fontSize: 14, lineHeight: 1.55, color: '#6E6B78', textDecoration: 'line-through', textDecorationColor: '#CFCBC5' }}>Moved the ledger service to Kafka Streams in Java on AWS; p95 latency went down about 38%.</div>
@@ -125,10 +125,50 @@ function WriterPanel() {
   );
 }
 
+function FitPanel() {
+  return (
+    <div className="rise" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 13, color: '#666666' }}>SDE-2, Backend · Company 1</div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: '#E4F3F6', color: '#0B5563', borderRadius: 12, padding: '10px 12px', fontSize: 14, lineHeight: 1.5 }}>
+        <strong>Apply, with a referral.</strong><span>Your work proves most of it; one gap is real.</span>
+      </div>
+      <div className="card" style={{ overflow: 'hidden' }}>
+        {FIT_ROWS.map((r) => (
+          <div key={r.req} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.5fr) auto', gap: 10, alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #F3F1EE', fontSize: 13 }}>
+            <span style={{ fontWeight: 600 }}>{r.req}</span><span style={{ color: '#666666' }}>{r.ev}</span><span style={r.style}>{r.s}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 12.5, color: '#666666' }}>Judged on what you’ve done, not on matching keywords.</div>
+    </div>
+  );
+}
+
+function OutreachPanel() {
+  return (
+    <div className="rise" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 13, color: '#666666' }}>From your applications and the CVs you sent</div>
+      {OUTREACH_ASKS.map((r) => (
+        <div key={r.co} className="card" style={{ padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{r.co}</div>
+            <div style={{ marginTop: 2, fontSize: 13, color: '#666666', lineHeight: 1.5 }}>{r.why}{r.proof && <> {r.proof}</>}</div>
+          </div>
+          <span style={r.style}>{r.tag}</span>
+        </div>
+      ))}
+      <div className="card" style={{ padding: '12px 14px', background: '#FFFFFF' }}>
+        <div className="mono" style={{ fontSize: 10.5, color: '#B4236E' }}>DRAFT · READY TO COPY</div>
+        <div className="typed" style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.55 }}>Dear [Name], I’ve applied for SDE-2 Backend at Company 1. At Northwind I cut payment-event latency 38% with Kafka Streams and ran a 2M events/day pipeline with no data loss. Would you be open to referring me?</div>
+      </div>
+    </div>
+  );
+}
+
 function AnalystPanel() {
   return (
     <div className="rise">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}><span style={{ fontSize: 13, color: '#666666' }}>SDE-2, Backend · Freshworks</span><span style={{ fontSize: 13 }}><strong>6 of 8</strong> requirements</span></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}><span style={{ fontSize: 13, color: '#666666' }}>SDE-2, Backend · Company 1</span><span style={{ fontSize: 13 }}><strong>6 of 8</strong> requirements</span></div>
       <div style={{ marginTop: 8, height: 8, borderRadius: 99, background: '#EAF0FD', overflow: 'hidden' }}><div style={{ width: '75%', height: '100%', background: '#2F5FD0', borderRadius: 99 }}></div></div>
       <div className="card" style={{ marginTop: 14, overflow: 'hidden' }}>
         {ANALYST_ROWS.map((r) => (
@@ -172,7 +212,7 @@ function StrategistPanel() {
         <div className="card" style={{ padding: '12px 14px' }}><div className="mono" style={{ fontSize: 10.5, color: '#0F7A5C' }}>WORKED</div><div style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.5 }}>Applications with a referral. Roles asking for 2–4 years.</div></div>
         <div className="card" style={{ padding: '12px 14px' }}><div className="mono" style={{ fontSize: 10.5, color: '#B4500F' }}>DIDN&apos;T</div><div style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.5 }}>Easy Apply without a referral. Roles asking for 8+ years.</div></div>
       </div>
-      <div className="card" style={{ padding: '12px 14px', borderColor: '#F3D8C4', background: '#FFFBF7' }}><div className="mono" style={{ fontSize: 10.5, color: '#B4500F' }}>NEXT WEEK</div><div style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.5 }}>3 referral asks first, then 5 targeted applications. Follow up with Groww and Flipkart.</div></div>
+      <div className="card" style={{ padding: '12px 14px', borderColor: '#F3D8C4', background: '#FFFBF7' }}><div className="mono" style={{ fontSize: 10.5, color: '#B4500F' }}>NEXT WEEK</div><div style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.5 }}>3 referral asks first, then 5 targeted applications. Follow up with Company 4 and Company 7.</div></div>
     </div>
   );
 }

@@ -123,9 +123,10 @@ def test_mentions_and_titles():
 
 def test_catalog_loads_builtins_and_reserves_handles():
     catalog = AgentCatalog.load(BACKEND / "agents" / "chat", BACKEND)
-    assert [s.handle for s in catalog.builtins()] == ["advisor", "analyst"]
+    assert [s.handle for s in catalog.builtins()] == [
+        "advisor", "analyst", "fit", "outreach", "strategist"]
     assert all(s.kind == "builtin" for s in catalog.builtins())
-    for handle in ("analyst", "advisor", "auto", "cv-writer"):
+    for handle in ("analyst", "advisor", "strategist", "outreach", "fit", "auto", "cv-writer"):
         assert catalog.is_reserved(handle)
     assert not catalog.is_reserved("follow-up")
 
@@ -148,7 +149,8 @@ def test_cv_agent_registry_ignores_the_chat_folder():
 # ---------- tool loop ----------
 
 LIMITS = LoopLimits(rounds_max=3, calls_max=4, tool_timeout_s=1, llm_timeout_s=5,
-                    llm_max_retries=1, temperature=0, max_output_tokens=512)
+                    llm_max_retries=1, temperature=0, max_output_tokens=512,
+                    thinking_budget=256)
 
 
 def _apps_tool(rows=2, delay=0.0, error: ToolError | None = None) -> Tool:
@@ -195,6 +197,8 @@ async def test_loop_reads_then_answers_with_cited_sources_and_live_steps():
     tool_msg = fake.tool_calls[1]["messages"][-1]
     assert tool_msg.role == "tool" and "untrusted_data" in tool_msg.tool_results[0].content
     assert fake.tool_calls[0]["tools"] == ["list_applications", "submit_answer"]
+    assert (fake.tool_calls[0]["max_output_tokens"], fake.tool_calls[0]["thinking_budget"]) \
+        == (512, 256)
 
 
 async def test_loop_forces_an_answer_after_the_round_cap_f1(capsys):

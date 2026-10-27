@@ -24,3 +24,8 @@ export const CHAT_POLL_MS = 1500;
 export const CHAT_POLL_MAX = 260;
 // Recent chats shown in the sidebar.
 export const SIDEBAR_CHATS = 3;
+
+// Honne Professional's exact preview on the CV page is the real PDF (PDF-1). Each layout change waits this
+// long for the next one before building, so moving a section three times costs one build of the daily
+// PDF cap, not three; an unchanged layout is reused by the server and costs none.
+export const PDF_PREVIEW_DEBOUNCE_MS = 1200;

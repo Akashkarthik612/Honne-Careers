@@ -8,7 +8,10 @@ Runs on AI output only, never on user text. For each AI-written bullet:
   * no new capitalised name (employer, product, team) may appear
   * **bold** is well formed, at most 3 spans of at most 4 words, each holding one of the
     user's skills or one of this item's numbers (the checks above read the plain text)
-Structure: same item ids, same bullet ids and counts, skills reordered only.
+Structure: same item ids, same bullet ids and counts. Skills (scope "all", V4.1): every
+existing skill stays; an added skill must be evidenced in the user's own experience or
+project text (truth/facts.py: evidenced), never only in the JD; each bad addition is its own
+path so the merger drops just that one.
 Time O(output text + facts); space O(facts). No I/O.
 """
 
@@ -16,6 +19,7 @@ from app.domain.cv import SKILL_CATEGORIES, CvContent
 from app.domain.markup import MalformedMarkup, parse, plain
 from app.domain.tailoring import SkillsView, TailorOutput
 from app.domain.truth import FactSet, Rule, TruthReport, Violation
+from app.truth.facts import evidenced
 from app.truth.text import (
     COMMON_CAPITALISED,
     mentions,
@@ -104,17 +108,29 @@ class TruthChecker:
                 violations += self.check_bullet(item.id, path, bullet.text, missing_skills)
 
         if scope == "all":
-            violations += _check_skills(content, output.skills)
+            violations += self._check_skills(content, output.skills, missing_skills)
         return TruthReport(tuple(violations))
 
-
-def _check_skills(content: CvContent, skills: SkillsView) -> list[Violation]:
-    out: list[Violation] = []
-    for category in SKILL_CATEGORIES:
-        before = [s.name for s in getattr(content.skills, category)]
-        after = list(getattr(skills, category))
-        if len(before) != len(after):
-            out.append(Violation(f"skills.{category}", "", Rule.COUNT_CHANGED))
-        elif sorted(map(str.lower, before)) != sorted(map(str.lower, after)):
-            out.append(Violation(f"skills.{category}", "", Rule.SKILL_SET_CHANGED))
-    return out
+    def _check_skills(self, content: CvContent, skills: SkillsView,
+                      missing_skills: list[str]) -> list[Violation]:
+        """Removing a skill rejects the category (kept as it was); a bad addition rejects
+        only itself, at path skills.<category>[<name>]."""
+        out: list[Violation] = []
+        missing = {norm_skill(s) for s in missing_skills}
+        existing = {norm_skill(s.name): category for category in SKILL_CATEGORIES
+                    for s in getattr(content.skills, category)}
+        for category in SKILL_CATEGORIES:
+            before = {norm_skill(s.name) for s in getattr(content.skills, category)}
+            after = list(getattr(skills, category))
+            if not before <= {norm_skill(n) for n in after}:
+                out.append(Violation(f"skills.{category}", "", Rule.SKILL_REMOVED))
+                continue
+            for name in after:
+                key = norm_skill(name)
+                if key in before:
+                    continue
+                if (key in existing or key in missing
+                        or not evidenced(self._facts, name)):
+                    out.append(Violation(f"skills.{category}[{name}]", name,
+                                         Rule.UNKNOWN_SKILL))
+        return out

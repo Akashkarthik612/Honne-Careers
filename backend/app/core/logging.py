@@ -31,8 +31,23 @@ def _redact(_: Any, __: str, event: dict[str, Any]) -> dict[str, Any]:
     return event
 
 
+class HealthCheckFilter(logging.Filter):
+    """Drops uvicorn's access line for GET /health: Render polls it every few seconds, which
+    buried real requests. Every other access line is kept."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn.access args: (client, method, path, http_version, status)
+        if not (isinstance(args, tuple) and len(args) >= 3):
+            return True
+        return str(args[2]).split("?")[0] != "/health"
+
+
 def configure_logging(level: str = "INFO") -> None:
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=level)
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, HealthCheckFilter) for f in access.filters):
+        access.addFilter(HealthCheckFilter())
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

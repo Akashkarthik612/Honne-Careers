@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requestFixture, response } from '@/test/contracts';
-import { contentToProfile, prefillToDoc, profileToContentIn, sectionPatch, toResume } from '@/data/cvAdapter';
+import { contentToProfile, layoutRequest, prefillToDoc, profileToContentIn, sectionPatch, toResume } from '@/data/cvAdapter';
+import { moveSection } from '@/data/templates';
 import { docToProfile } from '@/data/cvModel';
 import { manualToRequest, patchRequest, toApplicationDetail } from '@/data/applications';
 import { agentToForm, blankForm, formToRequest, formToUpdate, toAgent } from '@/data/agentsAdapter';
@@ -32,6 +33,7 @@ describe('request contracts', () => {
     ['set_jd.json', () => api.setJd('r1', { text: response('resume.json').jd.text, company: 'Freshworks', role: '' }), 'PUT', '/resumes/r1/jd'],
     ['tailor.json', () => api.startTailor('r1'), 'POST', '/resumes/r1/tailor'],
     ['settle.json', () => api.settleBullet('r1', 'nw1', 'keep', 7), 'POST', '/resumes/r1/bullets/nw1/keep'],
+    ['resume_confirm_skill.json', () => api.confirmSkill('r1', toResume(response('resume.json')).missingSkills[0], 'tools', 7), 'POST', '/resumes/r1/skills/confirm'],
     ['settings_put.json', () => api.saveSettings({ display_name: null, ask_before_save: false, product_emails: true }), 'PUT', '/settings'],
     ['profile_put.json', () => api.saveProfile(profileToContentIn(contentToProfile(response('profile.json').content)), 3), 'PUT', '/profile'],
     // A first-time user's profile from an upload, after the wizard made them fix the scheme-less link.
@@ -45,9 +47,12 @@ describe('request contracts', () => {
     ['chat_send_new.json', () => api.sendChatMessage(null, { message: '@follow-up who hasn’t replied?', agent: 'follow-up' }), 'POST', '/chats/messages'],
     ['chat_send.json', () => api.sendChatMessage('c1', { message: 'Draft one for Freshworks' }), 'POST', '/chats/c1/messages'],
     // Preview saves every section in this order; the last one marks the wizard done.
-    ...['personal', 'experience', 'projects', 'education', 'skills', 'spoken_languages'].map((section) => [
-      `resume_patch_${section}.json`, () => api.patchResume('r1', sectionPatch(withLinks, section, 7, section === 'spoken_languages' ? 'done' : null)), 'PATCH', '/resumes/r1',
+    ...['personal', 'experience', 'projects', 'education', 'skills', 'spoken_languages', 'certifications'].map((section) => [
+      `resume_patch_${section}.json`, () => api.patchResume('r1', sectionPatch(withLinks, section, 7, section === 'certifications' ? 'done' : null)), 'PATCH', '/resumes/r1',
     ]),
+    // PDF-1: a template switch with the user's own order, and one back to the template's default order.
+    ['resume_layout.json', () => { const r = toResume(response('resume.json')); return api.setLayout(r.id, layoutRequest('jake', moveSection(r.sectionOrder, 0, 1), r.rowVersion)); }, 'PATCH', `/resumes/${response('resume.json').id}/layout`],
+    ['resume_layout_default.json', () => api.setLayout('r1', layoutRequest('honne_professional', null, 7)), 'PATCH', '/resumes/r1/layout'],
   ];
 
   it.each(cases)('%s', async (name, call, method, path) => {

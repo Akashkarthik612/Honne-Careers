@@ -80,11 +80,14 @@ class GeminiProvider:
 
     async def generate_with_tools(self, *, system: str, messages: list[LlmMessage],
                                   tools: list[ToolDecl], model: str, temperature: float,
-                                  max_output_tokens: int) -> ToolTurn:
+                                  max_output_tokens: int, thinking_budget: int) -> ToolTurn:
         config = types.GenerateContentConfig(
             system_instruction=system,
             temperature=temperature,
-            max_output_tokens=max_output_tokens,
+            # Gemini counts thinking against max_output_tokens: ask for both caps together,
+            # so thinking stops at its budget and the writing keeps its own room.
+            max_output_tokens=max_output_tokens + thinking_budget,
+            thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
             tools=[types.Tool(function_declarations=[
                 types.FunctionDeclaration(name=t.name, description=t.description,
                                           parameters_json_schema=gemini_schema(inline_refs(t.parameters)))
@@ -106,6 +109,7 @@ class GeminiProvider:
             input_tokens=usage.prompt_token_count if usage else None,
             output_tokens=usage.candidates_token_count if usage else None,
             raw=candidate.content if candidate else None,  # keeps thought signatures
+            thinking_tokens=usage.thoughts_token_count if usage else None,
         )
 
     def raw_to_wire(self, raw: Any) -> Any:

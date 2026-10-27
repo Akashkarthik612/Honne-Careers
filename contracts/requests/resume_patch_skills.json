@@ -14,6 +14,7 @@
         "JUnit"
       ],
       "tools": [
+        "PostgreSQL",
         "AWS",
         "Docker",
         "Git",

@@ -1,10 +1,10 @@
 id: cv_tailor
-version: 3
+version: 4
 description: Tailors a CV to a JD without inventing anything
 model_tier: strong
 temperature: 0.2
 max_output_tokens: 8192
-instructions: prompts/cv_tailor/v3.md   # cv-jd-tailoring skill, adapted (B4); v2 bolds keywords; v3 career stage (TAIL-8)
+instructions: prompts/cv_tailor/v4.md   # cv-jd-tailoring skill, adapted (B4); v2 bolds keywords; v3 career stage (TAIL-8); v4 evidenced skill additions + gaps (V4.1)
 input_schema: TailorInput
 output_schema: TailorOutput
 tools: []

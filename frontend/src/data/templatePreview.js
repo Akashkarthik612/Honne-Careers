@@ -35,4 +35,5 @@ export const PREVIEW_PROFILE = {
     tools: ['AWS (EC2, SQS, RDS)', 'Git', 'Grafana'],
   },
   spoken: [{ id: 'l1', name: 'English', level: 'professional' }, { id: 'l2', name: 'Tamil', level: 'native' }],
+  certs: [{ id: 'c1', name: 'AWS Certified Developer', issuer: 'Amazon Web Services', date: '2023' }],
 };

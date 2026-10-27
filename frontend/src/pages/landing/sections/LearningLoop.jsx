@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FUNNEL_COLORS, LOOP_R, LOOP_STEPS, MONTHS, barWidth, clamp01, loopNodePos } from '../landingData';
+import { FUNNEL_COLORS, LOOP_R, LOOP_STEPS, WEEKS, barWidth, clamp01, loopNodePos } from '../landingData';
 import { useReducedMotion } from '../landingHooks';
 import { Reveal } from './parts';
 
@@ -12,7 +12,7 @@ export default function LearningLoop() {
   const trackRef = useRef(null);
   const [scrolledShown, setScrolledShown] = useState(0);
   const [sel, setSel] = useState(0);
-  const [month, setMonth] = useState('oct');
+  const [week, setWeek] = useState('this');
 
   useEffect(() => {
     if (reduce) return undefined;
@@ -36,7 +36,7 @@ export default function LearningLoop() {
   }, [reduce]);
 
   const shown = reduce ? LOOP_STEPS.length : Math.max(scrolledShown, sel + 1);
-  const M = MONTHS[month];
+  const M = WEEKS[week];
   const panel = LOOP_STEPS[sel].panel;
   const box = (k) => ({
     borderRadius: 12, padding: k === 'kpi' ? 0 : 12, transition: 'box-shadow .3s ease,background .3s ease',
@@ -50,7 +50,7 @@ export default function LearningLoop() {
         <Reveal>
           <div className="lbl">06 — The learning loop</div>
           <h2 id="lp-h" className="h2">Your next application should be <span className="serif" style={{ color: '#6655E8', fontSize: '1.08em' }}>smarter</span> <span className="lead">than your last.</span></h2>
-          <p className="sub">Every week, Honne looks at what you sent and what came back, then adjusts the plan. It shows patterns in your own data. It can&apos;t know why a company said no, and it won&apos;t pretend to.</p>
+          <p className="sub">Every week, ask @strategist for your review: it looks at what you sent and what came back, then adjusts the plan. It shows patterns in your own data. It can&apos;t know why a company said no, and it won&apos;t pretend to.</p>
 
           <div ref={trackRef} className="g2" style={{ marginTop: 36, display: 'grid', gridTemplateColumns: 'minmax(0,5fr) minmax(0,7fr)', gap: 18, alignItems: 'start' }}>
             <div className="card" style={{ padding: 18 }}>
@@ -91,9 +91,9 @@ export default function LearningLoop() {
             <div className="card" style={{ overflow: 'hidden' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid #F1EFEC', background: '#FCFCFB' }}>
                 <span className="h" style={{ fontSize: 15, fontWeight: 700 }}>Your search</span>
-                <div className="seg" role="group" aria-label="Month">
-                  <button type="button" className={`segb${month === 'sep' ? ' on' : ''}`} onClick={() => setMonth('sep')} aria-pressed={month === 'sep'}>September</button>
-                  <button type="button" className={`segb${month === 'oct' ? ' on' : ''}`} onClick={() => setMonth('oct')} aria-pressed={month === 'oct'}>October</button>
+                <div className="seg" role="group" aria-label="Week">
+                  <button type="button" className={`segb${week === 'last' ? ' on' : ''}`} onClick={() => setWeek('last')} aria-pressed={week === 'last'}>Last week</button>
+                  <button type="button" className={`segb${week === 'this' ? ' on' : ''}`} onClick={() => setWeek('this')} aria-pressed={week === 'this'}>This week</button>
                 </div>
                 <span style={{ flex: 1 }}></span><span className="tag">SAMPLE DATA</span>
               </div>
@@ -103,7 +103,7 @@ export default function LearningLoop() {
                     {M.kpi.map(([t, v]) => (
                       <div key={t} style={{ border: '1px solid #F1EFEC', borderRadius: 10, padding: '10px 12px', background: '#FFFFFF' }}>
                         <div style={{ fontSize: 12, color: '#666666' }}>{t}</div>
-                        <div key={`${month}-${v}`} className="h rise" style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{v}</div>
+                        <div key={`${week}-${v}`} className="h rise" style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{v}</div>
                       </div>
                     ))}
                   </div>
@@ -135,7 +135,7 @@ export default function LearningLoop() {
                 </div>
                 <div style={box('recs')}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 13, fontWeight: 600 }}>For next week</span><span className="mono" style={{ fontSize: 11, color: '#B4500F' }}>@strategist</span></div>
-                  <div key={month} className="rise" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div key={week} className="rise" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {M.recs.map((r) => (
                       <div key={r} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, lineHeight: 1.5 }}>
                         <span style={{ flex: 'none', width: 16, height: 16, marginTop: 3, borderRadius: 5, border: '2px solid #6655E8' }}></span>{r}

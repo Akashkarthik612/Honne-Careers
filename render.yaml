@@ -43,6 +43,8 @@ services:
         value: gemini:gemini-3.5-flash-lite
       - key: BETA_FREE_TAILORING
         value: "true"
+      - key: APPLICATION_RETENTION_DAYS   # applications and chats are deleted this many days after sending/creating
+        value: "40"
       # Tracing (metadata only) is off until a LangSmith key exists. To turn it on: add
       # LANGSMITH_API_KEY (sync: false) to the env group above, set it in the dashboard, then "true".
       - key: LANGSMITH_TRACING
@@ -69,6 +71,13 @@ services:
       # in production, so the 30s default timed out every chat (23 Oct 2026). Max allowed: 120.
       - key: AGENT_LLM_TIMEOUT_S
         value: "120"
+      # Separate caps per chat model call: writing and thinking. One shared 4096 cap let
+      # thinking use it all, so replies came back empty (MAX_TOKENS, 26 Oct 2026). Tune
+      # from thinking_tokens in the chat_turn_run log once real users are on.
+      - key: AGENT_MAX_OUTPUT_TOKENS
+        value: "8192"
+      - key: AGENT_THINKING_BUDGET
+        value: "8192"
 
   - type: web
     name: honne-careers
@@ -105,4 +114,4 @@ services:
         value: max-age=63072000; includeSubDomains
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://honne-careers-api.onrender.com https://*.supabase.co; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        value: "default-src 'self'; connect-src 'self' https://honne-careers-api.onrender.com https://*.supabase.co; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"

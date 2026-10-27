@@ -34,6 +34,23 @@ def norm_skill(name: str) -> str:
     return _CANON.get(key, key)
 
 
+def skill_keys(content) -> set[str]:
+    """norm_skill of every name in a CvContent's Skills section."""
+    return {norm_skill(s.name) for items in (content.skills.languages,
+            content.skills.frameworks, content.skills.tools) for s in items}
+
+
+def unique_skills(names: list[str]) -> list[str]:
+    """First spelling of each skill, aliases collapsed ("Postgres" == "PostgreSQL")."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in names:
+        if norm_skill(name) not in seen:
+            seen.add(norm_skill(name))
+            out.append(name)
+    return out
+
+
 def numbers_in(text: str) -> set[str]:
     """Numbers as normalised strings, years excluded (dates are checked separately)."""
     found = {m.group().replace(",", "") for m in _NUMBER.finditer(text)

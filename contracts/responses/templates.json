@@ -1,0 +1,28 @@
+[
+  {
+    "id": "jake",
+    "name": "Jake's Resume",
+    "description": "For entry-level candidates",
+    "default_order": [
+      "education",
+      "experience",
+      "projects",
+      "skills",
+      "certifications",
+      "languages"
+    ]
+  },
+  {
+    "id": "honne_professional",
+    "name": "Honne Professional",
+    "description": "For experienced professionals",
+    "default_order": [
+      "experience",
+      "projects",
+      "skills",
+      "education",
+      "certifications",
+      "languages"
+    ]
+  }
+]

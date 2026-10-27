@@ -1,0 +1,12 @@
+{
+  "expected_version": 7,
+  "template": "jake",
+  "section_order": [
+    "projects",
+    "experience",
+    "skills",
+    "certifications",
+    "languages",
+    "education"
+  ]
+}

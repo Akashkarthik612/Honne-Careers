@@ -23,6 +23,7 @@ from app.api.routes.tailoring import SettleRequest, TailorRequest
 from app.api.schemas import (
     AddApplication,
     ApplicationPatch,
+    ConfirmSkill,
     CreateResume,
     PreviewAgent,
     SaveProfile,
@@ -43,6 +44,7 @@ from app.api.schemas import (
     resume_view,
     settings_view,
     summary_view,
+    template_view,
     turn_view,
     usage_view,
 )
@@ -61,7 +63,8 @@ from app.domain.chat_agents import (
     StepRecord,
     TurnResult,
 )
-from app.domain.cv import Bullet, Origin, ResumePatch, TailorState
+from app.domain.cv import Bullet, Certification, Origin, ResumePatch, SkillItem, TailorState
+from app.domain.layout import LayoutPatch, SectionKey
 from app.domain.records import (
     AnalysisRow,
     ApplicationDetail,
@@ -75,6 +78,7 @@ from app.domain.records import (
 from app.domain.tailoring import PrefillCv
 from app.policy.limits import LimitsConfig
 from app.policy.quota import Usage, UsageItem
+from app.render.templates import TemplateRegistry
 from tests.fixtures import SAMPLE_JD, sample_cv
 
 CONTRACTS = Path(__file__).resolve().parents[3] / "contracts"
@@ -102,7 +106,11 @@ REQUEST_SHAPES: dict[str, type[BaseModel]] = {
     "resume_patch_projects.json": ResumePatch,
     "resume_patch_education.json": ResumePatch,
     "resume_patch_skills.json": ResumePatch,
+    "resume_confirm_skill.json": ConfirmSkill,
     "resume_patch_spoken_languages.json": ResumePatch,
+    "resume_patch_certifications.json": ResumePatch,
+    "resume_layout.json": LayoutPatch,
+    "resume_layout_default.json": LayoutPatch,
     "set_jd.json": SetJd,
     "settings_put.json": SaveSettings,
     "settle.json": SettleRequest,
@@ -123,17 +131,31 @@ def _content():
                   original_origin=Origin.PROFILE, tailor_state=TailorState.KEPT)
     edited = nw.bullets[2].model_copy(update={"origin": Origin.USER, "locked": True})
     nw = nw.model_copy(update={"bullets": [proposed, kept, edited]})
-    return cv.model_copy(update={"experience": [nw, *cv.experience[1:]]})
+    # V4.1: one skill the tailor added from the user's experience (origin=ai)
+    tools = [SkillItem(name="PostgreSQL", origin=Origin.AI), *cv.skills.tools]
+    skills = cv.skills.model_copy(update={"tools": tools})
+    return cv.model_copy(update={"experience": [nw, *cv.experience[1:]], "skills": skills,
+                                 "certifications": CERTS})
+
+
+CERTS = [Certification(name="AWS Certified Developer", issuer="Amazon Web Services",
+                       date="2024"), Certification(name="Smart India Hackathon finalist")]
+# A user-chosen order (PDF-1): Experience first, Education last.
+ORDER = tuple(SectionKey(k) for k in ("experience", "projects", "skills", "certifications",
+                                      "languages", "education"))
 
 
 def _resume() -> ResumeRow:
     return ResumeRow(
-        id=RID, title="SDE-2 Backend · Freshworks", template="jake", mode="tailored",
-        jd_id=JID, content=_content(), missing_skills=["Kubernetes"],
-        tailor_report={"changed": 2, "kept_original": [], "dropped_locked": 0, "rules": []},
+        id=RID, title="SDE-2 Backend · Freshworks", template="honne_professional",
+        mode="tailored", jd_id=JID, content=_content(), missing_skills=["Kubernetes"],
+        jd_gaps=[{"kind": "experience", "text": "5+ years of backend experience"},
+                 {"kind": "language", "text": "Fluent Kannada"}],
+        tailor_report={"changed": 2, "kept_original": [], "dropped_locked": 0,
+                       "added_skills": 1, "rejected_skills": 0, "rules": []},
         wizard_step="done", status="ready", job_step=None, job_started_at=None,
-        row_version=7, content_hash=HASH, pdf_path="x.pdf", pdf_content_hash=HASH,
-        page_count=1, error_code=None, updated_at=WHEN)
+        row_version=7, content_hash=HASH, pdf_path="x.pdf", pdf_render_key=HASH,
+        page_count=1, error_code=None, updated_at=WHEN, section_order=ORDER)
 
 
 def _jd() -> JdRow:
@@ -288,12 +310,14 @@ RESPONSES = {
         saved=True, application_id=AID, deletes_on=WINDOW.deletes_on(WHEN))),
     "application_record_no_jd.json": lambda: record_view(RecordResult(saved=False,
                                                                       reason="no_jd")),
-    "resume.json": lambda: resume_view(_resume(), _jd()),
+    "resume.json": lambda: resume_view(_resume(), _jd(), pdf_current=True),
+    "templates.json": lambda: [template_view(t) for t in TemplateRegistry().all()],
     "resume_summary.json": lambda: summary_view(ResumeSummary(
         id=RID, title="SDE-2 Backend · Freshworks", template="jake", mode="tailored",
         status="draft", wizard_step="experience", company="Freshworks", role="SDE-2 Backend",
-        updated_at=WHEN, content=_content())),
-    "profile.json": lambda: profile_view(ProfileRow(content=sample_cv(), content_hash=HASH,
+        updated_at=WHEN, content=_content(), section_order=None)),
+    "profile.json": lambda: profile_view(ProfileRow(
+        content=sample_cv().model_copy(update={"certifications": CERTS}), content_hash=HASH,
                                                      row_version=3, updated_at=WHEN)),
     "analysis.json": _analysis,
     "upload.json": _upload,

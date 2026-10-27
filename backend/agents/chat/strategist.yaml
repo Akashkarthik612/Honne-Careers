@@ -1,0 +1,7 @@
+# Built-in chat agent (launch, 25 Oct 2026): the weekly strategy review, run when the user asks.
+# Nothing is scheduled; users are reminded weekly to ask. See analyst.yaml.
+handle: strategist
+version: 1
+description: Your weekly review - what worked, what didn't, and a short plan for next week
+instructions: prompts/chat/strategist/v1.md
+knowledge: [applications, resumes, profile]

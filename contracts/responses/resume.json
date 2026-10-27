@@ -1,8 +1,16 @@
 {
   "id": "11111111-1111-4111-8111-111111111111",
   "title": "SDE-2 Backend · Freshworks",
-  "template": "jake",
+  "template": "honne_professional",
   "mode": "tailored",
+  "section_order": [
+    "experience",
+    "projects",
+    "skills",
+    "certifications",
+    "languages",
+    "education"
+  ],
   "status": "ready",
   "job_step": null,
   "error_code": null,
@@ -149,6 +157,10 @@
       ],
       "tools": [
         {
+          "name": "PostgreSQL",
+          "origin": "ai"
+        },
+        {
           "name": "AWS",
           "origin": "profile"
         },
@@ -175,15 +187,39 @@
         "name": "Tamil",
         "level": "native"
       }
+    ],
+    "certifications": [
+      {
+        "name": "AWS Certified Developer",
+        "issuer": "Amazon Web Services",
+        "date": "2024"
+      },
+      {
+        "name": "Smart India Hackathon finalist",
+        "issuer": "",
+        "date": ""
+      }
     ]
   },
   "missing_skills": [
     "Kubernetes"
   ],
+  "gaps": [
+    {
+      "kind": "experience",
+      "text": "5+ years of backend experience"
+    },
+    {
+      "kind": "language",
+      "text": "Fluent Kannada"
+    }
+  ],
   "tailor_report": {
     "changed": 2,
     "kept_original": [],
     "dropped_locked": 0,
+    "added_skills": 1,
+    "rejected_skills": 0,
     "rules": []
   },
   "jd": {

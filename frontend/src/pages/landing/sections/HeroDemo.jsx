@@ -89,18 +89,12 @@ export default function HeroDemo() {
       </div>
 
       {HS.sc === 'C' && (
-        <>
           <div className="floatchip di" style={{ animationDelay: '1.6s', position: 'absolute', left: -28, bottom: 58, display: 'flex', alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1px solid #E8E6E3', borderRadius: 12, padding: '10px 14px', boxShadow: '0 14px 36px rgba(23,23,23,.10)', fontSize: 13 }}>
             <span style={{ width: 26, height: 26, borderRadius: 8, background: '#FFF2E8', color: '#B4500F', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 7l9 6 9-6"></path></svg>
             </span>
-            <span><strong>Follow-up drafted</strong> for Groww<br /><span style={{ color: '#666666', fontSize: 12 }}>Waiting for your OK</span></span>
+            <span><strong>Follow-up drafted</strong> for Company 4<br /><span style={{ color: '#666666', fontSize: 12 }}>Waiting for your OK</span></span>
           </div>
-          <div className="floatchip di" style={{ animationDelay: '1.75s', position: 'absolute', right: -12, top: -14, display: 'flex', alignItems: 'center', gap: 8, background: '#FFFFFF', border: '1px solid #E8E6E3', borderRadius: 999, padding: '7px 12px 7px 8px', boxShadow: '0 12px 30px rgba(23,23,23,.08)', fontSize: 12.5, fontWeight: 600 }}>
-            <span style={{ width: 22, height: 22, borderRadius: 99, background: '#E6F4EE', color: '#0F7A5C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true"><Check size={12} /></span>
-            Zoho replied · interview booked
-          </div>
-        </>
       )}
     </div>
   );
@@ -119,7 +113,7 @@ function SceneA({ HS, kw, kwGap, done }) {
               <span style={{ fontSize: 12.5, color: '#6E6B78' }}>Paste the job description here<span className="caret"></span></span>
             ) : (
               <div className="rise">
-                <div style={{ fontSize: 13, fontWeight: 700 }}>SDE-2, Backend · Freshworks</div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>SDE-2, Backend · Company 1</div>
                 <p style={{ margin: '6px 0 0', fontSize: 12, lineHeight: 1.65, color: '#3A3A3A' }}>
                   You’ll <span style={kw}>design event-driven services</span> in <span style={kw}>Java and Kafka</span> on AWS, <span style={kw}>improve reliability and latency</span>, and <span style={kw}>mentor junior engineers</span>. 3+ years of backend experience. <span style={kwGap}>Kubernetes</span> is a plus.
                 </p>
@@ -206,7 +200,7 @@ function SceneB({ HS }) {
       </div>
       {HS.cvPop ? (
         <div className="rise" style={{ ...popCard, right: 16, width: '46%' }}>
-          <div style={popHead}><span style={docChip('#F0EDFF', '#5847D6')}>PDF</span><strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>CV_Freshworks_SDE2_v4.pdf</strong></div>
+          <div style={popHead}><span style={docChip('#F0EDFF', '#5847D6')}>PDF</span><strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>CV_Company1_SDE2_v4.pdf</strong></div>
           <div style={{ padding: '10px 12px', fontFamily: "'Times New Roman',Georgia,serif", fontSize: 10, lineHeight: 1.45, color: '#111111' }}>
             <div style={{ textAlign: 'center', fontSize: 12, fontVariant: 'small-caps', letterSpacing: '.04em' }}>Arjun Mehta</div>
             <div style={{ marginTop: 4, fontVariant: 'small-caps', borderBottom: '1px solid #111111' }}>Experience</div>
@@ -219,7 +213,7 @@ function SceneB({ HS }) {
       ) : null}
       {HS.jdPop ? (
         <div className="rise" style={{ ...popCard, left: '18%', width: '50%' }}>
-          <div style={popHead}><span style={docChip('#EAF0FD', '#2F5FD0')}>JD</span><strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>SDE-2, Backend · Freshworks</strong></div>
+          <div style={popHead}><span style={docChip('#EAF0FD', '#2F5FD0')}>JD</span><strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>SDE-2, Backend · Company 1</strong></div>
           <div style={{ padding: '10px 12px', fontSize: 11, lineHeight: 1.55, color: '#3A3A3A' }}>Design and own event-driven services in Java and Kafka on AWS. Improve reliability and latency. Mentor junior engineers. 3+ years of backend experience.</div>
           <div style={popFoot}>Saved 25 Oct · even if the posting is taken down</div>
         </div>
@@ -262,7 +256,7 @@ function SceneC() {
             </div>
             <div className="dashside" style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
               <div className="di" style={{ animationDelay: '1.15s', border: '1px solid #E2DDFB', background: '#FAF9FF', borderRadius: 12, padding: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}><span className="mono" style={{ fontWeight: 600, color: '#5847D6' }}>@cv-writer</span><span style={{ color: '#6E6B78' }}>· Freshworks</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}><span className="mono" style={{ fontWeight: 600, color: '#5847D6' }}>@cv-writer</span><span style={{ color: '#6E6B78' }}>· Company 1</span></div>
                 <div style={{ position: 'relative', height: 16, marginTop: 5, fontSize: 12, fontWeight: 600 }}>
                   <span className="swA" style={{ position: 'absolute', left: 0, top: 0 }}>Tailoring your CV to the JD…</span>
                   <span className="swB" style={{ position: 'absolute', left: 0, top: 0, color: '#0F7A5C' }}>✓ 3 bullets reworded · 0 added</span>

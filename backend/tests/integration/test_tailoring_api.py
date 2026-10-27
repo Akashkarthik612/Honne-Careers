@@ -119,8 +119,14 @@ def honest_tailor(user_message: str) -> dict:
         out.append({"id": item["id"], "bullets": bullets})
     skills = data["skills"]
     return {"experience_order": exp_ids, "items": out,
-            "skills": {**skills, "languages": list(reversed(skills["languages"]))},
-            "missing_skills": ["Kubernetes", "Java"]}  # Java isn't missing: filtered out
+            # PostgreSQL is in Ledger-lite's tech list (added); Kubernetes only in the JD
+            # (dropped). Neither is in the input Skills.
+            "skills": {**skills, "languages": list(reversed(skills["languages"])),
+                       "tools": ["PostgreSQL", "Kubernetes", *skills["tools"]]},
+            # Java isn't missing, PostgreSQL is evidenced: both filtered out
+            "missing_skills": ["Kubernetes", "Java", "PostgreSQL"],
+            "gaps": [{"kind": "qualification", "text": "M.Tech preferred"},
+                     {"kind": "language", "text": "Fluent Kannada"}]}
 
 
 async def test_full_tailor_job(api):
@@ -138,6 +144,87 @@ async def test_full_tailor_job(api):
     assert res["tailor_report"]["kept_original"] == ["experience[nw].bullets[nw2]"]
     assert [s["name"] for s in res["content"]["skills"]["languages"]] == ["SQL", "Python",
                                                                          "Java"]
+    tools = res["content"]["skills"]["tools"]
+    assert [s["name"] for s in tools] == ["PostgreSQL", "AWS", "Docker", "Git", "Grafana"]
+    assert tools[0]["origin"] == "ai"
+    assert (res["tailor_report"]["added_skills"], res["tailor_report"]["rejected_skills"]) \
+        == (1, 1)
+    assert res["gaps"] == [{"kind": "qualification", "text": "M.Tech preferred"},
+                           {"kind": "language", "text": "Fluent Kannada"}]
+
+
+# ---------- V4.1: JD skills are suggestions until the user confirms one ----------
+
+async def tailored(api):
+    h, rid = await returning_user(api)
+    api.provider.push(honest_tailor)
+    await api.client.post(f"/resumes/{rid}/tailor", json={"scope": "all"}, headers=h)
+    return h, rid, await get(api, h, rid)
+
+
+async def test_confirmed_skill_reaches_the_pdf_without_an_llm_call(api):
+    h, rid, res = await tailored(api)
+    llm_calls = len(api.provider.calls)
+    await api.client.post(f"/resumes/{rid}/pdf", headers=h)
+    assert "Kubernetes" not in api.compiler.sources[-1]  # unconfirmed: never in the CV
+    assert "PostgreSQL" in api.compiler.sources[-1]      # evidenced addition
+
+    r = await api.client.post(f"/resumes/{rid}/skills/confirm", headers=h, json={
+        "expected_version": res["row_version"], "name": "kubernetes", "category": "tools"})
+    assert r.status_code == 200, r.text
+    after = r.json()
+    assert after["missing_skills"] == []
+    assert after["content"]["skills"]["tools"][-1] == {"name": "Kubernetes", "origin": "user"}
+    assert after["pdf"]["up_to_date"] is False
+
+    rebuilt = (await api.client.post(f"/resumes/{rid}/pdf", headers=h)).json()
+    assert rebuilt["reused"] is False
+    assert "Kubernetes" in api.compiler.sources[-1]
+    assert len(api.provider.calls) == llm_calls  # PDF and confirm: 0 LLM calls
+
+
+async def test_only_a_listed_suggestion_can_be_confirmed(api):
+    h, rid, res = await tailored(api)
+    r = await api.client.post(f"/resumes/{rid}/skills/confirm", headers=h, json={
+        "expected_version": res["row_version"], "name": "Terraform", "category": "tools"})
+    assert (r.status_code, r.json()["error"]["details"]["reason"]) == (422,
+                                                                      "not_a_suggestion")
+    r = await api.client.post(f"/resumes/{rid}/skills/confirm", headers=h, json={
+        "expected_version": res["row_version"] - 1, "name": "Kubernetes",
+        "category": "tools"})
+    assert r.status_code == 409
+    r = await api.client.post(f"/resumes/{rid}/skills/confirm", headers=api.new_user(),
+                              json={"expected_version": res["row_version"],
+                                    "name": "Kubernetes", "category": "tools"})
+    assert r.status_code == 404
+    r = await api.client.post(f"/resumes/{rid}/skills/confirm", headers=h, json={
+        "expected_version": res["row_version"], "name": "Kubernetes", "category": "tools",
+        "origin": "profile"})
+    assert r.status_code == 422  # origin is never accepted from a client (B5)
+    assert (await get(api, h, rid))["missing_skills"] == ["Kubernetes"]
+
+
+async def test_skills_typed_in_the_wizard_leave_the_suggestions(api):
+    h, rid, res = await tailored(api)
+    skills = {k: [s["name"] for s in v] for k, v in res["content"]["skills"].items()}
+    skills["tools"].append("Kubernetes")
+    r = await api.client.patch(f"/resumes/{rid}", headers=h, json={
+        "expected_version": res["row_version"],
+        "change": {"section": "skills", "value": skills}})
+    assert r.status_code == 200, r.text
+    assert (await get(api, h, rid))["missing_skills"] == []
+
+
+async def test_experience_projects_scope_leaves_skills_unchanged(api):
+    h, rid = await returning_user(api)
+    before = (await get(api, h, rid))["content"]["skills"]
+    api.provider.push(honest_tailor)  # adds and reorders skills: must be ignored
+    await api.client.post(f"/resumes/{rid}/tailor", json={"scope": "experience_projects"},
+                          headers=h)
+    res = await get(api, h, rid)
+    assert res["status"] == "ready", res["error_code"]
+    assert res["content"]["skills"] == before
+    assert res["tailor_report"]["added_skills"] == 0
 
 
 async def test_llm_outage_fails_job_and_leaves_content(api):

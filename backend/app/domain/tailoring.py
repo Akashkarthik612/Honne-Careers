@@ -56,11 +56,24 @@ class ItemOut(Model):
     bullets: list[BulletOut] = Field(max_length=12)
 
 
+GapKind = Literal["qualification", "experience", "language"]
+
+
+class Gap(Model):
+    """A JD requirement that is not a technical skill (degree, years, spoken language).
+    Shown to the user as a gap; never confirmable into Skills (TAIL-6)."""
+    kind: GapKind
+    text: Short
+
+
 class TailorOutput(Model):
     experience_order: list[ItemId] = Field(max_length=15)   # TAIL-5: most relevant first
     items: list[ItemOut] = Field(max_length=30)
-    skills: SkillsView                                       # same items, reordered only
+    # Every existing skill, reordered, plus additions evidenced in the user's own experience
+    # or project text (cv_tailor v4). Checked per added skill by TruthChecker.
+    skills: SkillsView
     missing_skills: list[SkillName] = Field(default_factory=list, max_length=30)  # TAIL-6
+    gaps: list[Gap] = Field(default_factory=list, max_length=10)
 
 
 # ---------- bullet_tailor ----------

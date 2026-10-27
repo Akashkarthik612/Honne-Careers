@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Copy, Download, MoreHorizontal, Plus, Trash2, User } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import { CvThumb } from '@/components/CvDoc';
+import { sectionOrderOf } from '@/data/templates';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { contentToProfile, timeAgo, toSummary } from '@/data/cvAdapter';
 import { docToCv, emptyProfile, profileSections } from '@/data/cvModel';
@@ -61,7 +62,7 @@ function ResumeCard({ resume, menuOpen, onToggleMenu, onDuplicate, onDelete }) {
 
   return (
     <article className="hc-card hc-rcard" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
-      <CvThumb cv={docToCv(resume.doc)} />
+      <CvThumb cv={docToCv(resume.doc)} template={resume.template} order={sectionOrderOf(resume)} />
       <div style={{ padding: '16px 16px 14px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <h2 className="hc-disp" style={{ margin: 0, fontSize: 17, fontWeight: 700, lineHeight: 1.25 }}>{title}</h2>

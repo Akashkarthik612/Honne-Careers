@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FIX_CARDS, HERO_STEPS, HERO_TABS, LOOP_STEPS, SAMPLE_JDS, barWidth, cardFrame, countReqs, easeInOut,
+  AGENTS, AGENT_HUB, AGENT_RING_R, WEEKS, agentPos, FIX_CARDS, HERO_STEPS, HERO_TABS, LOOP_STEPS, SAMPLE_JDS, barWidth, cardFrame, countReqs, easeInOut,
   fixColX, gapNote, heroDbRows, loopNodePos, nextHeroStep, previewHandle,
 } from './landingData';
 
@@ -54,7 +54,7 @@ describe('hero demo', () => {
     expect(heroDbRows(false)).toHaveLength(4);
     const rows = heroDbRows(true);
     expect(rows).toHaveLength(4);
-    expect(rows[0][1]).toBe('Freshworks');
+    expect(rows[0][1]).toBe('Company 1');
     expect(rows[0][6]).toBe(true);
   });
 });
@@ -94,5 +94,33 @@ describe('previewHandle', () => {
     expect(previewHandle('Interview Prep!')).toBe('@interview-prep');
     expect(previewHandle('@follow-up')).toBe('@follow-up');
     expect(previewHandle('  ')).toBe('@your-agent');
+  });
+});
+
+describe('agentPos', () => {
+  it('puts the first agent at 12 o’clock and every agent on the ring', () => {
+    const [x0, y0] = agentPos(0, AGENTS.length);
+    expect(x0).toBeCloseTo(AGENT_HUB[0]);
+    expect(y0).toBeCloseTo(AGENT_HUB[1] - AGENT_RING_R);
+    AGENTS.forEach((_, i) => {
+      const [x, y] = agentPos(i, AGENTS.length);
+      expect(Math.hypot(x - AGENT_HUB[0], y - AGENT_HUB[1])).toBeCloseTo(AGENT_RING_R);
+      expect(x).toBeGreaterThan(40); // node + label stay inside the 520-wide viewBox
+      expect(x).toBeLessThan(480);
+    });
+  });
+
+  it('lists the launch agents', () => {
+    expect(AGENTS.map((a) => a.id)).toEqual(['writer', 'fit', 'analyst', 'advisor', 'outreach', 'strategist', 'custom']);
+  });
+});
+
+describe('learning-loop weeks', () => {
+  it('has last and this week, each with a funnel led by Applied', () => {
+    expect(Object.keys(WEEKS).sort()).toEqual(['last', 'this']);
+    Object.values(WEEKS).forEach((w) => {
+      expect(w.funnel[0][0]).toBe('Applied');
+      expect(w.kpi[0][1]).toBe(String(w.funnel[0][1]));
+    });
   });
 });
