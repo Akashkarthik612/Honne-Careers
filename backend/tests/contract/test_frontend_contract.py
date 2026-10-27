@@ -23,6 +23,7 @@ from app.api.routes.tailoring import SettleRequest, TailorRequest
 from app.api.schemas import (
     AddApplication,
     ApplicationPatch,
+    ConfirmSkill,
     CreateResume,
     PreviewAgent,
     SaveProfile,
@@ -61,7 +62,7 @@ from app.domain.chat_agents import (
     StepRecord,
     TurnResult,
 )
-from app.domain.cv import Bullet, Origin, ResumePatch, TailorState
+from app.domain.cv import Bullet, Origin, ResumePatch, SkillItem, TailorState
 from app.domain.records import (
     AnalysisRow,
     ApplicationDetail,
@@ -102,6 +103,7 @@ REQUEST_SHAPES: dict[str, type[BaseModel]] = {
     "resume_patch_projects.json": ResumePatch,
     "resume_patch_education.json": ResumePatch,
     "resume_patch_skills.json": ResumePatch,
+    "resume_confirm_skill.json": ConfirmSkill,
     "resume_patch_spoken_languages.json": ResumePatch,
     "set_jd.json": SetJd,
     "settings_put.json": SaveSettings,
@@ -123,14 +125,20 @@ def _content():
                   original_origin=Origin.PROFILE, tailor_state=TailorState.KEPT)
     edited = nw.bullets[2].model_copy(update={"origin": Origin.USER, "locked": True})
     nw = nw.model_copy(update={"bullets": [proposed, kept, edited]})
-    return cv.model_copy(update={"experience": [nw, *cv.experience[1:]]})
+    # V4.1: one skill the tailor added from the user's experience (origin=ai)
+    tools = [SkillItem(name="PostgreSQL", origin=Origin.AI), *cv.skills.tools]
+    skills = cv.skills.model_copy(update={"tools": tools})
+    return cv.model_copy(update={"experience": [nw, *cv.experience[1:]], "skills": skills})
 
 
 def _resume() -> ResumeRow:
     return ResumeRow(
         id=RID, title="SDE-2 Backend · Freshworks", template="jake", mode="tailored",
         jd_id=JID, content=_content(), missing_skills=["Kubernetes"],
-        tailor_report={"changed": 2, "kept_original": [], "dropped_locked": 0, "rules": []},
+        jd_gaps=[{"kind": "experience", "text": "5+ years of backend experience"},
+                 {"kind": "language", "text": "Fluent Kannada"}],
+        tailor_report={"changed": 2, "kept_original": [], "dropped_locked": 0,
+                       "added_skills": 1, "rejected_skills": 0, "rules": []},
         wizard_step="done", status="ready", job_step=None, job_started_at=None,
         row_version=7, content_hash=HASH, pdf_path="x.pdf", pdf_content_hash=HASH,
         page_count=1, error_code=None, updated_at=WHEN)

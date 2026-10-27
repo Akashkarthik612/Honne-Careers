@@ -1,10 +1,10 @@
 """AgentCatalog: "@handle" -> AgentSpec (Day 3).
 
-Built-in chat agents (@analyst, @advisor) are config files, like the CV agents: a YAML in
-backend/agents/chat/ plus a Markdown prompt. Adding one = adding files (OCP). A bad file
-stops the app at startup (ConfigError). A handle is looked up among the built-ins first,
-then among the user's active agents; built-in handles and a few words are reserved, so a
-user agent can never shadow ours.
+Built-in chat agents (@analyst, @advisor, @strategist, @outreach, @fit) are config files,
+like the CV agents: a YAML in backend/agents/chat/ plus a Markdown prompt. Adding one =
+adding files (OCP). A bad file stops the app at startup (ConfigError). A handle is looked
+up among the built-ins first, then among the user's active agents; built-in handles and a
+few words are reserved, so a user agent can never shadow ours.
 """
 
 from pathlib import Path
@@ -25,10 +25,9 @@ from app.domain.chat_agents import (
     Speaker,
 )
 
-# Words the UI uses (Auto) or may use (@all), and the built-ins the UI shows that aren't
-# chat agents yet (@cv-writer opens the tailor flow; @strategist is coming).
-RESERVED = frozenset({"auto", "honne", "all", "here", "everyone", "me", "you",
-                      "cv-writer", "strategist"})
+# Words the UI uses (Auto) or may use (@all), and the built-in the UI shows that isn't a
+# chat agent (@cv-writer opens the tailor flow). Built-in handles are reserved through _builtins.
+RESERVED = frozenset({"auto", "honne", "all", "here", "everyone", "me", "you", "cv-writer"})
 
 
 class BuiltinAgentConfig(BaseModel):

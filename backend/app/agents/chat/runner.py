@@ -113,5 +113,6 @@ class ChatAgentRunner:
                          model=model.model_id, status=status, attempts=usage.attempts.n,
                          latency_ms=latency_ms, tool_calls=len(usage.tool_names),
                          tools=sorted(set(usage.tool_names)), input_tokens=usage.input_tokens,
-                         output_tokens=usage.output_tokens, entity_id=entity_id)
+                         output_tokens=usage.output_tokens,
+                         thinking_tokens=usage.thinking_tokens, entity_id=entity_id)
         return result

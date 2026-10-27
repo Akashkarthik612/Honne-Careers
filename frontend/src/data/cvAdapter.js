@@ -10,6 +10,8 @@ import { LINK_FIELDS, personalLinks, pruneDoc, toDoc } from './cvModel';
 
 export const WIZARD_ORDER = ['personal', 'experience', 'projects', 'education', 'skills'];
 const SKILL_KEYS = [['lang', 'languages'], ['fw', 'frameworks'], ['tools', 'tools']];
+// The API's skill category for each UI group (cvModel SKILL_GROUPS), e.g. for "I have this" (V4.1).
+export const SKILL_API_CATEGORY = Object.fromEntries(SKILL_KEYS);
 
 const filled = (s) => Boolean(s && s.trim());
 const trim = (s) => (s ?? '').trim();
@@ -169,10 +171,17 @@ export function toResume(r) {
     state: resumeState(r.status, r.wizard_step), jobStep: r.job_step ?? null, errorCode: r.error_code ?? null,
     wizardStep: r.wizard_step, stepNo: stepNo(r.wizard_step), rowVersion: r.row_version,
     doc: contentToDoc(r.content), missingSkills: r.missing_skills ?? [],
+    // V4.1: skills the tailor added because the user's own experience shows them (origin ai), and JD
+    // requirements that aren't skills (degree, years, spoken language), shown but never confirmable.
+    addedSkills: aiSkills(r.content), gaps: (r.gaps ?? []).map((g) => ({ kind: g.kind, text: g.text })),
     jd: r.jd ? { text: r.jd.text, company: r.jd.company ?? '', role: r.jd.role ?? '' } : null,
     pdf: r.pdf ? { upToDate: r.pdf.up_to_date, pageCount: r.pdf.page_count } : null,
     updatedAt: r.updated_at,
   };
+}
+
+function aiSkills(c) {
+  return SKILL_KEYS.flatMap(([, api]) => (c.skills?.[api] ?? []).filter((s) => typeof s !== 'string' && s.origin === 'ai').map((s) => s.name));
 }
 
 export function toSummary(s) {

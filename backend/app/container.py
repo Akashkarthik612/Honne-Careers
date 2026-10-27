@@ -166,7 +166,8 @@ def build_container(settings: Settings, *, providers: dict[str, LlmProvider] | N
             llm_timeout_s=settings.agent_llm_timeout_s,
             llm_max_retries=settings.agent_llm_max_retries,
             temperature=settings.agent_temperature,
-            max_output_tokens=settings.agent_max_output_tokens),
+            max_output_tokens=settings.agent_max_output_tokens,
+            thinking_budget=settings.agent_thinking_budget),
             checkpointer=agent_state.saver),
         recorder, tracer)
     slots = TurnSlots(settings.chat_concurrent_turns_max, settings.chat_turn_timeout_s)

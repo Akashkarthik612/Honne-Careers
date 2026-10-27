@@ -7,6 +7,7 @@ from fastapi import APIRouter, Response
 
 from app.api.deps import Deps, User
 from app.api.schemas import (
+    ConfirmSkill,
     CreateResume,
     SaveProfile,
     SetJd,
@@ -58,6 +59,14 @@ async def autosave(resume_id: UUID, body: ResumePatch, user: User, c: Deps
                    ) -> dict[str, object]:
     version, chash = await c.resumes.autosave(user, resume_id, body)
     return {"row_version": version, "content_hash": chash}
+
+
+@router.post("/resumes/{resume_id}/skills/confirm", tags=["resumes"])
+async def confirm_skill(resume_id: UUID, body: ConfirmSkill, user: User, c: Deps
+                        ) -> dict[str, object]:
+    row = await c.resumes.confirm_skill(user, resume_id, body.name, body.category,
+                                        body.expected_version)
+    return resume_view(row)
 
 
 @router.delete("/resumes/{resume_id}", status_code=204, tags=["resumes"])

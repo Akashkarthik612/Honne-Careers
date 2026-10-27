@@ -77,7 +77,8 @@ async def test_create_edit_version_and_archive_an_agent(api):
 
     listing = (await api.client.get("/agents", headers=h)).json()
     assert [a["handle"] for a in listing["mine"]] == ["follow-up"]
-    assert {b["handle"] for b in listing["builtin"]} == {"analyst", "advisor"}
+    assert {b["handle"] for b in listing["builtin"]} == {
+        "analyst", "advisor", "fit", "outreach", "strategist"}
     assert listing["limit"] == 10 and listing["count"] == 1
 
     r = await api.client.put(f"/agents/{agent['id']}", headers=h, json={
@@ -301,7 +302,7 @@ async def test_another_users_chat_is_a_404(api):
                                   json={"message": "@analyst x"})).status_code == 404
     assert (await api.client.delete(f"/chats/{cid}", headers=b)).status_code == 404
     assert (await api.client.get("/chats", headers=b)).json() == {
-        "items": [], "retention_days": 20, "limit": 50}
+        "items": [], "retention_days": api.container.applications.window.days, "limit": 50}
 
 
 # ---------- failures, retry, stale, busy ----------
@@ -465,7 +466,8 @@ async def test_old_chats_are_hidden_and_purged(api):
     api.provider.push_turn(answer(content="Hi.", cited=()))
     cid = (await api.client.post("/chats/messages", headers=h,
                                  json={"message": "@follow-up hi"})).json()["chat"]["id"]
-    sql(api, "update app.chats set created_at = now() - interval '21 days' where id = %s", cid)
+    sql(api, "update app.chats set created_at = now() - make_interval(days => %s) where id = %s",
+        api.container.applications.window.days + 1, cid)
     assert (await api.client.get(f"/chats/{cid}", headers=h)).status_code == 404
     assert (await api.client.get("/chats", headers=h)).json()["items"] == []
     result = await api.container.janitor.run_once()

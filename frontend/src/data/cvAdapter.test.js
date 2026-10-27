@@ -134,7 +134,7 @@ describe('UI → client input shapes (B5: ids + text only)', () => {
     const body = docToContentIn(contentToDoc(raw));
     expect(body.experience.map((e) => e.id)).toEqual(raw.experience.map((e) => e.id));
     expect(body.projects[0].tech).toEqual(raw.projects[0].tech);
-    expect(body.skills).toEqual({ languages: ['Java', 'Python', 'SQL'], frameworks: ['Spring Boot', 'Kafka Streams', 'JUnit'], tools: ['AWS', 'Docker', 'Git', 'Grafana'] });
+    expect(body.skills).toEqual({ languages: ['Java', 'Python', 'SQL'], frameworks: ['Spring Boot', 'Kafka Streams', 'JUnit'], tools: ['PostgreSQL', 'AWS', 'Docker', 'Git', 'Grafana'] });
   });
 
   it('drops empty entries and bullets before sending', () => {
@@ -182,6 +182,14 @@ describe('helpers', () => {
     const merged = mergePrefill({ ...saved, education: [] }, pre);
     expect(merged.roles).toBe(saved.roles);
     expect(merged.education).toBe(pre.education);
+  });
+
+  it('toResume exposes tailor-added skills and non-skill gaps (V4.1)', () => {
+    const resume = toResume(response('resume.json'));
+    expect(resume.addedSkills).toEqual(['PostgreSQL']);
+    expect(resume.doc.skills.tools[0]).toBe('PostgreSQL');
+    expect(resume.gaps).toEqual([{ kind: 'experience', text: '5+ years of backend experience' }, { kind: 'language', text: 'Fluent Kannada' }]);
+    expect(toResume({ ...response('resume.json'), gaps: undefined }).gaps).toEqual([]);
   });
 
   it('openSuggestions drops skills the user already added (case-insensitive)', () => {

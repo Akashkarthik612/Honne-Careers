@@ -1,14 +1,14 @@
 import { useCallback, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { AlertCircle, Check, ChevronDown, Database, Download, ExternalLink, Maximize2, PenLine, X } from 'lucide-react';
+import { AlertCircle, Check, ChevronDown, Database, Download, ExternalLink, Maximize2, PenLine, Plus, X } from 'lucide-react';
 import CvDoc, { BulletText } from '@/components/CvDoc';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { shortDate } from '@/data/applications';
-import { bulletToDoc, toResume } from '@/data/cvAdapter';
+import { SKILL_API_CATEGORY, bulletToDoc, openSuggestions, sectionPatch, toResume } from '@/data/cvAdapter';
 import { SKILL_GROUPS, docChanges, docToCv } from '@/data/cvModel';
 import { templateName } from '@/data/templates';
 import useResource from '@/hooks/useResource';
-import { buildPdf, getProfile, getResume, getSettings, saveResumeToProfile, settleBullet, startTailor } from '@/services/api';
+import { buildPdf, confirmSkill, getProfile, getResume, getSettings, patchResume, saveResumeToProfile, settleBullet, startTailor } from '@/services/api';
 import { errorText } from '@/services/apiClient';
 import { clearPending, isRetryable, markPending, saveWithRetry } from '@/services/applicationSaver';
 import AnalysisSection from './AnalysisSection';
@@ -19,6 +19,11 @@ import AnalysisSection from './AnalysisSection';
 // wording (TRUTH-1). Proposed AI bullets can be kept or reverted here (B6).
 // After the PDF opens, the download is saved to the Database (SAVE-1: POST /resumes/{id}/application) with a
 // bounded retry; if it still fails it is kept as pending and retried on the next visit (applicationSaver.js).
+// V4.1: skills the tailor added from the user's own experience can be removed here; JD skills the CV doesn't
+// show are only suggestions until the user says "I have this" (POST skills/confirm, this CV only), and
+// non-skill gaps (degree, years, language) are listed, never confirmable.
+
+const GAP_LABEL = { qualification: 'Qualification', experience: 'Experience', language: 'Language' };
 
 function WhiteSpinner() {
   return (
@@ -61,14 +66,17 @@ function CvReady({ initial, askSave }) {
   const [profileError, setProfileError] = useState(null);
   const [settleError, setSettleError] = useState(null);
   const [retryError, setRetryError] = useState(null);
+  const [skillError, setSkillError] = useState(null);
+  const [skillBusy, setSkillBusy] = useState(null); // the skill being confirmed or removed
+  const [category, setCategory] = useState({}); // suggestion -> chosen UI group (default Cloud & tools)
   const [changesOpen, setChangesOpen] = useState(true);
   const [full, setFull] = useState(false);
 
   const cv = docToCv(resume.doc);
   const changes = docChanges(resume.doc);
   const pending = changes.filter((c) => c.status === 'review').length;
-  const have = new Set(SKILL_GROUPS.flatMap(([k]) => resume.doc.skills[k]).map((s) => s.toLowerCase()));
-  const added = resume.missingSkills.filter((s) => have.has(s.toLowerCase())); // taken from the JD suggestions
+  const added = resume.addedSkills; // added by the tailor because the user's experience shows them
+  const suggestions = openSuggestions(resume.missingSkills, resume.doc.skills);
   const meta = [resume.title, templateName(resume.template)].join(' · ');
 
   // PDF-2, then (unless the user unticked it) save to profile. Each step reports its own failure: a
@@ -117,6 +125,37 @@ function CvReady({ initial, askSave }) {
       setResume((cur) => ({ ...cur, rowVersion: r.row_version, doc: replaceBullet(cur.doc, bulletToDoc(r.bullet)) }));
     } catch (e) {
       setSettleError(e);
+    }
+  }
+
+  // Both change the CV, so a PDF already built is out of date: the button goes back to "Download PDF".
+  async function confirm(name) {
+    setSkillError(null);
+    setSkillBusy(name);
+    try {
+      const r = await confirmSkill(resume.id, name, SKILL_API_CATEGORY[category[name] ?? 'tools'], resume.rowVersion);
+      setResume((cur) => ({ ...toResume(r), jd: cur.jd }));
+      setDl({ phase: 'idle' });
+    } catch (e) {
+      setSkillError(e);
+    } finally {
+      setSkillBusy(null);
+    }
+  }
+
+  async function removeSkill(name) {
+    setSkillError(null);
+    setSkillBusy(name);
+    try {
+      const skills = Object.fromEntries(Object.entries(resume.doc.skills).map(([k, v]) => [k, v.filter((s) => s !== name)]));
+      const doc = { ...resume.doc, skills };
+      const r = await patchResume(resume.id, sectionPatch(doc, 'skills', resume.rowVersion, null));
+      setResume((cur) => ({ ...cur, doc, rowVersion: r.row_version, addedSkills: cur.addedSkills.filter((s) => s !== name), pdf: cur.pdf && { ...cur.pdf, upToDate: false } }));
+      setDl({ phase: 'idle' });
+    } catch (e) {
+      setSkillError(e);
+    } finally {
+      setSkillBusy(null);
     }
   }
 
@@ -220,11 +259,48 @@ function CvReady({ initial, askSave }) {
                 ))}
                 {added.length > 0 && (
                   <div style={{ border: '1px solid var(--hc-hairline)', borderRadius: 14, padding: 14, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-                    <span className="hc-lbl">Skills you added</span>
-                    {added.map((s) => <span key={s} className="hc-chip" style={{ background: '#E8F5EC', color: 'var(--hc-success)' }}>+ {s}</span>)}
-                    <span style={{ fontSize: 12.5, color: 'var(--hc-ink-muted)' }}>Added by you from the JD suggestions.</span>
+                    <span className="hc-lbl">Skills added from your experience</span>
+                    {added.map((s) => (
+                      <span key={s} className="hc-chip" style={{ background: '#E8F5EC', color: 'var(--hc-success)' }}>
+                        + {s}
+                        <button type="button" onClick={() => removeSkill(s)} disabled={skillBusy !== null} aria-label={`Remove ${s} from Skills`} style={{ display: 'inline-flex', border: 0, background: 'transparent', padding: 0, color: 'inherit', cursor: 'pointer' }}><X size={13} aria-hidden="true" /></button>
+                      </span>
+                    ))}
+                    <span style={{ fontSize: 12.5, color: 'var(--hc-ink-muted)' }}>Your bullets or project tech already show these. Remove any you don’t want listed.</span>
                   </div>
                 )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {(suggestions.length > 0 || resume.gaps.length > 0) && (
+          <section className="hc-card" style={{ marginTop: 20, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <span className="hc-disp" style={{ fontSize: 18, fontWeight: 700 }}>From the job description</span>
+            <ErrorBanner error={skillError} style={{ marginTop: 0 }} />
+            {suggestions.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ margin: 0, fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>The JD asks for these skills and your CV doesn’t show them, so we didn’t add them. Add only skills you really have.</p>
+                {suggestions.map((s) => (
+                  <div key={s} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+                    <span className="hc-chip" style={{ background: '#FFF4E8', color: '#9A3412', flex: 'none' }}>{s}</span>
+                    <select aria-label={`Section for ${s}`} value={category[s] ?? 'tools'} onChange={(e) => setCategory((c) => ({ ...c, [s]: e.target.value }))} style={{ minHeight: 36, borderRadius: 10, border: '1px solid var(--hc-hairline)', padding: '0 8px', fontFamily: 'inherit', fontSize: 13, background: '#FFFFFF', color: 'var(--hc-ink)' }}>
+                      {SKILL_GROUPS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                    </select>
+                    <button type="button" className="hc-btn-sm" onClick={() => confirm(s)} disabled={skillBusy !== null} style={{ border: '1px solid var(--hc-hairline)', background: '#FFFFFF', color: 'var(--hc-ink)' }}>
+                      <Plus size={13} strokeWidth={3} aria-hidden="true" />{skillBusy === s ? 'Adding…' : 'I have this'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {resume.gaps.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span className="hc-lbl">Other requirements your CV doesn’t show</span>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, lineHeight: 1.6 }}>
+                  {resume.gaps.map((g) => <li key={`${g.kind}:${g.text}`}><strong>{GAP_LABEL[g.kind] ?? g.kind}:</strong> {g.text}</li>)}
+                </ul>
+                <span style={{ fontSize: 12.5, color: 'var(--hc-ink-muted)' }}>These aren’t skills, so they can’t be added here. If you meet one, add it to your profile.</span>
               </div>
             )}
           </section>

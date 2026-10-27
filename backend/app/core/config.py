@@ -88,11 +88,17 @@ class Settings(BaseSettings):
     agent_llm_timeout_s: int = Field(default=30, ge=5, le=120)         # per model call
     agent_llm_max_retries: int = Field(default=1, ge=0, le=5)
     agent_temperature: float = Field(default=0.3, ge=0, le=1)
-    agent_max_output_tokens: int = Field(default=4096, ge=256, le=32768)
+    # Two separate caps per model call: writing (the answer / tool calls) and thinking.
+    # Gemini counts thinking against max_output_tokens, so the provider asks for the sum;
+    # with one shared 4096 cap, thinking used it all and the reply came back empty
+    # (finish_reason=MAX_TOKENS, 26 Oct 2026). Pre-launch caps; tune from the logged
+    # thinking_tokens once real users' data is in.
+    agent_max_output_tokens: int = Field(default=8192, ge=256, le=32768)   # writing
+    agent_thinking_budget: int = Field(default=8192, ge=0, le=24576)       # thinking
 
     # Application Database (Day 2 §4). The one place the number of days lives: reads hide
     # older rows at once and the daily clean-up deletes them. Changing it needs no migration.
-    application_retention_days: int = Field(default=20, ge=1, le=3650)
+    application_retention_days: int = Field(default=40, ge=1, le=3650)
     application_list_max: int = Field(default=500, ge=1, le=5000)
     janitor_enabled: bool = True
     janitor_every_h: int = Field(default=24, ge=1)          # one run per day across instances

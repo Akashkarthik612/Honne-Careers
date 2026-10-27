@@ -149,6 +149,10 @@
       ],
       "tools": [
         {
+          "name": "PostgreSQL",
+          "origin": "ai"
+        },
+        {
           "name": "AWS",
           "origin": "profile"
         },
@@ -180,10 +184,22 @@
   "missing_skills": [
     "Kubernetes"
   ],
+  "gaps": [
+    {
+      "kind": "experience",
+      "text": "5+ years of backend experience"
+    },
+    {
+      "kind": "language",
+      "text": "Fluent Kannada"
+    }
+  ],
   "tailor_report": {
     "changed": 2,
     "kept_original": [],
     "dropped_locked": 0,
+    "added_skills": 1,
+    "rejected_skills": 0,
     "rules": []
   },
   "jd": {

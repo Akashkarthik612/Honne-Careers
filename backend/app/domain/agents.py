@@ -107,6 +107,7 @@ class ToolTurn:
     input_tokens: int | None
     output_tokens: int | None
     raw: Any = None
+    thinking_tokens: int | None = None   # not part of output_tokens
 
 
 @dataclass(frozen=True, slots=True)

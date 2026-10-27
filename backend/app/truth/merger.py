@@ -3,7 +3,9 @@
   * Locked bullets are never changed, whatever the model returned.
   * Bullets with a truth violation keep their original text (full tailor, B11 #4).
   * Changed bullets become `proposed` with their original kept, so Keep/Revert works.
-Time O(bullets); space O(content).
+  * Skills (V4.1): existing items keep their origin; evidenced additions come in as
+    origin=ai (shown as "added from your experience", removable by the user).
+Time O(bullets + skills); space O(content).
 """
 
 from dataclasses import dataclass
@@ -15,11 +17,13 @@ from app.domain.cv import (
     ExperienceItem,
     Origin,
     ProjectItem,
+    SkillItem,
     Skills,
     TailorState,
 )
 from app.domain.tailoring import ItemOut, TailorOutput
 from app.domain.truth import TruthReport
+from app.truth.text import norm_skill
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +32,7 @@ class MergeResult:
     changed: int          # bullets now proposed
     dropped_locked: int   # model edits to locked bullets, ignored
     kept_original: int    # bullets that violated the truth check, left as they were
+    added_skills: int = 0  # evidenced skills added to Skills (V4.1)
 
 
 def propose(bullet: Bullet, text: str) -> Bullet:
@@ -91,13 +96,14 @@ class ResumeMerger:
             position = {item_id: n for n, item_id in enumerate(output.experience_order)}
             experience.sort(key=lambda i: position[i.id])
 
-        skills = content.skills
+        skills, added = content.skills, 0
         if scope == "all":
-            skills = _reorder_skills(content.skills, output, bad_paths)
+            skills, added = _merge_skills(content.skills, output, bad_paths)
 
         merged = content.model_copy(update={"experience": experience, "projects": projects,
                                             "skills": skills})
-        return MergeResult(merged, counters["changed"], counters["dropped"], counters["kept"])
+        return MergeResult(merged, counters["changed"], counters["dropped"], counters["kept"],
+                           added)
 
     @staticmethod
     def _merge_bullets(item, out_item: ItemOut, kind: str, bad_paths: frozenset[str],
@@ -121,11 +127,27 @@ class ResumeMerger:
         return merged
 
 
-def _reorder_skills(skills: Skills, output: TailorOutput, bad_paths: frozenset[str]) -> Skills:
-    updates = {}
+def _merge_skills(skills: Skills, output: TailorOutput, bad_paths: frozenset[str]
+                  ) -> tuple[Skills, int]:
+    """Model order; existing SkillItems kept as they are; additions that passed the check
+    become origin=ai. Duplicates (aliases included) are dropped across categories."""
+    seen = {norm_skill(s.name) for category in SKILL_CATEGORIES
+            for s in getattr(skills, category)}
+    updates: dict[str, list[SkillItem]] = {}
+    added = 0
     for category in SKILL_CATEGORIES:
         if f"skills.{category}" in bad_paths:
-            continue
-        current = {s.name.lower(): s for s in getattr(skills, category)}
-        updates[category] = [current[name.lower()] for name in getattr(output.skills, category)]
-    return skills.model_copy(update=updates)
+            continue  # SKILL_REMOVED: the category stays exactly as it was
+        current = {norm_skill(s.name): s for s in getattr(skills, category)}
+        merged: list[SkillItem] = []
+        for name in getattr(output.skills, category):
+            key = norm_skill(name)
+            if key in current:
+                merged.append(current.pop(key))
+            elif key not in seen and f"skills.{category}[{name}]" not in bad_paths:
+                seen.add(key)
+                merged.append(SkillItem(name=name, origin=Origin.AI))
+                added += 1
+        merged.extend(current.values())  # never lose an existing skill (checker enforces it)
+        updates[category] = merged
+    return skills.model_copy(update=updates), added

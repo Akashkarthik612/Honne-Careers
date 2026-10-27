@@ -61,6 +61,7 @@ class ResumeRow:
     jd_id: UUID | None
     content: CvContent
     missing_skills: list[str]
+    jd_gaps: list[dict[str, str]]   # [{kind, text}] from the last full tailor (V4.1)
     tailor_report: dict[str, object] | None
     wizard_step: str
     status: ResumeStatus

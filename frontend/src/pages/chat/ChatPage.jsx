@@ -20,10 +20,11 @@ import Message from './Message';
 // Home's chat bar) that message is sent at once.
 
 const SUGGESTIONS = [
+  '@strategist run my weekly review',
+  '@fit how well do I really fit my latest application?',
+  '@outreach which applications are worth a referral ask?',
   '@analyst which applications should I follow up on this week?',
-  '@analyst what’s working in my search so far?',
   '@advisor where should I apply next, given my profile?',
-  '@advisor who could I ask for a referral, and how?',
 ];
 
 const agentByHandle = (agents, handle) => (agents && handle ? [...agents.builtin, ...agents.mine].find((a) => a.handle === handle) ?? null : null);

@@ -148,6 +148,10 @@
       ],
       "tools": [
         {
+          "name": "PostgreSQL",
+          "origin": "ai"
+        },
+        {
           "name": "AWS",
           "origin": "profile"
         },

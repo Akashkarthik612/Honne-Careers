@@ -41,9 +41,9 @@ from app.policy.limits import DailyAction
 from app.policy.quota import QuotaGuard
 from app.truth.checker import TruthChecker
 from app.truth.copying import fact_text
-from app.truth.facts import FactSetBuilder
+from app.truth.facts import FactSetBuilder, evidenced
 from app.truth.merger import ResumeMerger, keep, propose, replace_bullet, revert
-from app.truth.text import norm_skill
+from app.truth.text import norm_skill, skill_keys, unique_skills
 
 log = get_logger(__name__)
 
@@ -259,14 +259,25 @@ class TailorService:
         output = run.output
         if not await self._step(user, resume_id, "checking"):
             return
-        missing = [s for s in output.missing_skills if norm_skill(s) not in ctx.facts.skills]
+        # TAIL-6: a JD skill the user already has, or that their experience shows, is not
+        # missing; what's left is offered for one-click confirmation, never added by us.
+        missing = [s for s in output.missing_skills
+                   if norm_skill(s) not in ctx.facts.skills and not evidenced(ctx.facts, s)]
 
         report = TruthChecker(ctx.facts).check_tailor(content, output, missing, scope)
         merged = ResumeMerger().merge_tailor(content, output, report, scope)
-        summary = {"changed": merged.changed, "kept_original": sorted(report.violating_paths()),
+        have = skill_keys(merged.content)
+        missing = unique_skills([s for s in missing if norm_skill(s) not in have])
+        gaps = [g.model_dump() for g in output.gaps]
+        # tailor_report holds no CV/JD text: rejected skill additions are counted, not named.
+        paths = report.violating_paths()
+        dropped = {p for p in paths if p.startswith("skills.") and p.endswith("]")}
+        summary = {"changed": merged.changed, "kept_original": sorted(paths - dropped),
                    "dropped_locked": merged.dropped_locked,
+                   "added_skills": merged.added_skills, "rejected_skills": len(dropped),
                    "rules": sorted({v.rule.value for v in report.violations})}
-        span.update(truth_violations=len(report.violations), changed=merged.changed)
+        span.update(truth_violations=len(report.violations), changed=merged.changed,
+                    added_skills=merged.added_skills)
         if not report.passed:
             log.warning("tailor_truth_violations", resume_id=resume_id,
                         count=len(report.violations), rules=summary["rules"])
@@ -274,13 +285,14 @@ class TailorService:
         async with self._uow(user.id) as uow:
             version = await uow.resumes.finish_tailoring(
                 user.id, resume_id, merged.content, content_hash(merged.content), missing,
-                summary, started_version)
+                gaps, summary, started_version)
         if version is None:
             log.warning("tailor_job_result_discarded", resume_id=resume_id,
                         reason="resume deleted, timed out or changed")
             return
         log.info("tailor_job_finished", resume_id=resume_id, changed=merged.changed,
-                 kept_original=merged.kept_original, row_version=version)
+                 kept_original=merged.kept_original, added_skills=merged.added_skills,
+                 missing_skills=len(missing), gaps=len(gaps), row_version=version)
 
     async def _step(self, user: AuthUser, resume_id: UUID, step: JobStep) -> bool:
         """TAIL-3 progress. False = the job is no longer live (timed out as stale, or the

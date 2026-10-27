@@ -51,6 +51,8 @@ export const uploadLatex = (text) => apiRequest('/uploads/latex', json('POST', {
 // ── tailoring (TAIL-3, TAIL-4) ──────────────────────────────────────────────
 export const startTailor = (id, scope = 'all') => apiRequest(`/resumes/${id}/tailor`, json('POST', { scope }));
 export const tailorBullet = (id, bulletId) => apiRequest(`/resumes/${id}/bullets/${bulletId}/tailor`, { method: 'POST' });
+// V4.1: "I have this" on a JD skill from missing_skills; the server adds it to Skills as the user's (origin user).
+export const confirmSkill = (id, name, category, expectedVersion) => apiRequest(`/resumes/${id}/skills/confirm`, json('POST', { expected_version: expectedVersion, name, category }));
 export const settleBullet = (id, bulletId, action, expectedVersion) => apiRequest(`/resumes/${id}/bullets/${bulletId}/${action}`, json('POST', { expected_version: expectedVersion }));
 
 // ── PDF and analysis (PDF-2, ANA-1…4) ───────────────────────────────────────

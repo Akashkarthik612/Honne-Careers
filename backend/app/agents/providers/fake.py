@@ -44,8 +44,10 @@ class FakeProvider:
 
     async def generate_with_tools(self, *, system: str, messages: list[LlmMessage],
                                   tools: list[ToolDecl], model: str, temperature: float,
-                                  max_output_tokens: int) -> ToolTurn:
+                                  max_output_tokens: int, thinking_budget: int) -> ToolTurn:
         self.tool_calls.append({"system": system, "messages": list(messages), "model": model,
+                                "max_output_tokens": max_output_tokens,
+                                "thinking_budget": thinking_budget,
                                 "tools": [t.name for t in tools],
                                 "declared": [{"name": t.name, "parameters": t.parameters}
                                              for t in tools]})

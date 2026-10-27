@@ -100,7 +100,7 @@ Backend work starts at P1. P2–P4 are listed so P1 data shapes don't block them
 | TAIL-3 | MUST run as a job with 4 reported steps: reading the JD → matching experience → rewriting bullets → building the PDF. The UI polls or streams progress. |
 | TAIL-4 | MUST write bullets as "Accomplished X, measured by Y, by doing Z", using only profile facts. If the profile has no metric, the bullet has no metric. |
 | TAIL-5 | MUST put the experience most relevant to the JD first ("everything relevant, up top"). |
-| TAIL-6 | MUST NOT add a JD skill the profile lacks; list it as missing instead (see TRUTH rules, §7). |
+| TAIL-6 | MUST NOT add a JD skill the profile lacks; list it as missing instead (see TRUTH rules, §7). The user may confirm a listed technical skill with one click, which adds it to that CV as their own fact. A skill shown in the user's own experience or project text may be added by the tailor. Non-skill requirements (degree, years, spoken language) are listed as gaps, never confirmable (V4.1, 27 Oct 2026). |
 | TAIL-7 | MUST produce a versioned tailored CV (structured content \+ PDF), linked to its JD and profile version. "Tailor again" creates a new version. |
 | TAIL-8 | SHOULD keep the CV to one page unless the user asks otherwise, or has more than 8 years of experience (counted in Python from role dates, internships excluded). A fresher (under 2 years, internships included, or no roles) gets every editable bullet rewritten professionally, from its own facts only (tailor prompts v3, 23 Oct 2026). |
 

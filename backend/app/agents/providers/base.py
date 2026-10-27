@@ -26,9 +26,10 @@ class LlmProvider(Protocol):
 
     async def generate_with_tools(self, *, system: str, messages: list[LlmMessage],
                                   tools: list[ToolDecl], model: str, temperature: float,
-                                  max_output_tokens: int) -> ToolTurn:
+                                  max_output_tokens: int, thinking_budget: int) -> ToolTurn:
         """One function-calling round (Day 3 chat agents). The model must call a tool
-        (mode ANY); a plain-text reply comes back as ToolTurn.text and is TurnGraph's call."""
+        (mode ANY); a plain-text reply comes back as ToolTurn.text and is TurnGraph's call.
+        max_output_tokens caps the writing and thinking_budget the thinking, separately."""
         ...
 
     def raw_to_wire(self, raw: Any) -> Any:

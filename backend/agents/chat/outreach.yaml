@@ -1,0 +1,7 @@
+# Built-in chat agent (launch, 25 Oct 2026): which applications deserve a referral or recruiter
+# ask, and ready-to-send messages for them. See analyst.yaml.
+handle: outreach
+version: 1
+description: Finds the applications worth a referral ask and drafts the message for each
+instructions: prompts/chat/outreach/v1.md
+knowledge: [applications, resumes, profile]

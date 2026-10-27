@@ -32,6 +32,7 @@ describe('request contracts', () => {
     ['set_jd.json', () => api.setJd('r1', { text: response('resume.json').jd.text, company: 'Freshworks', role: '' }), 'PUT', '/resumes/r1/jd'],
     ['tailor.json', () => api.startTailor('r1'), 'POST', '/resumes/r1/tailor'],
     ['settle.json', () => api.settleBullet('r1', 'nw1', 'keep', 7), 'POST', '/resumes/r1/bullets/nw1/keep'],
+    ['resume_confirm_skill.json', () => api.confirmSkill('r1', toResume(response('resume.json')).missingSkills[0], 'tools', 7), 'POST', '/resumes/r1/skills/confirm'],
     ['settings_put.json', () => api.saveSettings({ display_name: null, ask_before_save: false, product_emails: true }), 'PUT', '/settings'],
     ['profile_put.json', () => api.saveProfile(profileToContentIn(contentToProfile(response('profile.json').content)), 3), 'PUT', '/profile'],
     // A first-time user's profile from an upload, after the wizard made them fix the scheme-less link.

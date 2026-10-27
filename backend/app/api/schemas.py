@@ -57,6 +57,14 @@ class SetJd(Model):
     role: JdMeta | None = None
 
 
+class ConfirmSkill(Model):
+    """V4.1: confirm a JD skill from the resume's missing_skills. Name + category only; the
+    server sets origin=user."""
+    expected_version: int = Field(ge=1)
+    name: Annotated[str, StringConstraints(min_length=1, max_length=60)]
+    category: Literal["languages", "frameworks", "tools"]
+
+
 class SaveSettings(Model):
     display_name: Annotated[str, StringConstraints(min_length=1, max_length=120)] | None = None
     ask_before_save: bool
@@ -127,7 +135,7 @@ def resume_view(r: ResumeRow, jd: JdRow | None = None) -> dict[str, Any]:
         "wizard_step": r.wizard_step,
         "row_version": r.row_version, "content_hash": r.content_hash,
         "content": r.content.model_dump(mode="json"), "missing_skills": r.missing_skills,
-        "tailor_report": r.tailor_report,
+        "gaps": r.jd_gaps, "tailor_report": r.tailor_report,
         "jd": jd_view(jd),
         "pdf": {"up_to_date": r.pdf_content_hash == r.content_hash,
                 "page_count": r.page_count} if r.pdf_path else None,
