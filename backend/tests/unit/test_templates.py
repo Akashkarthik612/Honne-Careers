@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from app.core.errors import InvalidInput, RenderFailed
 from app.core.hashing import render_key
-from app.domain.cv import Certification, CvContent, ResumePatch
+from app.domain.cv import SKILL_CATEGORIES, Certification, CvContent, ResumePatch
 from app.domain.layout import LayoutPatch, SectionKey
 from app.ingest.extractors import PdfExtractor
 from app.render.compiler import CompileQueue, TectonicCompiler
@@ -168,6 +168,25 @@ def test_bad_certifications_are_rejected(bad):
 def test_certifications_cap():
     with pytest.raises(ValidationError):
         CvContent.model_validate({"certifications": [{"name": f"C{i}"} for i in range(16)]})
+
+
+# ---------- Docker offline cache fixture ----------
+
+def test_warm_fixture_has_two_of_everything():
+    """The image's LaTeX cache holds only what docker/warm_cache.py compiled. Separators
+    between items are typeset at each section's size, so every list section needs two items
+    or a real CV hits an uncached font offline (27 Oct 2026: 3 spoken languages -> cmr9)."""
+    from docker.warm_cache import CV
+
+    lists = {"links": CV.header.links, "experience": CV.experience, "projects": CV.projects,
+             "education": CV.education, "spoken_languages": CV.spoken_languages,
+             "certifications": CV.certifications,
+             **{f"skills.{c}": getattr(CV.skills, c) for c in SKILL_CATEGORIES}}
+    assert {k: len(v) for k, v in lists.items() if len(v) < 2} == {}
+    assert all(p.link for p in CV.projects)  # the project link separator at 10 pt
+    assert set(CvContent.model_fields) == {"header", "experience", "projects", "education",
+                                           "skills", "spoken_languages", "certifications"}, \
+        "a new CvContent section: add it to docker/warm_cache.py with two items"
 
 
 # ---------- real compile: geometry + text layer ----------
