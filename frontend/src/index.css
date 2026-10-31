@@ -205,3 +205,42 @@ a.hc-agent:hover, .hc-agent.is-link:hover { border-color: var(--hc-brand-soft); 
 @media (prefers-reduced-motion: reduce) {
   .hc-dockbar, .hc-dockbar .hc-ask, .hc-acard, .hc-agent { transition: none !important; }
 }
+
+/* Home dashboard (design: Home.dc.html) */
+.hc-home { flex: 1; width: 100%; max-width: 1120px; margin: 0 auto; padding: 36px 32px 120px; display: flex; flex-direction: column; gap: 22px; }
+.hc-hcard { background: var(--hc-surface); border: 1px solid var(--hc-hairline); border-radius: 18px; overflow: hidden; }
+.hc-hhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px 12px; }
+.hc-hhead h2 { margin: 0; font-family: var(--hc-font-display); font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.hc-hline { border-top: 1px solid #F0F1F5; }
+.hc-lnk { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; font-size: 13.5px; font-weight: 600; text-decoration: none; color: var(--hc-brand); border: 0; background: none; padding: 0; font-family: inherit; cursor: pointer; }
+.hc-lnk:hover { color: var(--hc-brand-hover); }
+.hc-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.hc-kpi { display: flex; flex-direction: column; gap: 2px; padding: 18px 18px 16px; border-radius: 16px; background: var(--hc-surface); border: 1px solid var(--hc-hairline); text-decoration: none; color: var(--hc-ink); transition: border-color .2s ease, box-shadow .2s ease; }
+.hc-kpi:hover { border-color: #C9D3F7; box-shadow: 0 10px 24px rgba(22,26,43,.05); color: var(--hc-ink); }
+.hc-kpi .hc-knum { margin-top: 10px; font-family: var(--hc-font-display); font-size: 32px; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; }
+.hc-hrow { display: grid; grid-template-columns: minmax(0,1fr) 70px 136px 44px; align-items: center; gap: 12px; min-height: 60px; padding: 8px 18px; border-top: 1px solid #F0F1F5; text-decoration: none; color: var(--hc-ink); transition: background-color .16s ease; }
+.hc-hrow:hover { background: #FAFBFD; color: var(--hc-ink); }
+.hc-team { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 18px; border: 0; border-top: 1px solid #F0F1F5; background: transparent; font-family: inherit; text-align: left; cursor: pointer; text-decoration: none; color: var(--hc-ink); transition: background-color .16s ease; }
+.hc-team:hover { background: #FAFBFD; color: var(--hc-ink); }
+.hc-team .hc-chev { flex: none; transition: transform .16s ease; }
+.hc-team:hover .hc-chev { transform: translateX(2px); }
+.hc-hjd { border: 1px solid var(--hc-hairline); border-radius: 14px; background: #FAFBFC; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
+.hc-hjd:focus-within { border-color: var(--hc-brand); box-shadow: 0 0 0 4px rgba(63,95,216,.12); background: #FFFFFF; }
+.hc-hjd .hc-jd { min-height: 150px; padding: 14px 16px 4px; font-size: 15px; line-height: 1.6; }
+.hc-hg2 { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(0,1fr); gap: 18px; align-items: start; }
+.hc-hg2b { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 18px; align-items: start; }
+@media (max-width: 1080px) { .hc-hg2, .hc-hg2b { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .hc-home { padding: 20px 16px 110px; }
+  .hc-hrow { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "main status" "date view"; row-gap: 2px; padding: 12px 16px; }
+  .hc-hrow .c-main { grid-area: main; } .hc-hrow .c-date { grid-area: date; } .hc-hrow .c-status { grid-area: status; justify-self: end; } .hc-hrow .c-view { grid-area: view; justify-self: end; }
+  .hc-tailfoot { flex-direction: column; align-items: stretch !important; }
+  .hc-tailfoot .hc-btn-p, .hc-tailfoot .hc-btn-s, .hc-tailfoot .hc-btn-off { width: 100%; }
+}
+@media (max-width: 640px) {
+  .hc-kpis { gap: 8px; } .hc-kpi { padding: 12px 10px; } .hc-kpi .hc-knum { font-size: 24px; } .hc-kpi .hc-ksup { display: none; }
+  .hc-home h1 { font-size: 24px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hc-kpi, .hc-hrow, .hc-team, .hc-team .hc-chev, .hc-hjd { transition: none !important; }
+}

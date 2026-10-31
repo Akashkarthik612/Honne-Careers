@@ -206,6 +206,13 @@ export function toSummary(s) {
   };
 }
 
+// Where a resume card opens: the tailoring job, the wizard step it stopped at, or the finished CV.
+export function openPath(r) {
+  if (r.state === 'tailoring') return `/tailoring/${r.id}`;
+  if (r.state === 'draft') return `/new/details?resume=${r.id}&step=${r.wizardStep}`;
+  return `/cv/${r.id}`;
+}
+
 const LEVEL = { yes: 'Yes', strong: 'Strong', partial: 'Partial', none: 'None' };
 
 export function toAnalysis(a) {

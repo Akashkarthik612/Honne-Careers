@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 import pytest
@@ -6,7 +7,15 @@ from app.analysis.scores import ScoreCalculator, years_of_experience
 from app.core.errors import InvalidInput, UnreadableUpload
 from app.domain.analysis import AnalysisJudgment
 from app.ingest.extractors import TextExtractor
-from tests.docs import docx, text_pdf, zip_bomb_docx
+from tests.docs import (
+    SPACING_BROKEN,
+    SPACING_PHRASES,
+    TECH_TERMS,
+    docx,
+    kerned_bold_pdf,
+    text_pdf,
+    zip_bomb_docx,
+)
 from tests.fakes import FakeLatexCompiler
 from tests.fixtures import sample_cv
 
@@ -19,6 +28,28 @@ async def test_pdf_and_docx_text_extracted_by_magic_bytes():
     assert pdf.source_type == "pdf" and "Northwind Fintech" in pdf.text
     doc = await EXTRACTOR.extract(docx())
     assert doc.source_type == "docx" and "38%" in doc.text
+
+
+def test_fixture_reproduces_the_default_mode_artifact():
+    # Guards the fixture: if pypdf's default mode stops merging/splitting here, the test
+    # below would pass without proving anything.
+    from io import BytesIO
+
+    from pypdf import PdfReader
+    text = PdfReader(BytesIO(kerned_bold_pdf())).pages[0].extract_text()
+    assert all(broken in text for broken in SPACING_BROKEN)
+
+
+async def test_pdf_keeps_spaces_at_font_switches_and_kerned_pairs():
+    """PROF-2: the 19 Oct upload stored "throughPython" / "T echnology" (pypdf default mode).
+    The extractor must read what the page shows, and must not split technical terms."""
+    text = (await EXTRACTOR.extract(kerned_bold_pdf())).text
+    for phrase in SPACING_PHRASES:
+        assert phrase in text
+    for broken in SPACING_BROKEN:
+        assert broken not in text
+    for term in TECH_TERMS:
+        assert re.search(rf"\b{term}\b", text)
 
 
 @pytest.mark.parametrize("data,reason", [
