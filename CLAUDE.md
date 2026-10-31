@@ -84,7 +84,7 @@ One agent per AI task, no orchestration (Day_1 A2 #2). Each is a YAML config plu
 - **Version a prompt:** add `v2.md`, point the YAML's `instructions` at it and bump `version`; every run records the agent version in `agent_runs`.
 - **Don't** add prompt-injection boilerplate (`AgentRunner` already wraps JD/CV text as untrusted data) or rely on the prompt for truthfulness (TRUTH-2 is checked in Python).
 - Tiers map to models through `LLM_STRONG` / `LLM_LIGHT` (`render.yaml`, `.env`): Gemini 3.8 Flash (strong) / 3.5 Flash-Lite (light) today. Per-agent `temperature`, `max_output_tokens`, `timeout_s`, `max_retries` live in the YAML.
-- CI never calls a model: tests script replies with `FakeProvider`, so real-model output quality (parsing, tailoring) is checked by hand on the deployed app.
+- Normal CI never calls a model: tests script replies with `FakeProvider`. `tests/integration/test_live_ai.py` calls real Gemini + Tectonic with made-up CVs and production's settings from `render.yaml`, and writes token/latency metrics; it needs `RUN_LIVE_AI=1` + `GEMINI_API_KEY_TEST` and runs in `.github/workflows/live-ai.yml` (branch `test-live-ai` or by hand), never on `main`. Writing quality is still checked by hand.
 
 **Chat agents (Day 3)** are a separate mechanism: multi-turn, tool-calling, prose answers (Markdown-lite with `[n]` cites + optional drafts), not one-shot JSON. Built-ins (strong tier, settings `AGENT_*` for timeout/retries/temperature):
 
