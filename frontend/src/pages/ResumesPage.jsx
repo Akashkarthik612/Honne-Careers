@@ -5,7 +5,7 @@ import PageTitle from '@/components/PageTitle';
 import { CvThumb } from '@/components/CvDoc';
 import { sectionOrderOf } from '@/data/templates';
 import { ErrorBanner, PageLoading } from '@/components/Status';
-import { contentToProfile, timeAgo, toSummary } from '@/data/cvAdapter';
+import { contentToProfile, openPath, timeAgo, toSummary } from '@/data/cvAdapter';
 import { docToCv, emptyProfile, profileSections } from '@/data/cvModel';
 import useResource from '@/hooks/useResource';
 import { deleteResume, duplicateResume, getProfile, listResumes } from '@/services/api';
@@ -20,12 +20,6 @@ const STATE_CHIP = {
   tailoring: [{ background: 'var(--hc-brand-tint)', color: 'var(--hc-brand-hover)' }, () => 'Tailoring…'],
   failed: [{ background: '#FFF4EE', color: 'var(--hc-warm)' }, () => 'Tailoring didn’t finish'],
 };
-
-function openPath(r) {
-  if (r.state === 'tailoring') return `/tailoring/${r.id}`;
-  if (r.state === 'draft') return `/new/details?resume=${r.id}&step=${r.wizardStep}`;
-  return `/cv/${r.id}`;
-}
 
 function EmptyArt() {
   const ink = { fill: '#FFFFFF', stroke: '#161A2B' };

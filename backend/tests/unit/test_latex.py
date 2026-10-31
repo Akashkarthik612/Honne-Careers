@@ -8,9 +8,11 @@ import pytest
 
 from app.core.errors import RenderBusy
 from app.domain.cv import Header, Link
+from app.domain.markup import plain
 from app.render.compiler import CompileQueue, TectonicCompiler
 from app.render.inspector import PdfInspector
-from app.render.latex import escape, escape_url
+from app.render.latex import escape, escape_url, rich
+from tests.docs import SPACING_BROKEN, SPACING_PHRASES, TECH_TERMS
 from tests.fixtures import TEMPLATE_IDS, render, sample_cv
 
 ATTACKS = [r"\input{/etc/passwd}", r"\immediate\write18{rm -rf /}", r"$\x$", "}{\\end{document}",
@@ -103,3 +105,75 @@ async def test_real_compile_offline_one_page(template):
     text = PdfReader(BytesIO(pdf)).pages[0].extract_text()
     assert r"\input{/etc/passwd}" in text  # printed literally, not executed
     assert "Cut latency by 38% with Kafka" in text and "**" not in text  # bold, no markers
+
+
+# The six phrases a real CV lost its spaces in (PROF-2, PDF-4). The defect was in stored text
+# (pypdf default mode at upload), not here; these pin that rich() never adds or drops a space.
+RICH_CASES = [
+    ("Built Python (FastAPI) microservices and RESTful APIs for the payments modules",
+     "Built Python (FastAPI) microservices and RESTful APIs for the payments modules"),
+    ("Built **microservices** and **RESTful APIs** for the **payments** modules",
+     r"Built \textbf{microservices} and \textbf{RESTful APIs} for the \textbf{payments} modules"),
+    ("Shipped releases with 100% audit accuracy, through Python automation",
+     r"Shipped releases with 100\% audit accuracy, through Python automation"),
+    ("Shipped releases with **100%** audit accuracy, through **Python** automation",
+     r"Shipped releases with \textbf{100\%} audit accuracy, through \textbf{Python} automation"),
+    ("Joined Cognizant Technology Solutions", "Joined Cognizant Technology Solutions"),
+    ("Joined **Cognizant Technology Solutions**",
+     r"Joined \textbf{Cognizant Technology Solutions}"),
+    ("**Python**/FastAPI on **PostgreSQL**, GitHub and NextJS",
+     r"\textbf{Python}/FastAPI on \textbf{PostgreSQL}, GitHub and NextJS"),
+]
+
+
+@pytest.mark.parametrize("text,tex", RICH_CASES)
+def test_rich_keeps_every_space_around_bold(text, tex):
+    assert rich(text) == tex
+    # Unwrapping \textbf gives exactly the escaped plain text: nothing added or trimmed.
+    unwrapped = rich(text).replace(r"\textbf{", "")
+    assert unwrapped.replace("}", "") == escape(plain(text)).replace("}", "")
+
+
+def _spacing_cv():
+    """sample_cv with the six phrases as plain and as bold bullets, the employer as a field."""
+    cv = sample_cv()
+    exp = cv.experience[0]
+    texts = ["Built microservices and RESTful APIs for the payments team",
+             "Built **microservices** and **RESTful APIs** for the **payments** team",
+             "Cut toil with 100% audit accuracy, through Python automation",
+             "Cut toil with **100%** audit accuracy, through **Python** automation",
+             "Ran **FastAPI** on **PostgreSQL** with GitHub Actions and NextJS"]
+    bullets = [exp.bullets[0].model_copy(update={"id": f"sp{i}", "text": t})
+               for i, t in enumerate(texts)]
+    return cv.model_copy(update={"experience": [
+        exp.model_copy(update={"company": "Cognizant Technology Solutions", "bullets": bullets}),
+        *cv.experience[1:]]})
+
+
+@pytest.mark.latex
+@pytest.mark.skipif(not TECTONIC, reason="tectonic not installed; runs in the Docker CI job")
+@pytest.mark.parametrize("template", TEMPLATE_IDS)
+async def test_compiled_pdf_reads_back_with_every_space(template):
+    """PDF-4: a fresh compile (no PDF cache) read by two parsers shows the exact phrases and
+    never splits a word. pypdf's default mode is not asserted: it drops the space at a
+    font switch in any TeX PDF (the upload bug), so it is only reported by the verify script."""
+    from io import BytesIO
+
+    import pymupdf
+    from pypdf import PdfReader
+    compiler = TectonicCompiler(TECTONIC, 60, 4096, CompileQueue(1, 1, 60),
+                                os.environ.get("TECTONIC_CACHE_DIR"))
+    pdf = await compiler.compile(render(_spacing_cv(), template))
+    readers = {
+        "pypdf_layout": PdfReader(BytesIO(pdf)).pages[0].extract_text(extraction_mode="layout"),
+        "pymupdf": pymupdf.open(stream=pdf, filetype="pdf").load_page(0).get_text(),
+    }
+    for name, raw in readers.items():
+        text = " ".join(raw.split())  # line breaks and layout padding -> one space
+        for phrase in SPACING_PHRASES:
+            assert phrase in text, (name, phrase)
+        for broken in SPACING_BROKEN:
+            assert broken not in text, (name, broken)
+        for term in TECH_TERMS:
+            assert term in text, (name, term)
+        assert "**" not in text

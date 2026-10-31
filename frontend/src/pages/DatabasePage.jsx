@@ -389,10 +389,10 @@ export default function DatabasePage() {
   const [view, setView] = useState('table');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  // ?open=<id> opens that row's side panel (links from a chat answer's sources, Day 3).
+  // ?open=<id> opens that row's side panel (links from a chat answer's sources, Day 3; Home's rows).
   const [params] = useSearchParams();
   const [peek, setPeek] = useState(() => (params.get('open') ? { id: params.get('open'), tab: 'jd' } : null)); // { id, tab }
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(() => params.get('add') === '1'); // ?add=1: "Add an application" on Home
   const [busyId, setBusyId] = useState(null);
   const [rowError, setRowError] = useState(null);
 

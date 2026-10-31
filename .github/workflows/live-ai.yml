@@ -1,0 +1,65 @@
+name: live-ai
+
+# Real Gemini + real Tectonic against made-up CVs. Separate from backend.yml so a free-tier rate
+# limit can never block a deploy: it never runs on main or on pull requests.
+on:
+  workflow_dispatch:
+  push:
+    branches: [test-live-ai]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-ai
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: main - honne-careers-api  # holds GEMINI_API_KEY_TEST
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/postgres
+      GEMINI_API_KEY_TEST: ${{ secrets.GEMINI_API_KEY_TEST }}
+      RUN_LIVE_AI: "1"
+      LIVE_AI_PACE_S: "10"
+      LIVE_AI_METRICS_DIR: live-ai-metrics
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: The key must be present (a skipped run would look green)
+        working-directory: .
+        run: test -n "$GEMINI_API_KEY_TEST"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: Tectonic (same version and checksum as the Dockerfile)
+        run: |
+          curl -fsSL -o /tmp/tectonic.tar.gz \
+            "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz"
+          echo "dfb82876f2986862996e564fa507a9e576e0c1e3bee63c2c1bd677c2543e6407  /tmp/tectonic.tar.gz" | sha256sum -c -
+          sudo tar -xzf /tmp/tectonic.tar.gz -C /usr/local/bin tectonic
+      - name: Live AI tests
+        run: pytest -m live_llm -v --tb=short tests/integration/test_live_ai.py
+      - name: Keep the metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-ai-metrics
+          path: backend/live-ai-metrics
+          if-no-files-found: warn
