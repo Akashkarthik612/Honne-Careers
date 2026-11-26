@@ -20,11 +20,19 @@ async def layout(api, h, rid, template, order=None, version=None):
         "expected_version": version, "template": template, "section_order": order})
 
 
-async def test_templates_lists_both_with_default_orders(api):
-    r = (await api.client.get("/templates", headers=api.new_user())).json()
-    assert [(t["id"], t["description"]) for t in r] == [
-        ("jake", "For entry-level candidates"), (PRO, "For experienced professionals")]
-    assert r[0]["default_order"][0] == "education" and r[1]["default_order"][0] == "experience"
+async def test_templates_lists_all_with_default_orders(api):
+    response = await api.client.get("/templates", headers=api.new_user())
+    assert response.status_code == 200, response.text
+    assert [(template["id"], template["default_order"][0])
+            for template in response.json()] == [
+        ("jake", "education"),
+        (PRO, "experience"),
+        ("graduate", "education"),
+        ("marketing", "experience"),
+        ("sales", "experience"),
+        ("customer_success", "experience"),
+        ("project_operations", "experience"),
+    ]
 
 
 async def test_create_with_professional_template(api):

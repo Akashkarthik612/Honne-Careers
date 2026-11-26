@@ -31,7 +31,7 @@ export default function Templates() {
           <div className="tplhead">
             <div>
               <h2 id="tp-h" className="h2">Find a resume for <span className="lead">the role you want.</span></h2>
-              <p className="sub">Browse seven sample resumes before signing in. Each layout uses one column and exports as a selectable-text PDF.</p>
+              <p className="sub">Browse {cards.length} sample resumes before signing in. Each layout uses one column and exports as a selectable-text PDF.</p>
             </div>
             <div className="tplcontrols">
               <button type="button" className="iconbtn" onClick={() => scroll(-1)} aria-label="Previous template"><Chevron size={16} dir="left" /></button>
