@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useJump } from '../landingHooks';
 import { Chevron, Logo, Wordmark } from './parts';
 
-const LINKS = [['templates', 'Templates'], ['tailor', 'CV tailoring'], ['loop', 'Learning loop'], ['how', 'Agents']];
+const LINKS = [['iq', 'Honne IQ'], ['templates', 'Templates'], ['fit', 'CV fit'], ['tracking', 'Tracking'], ['pricing', 'Pricing']];
 
 // Sticky nav: clear over the hero, frosted with a hairline once the page scrolls.
 export default function Nav() {

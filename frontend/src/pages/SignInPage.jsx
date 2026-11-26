@@ -44,7 +44,7 @@ export default function SignInPage() {
   return (
     <AuthLayout eyebrow="SIGN IN" footer={footer}>
       <h1 className="hc-disp" style={authText.h1}>Continue to Honne Careers</h1>
-      <p style={authText.sub}>Sign in, or create your account. The beta is free — no card required.</p>
+      <p style={authText.sub}>Sign in or create an account to save your profile and build your CV.</p>
 
       {error && <p role="alert" style={authText.error}>{error}</p>}
 

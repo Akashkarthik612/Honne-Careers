@@ -70,7 +70,7 @@ export default function AgentsPage() {
           <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)', maxWidth: 620 }}>Make an agent for anything ours don’t do yet. Call any of them in a chat by typing @ and its name.</p>
         </div>
         {list && (list.atLimit
-          ? <span className="hc-btn-off" aria-disabled="true" title={`You have ${list.limit} agents, the most during the beta. Delete one to make another.`} style={{ minHeight: 44, fontSize: 14 }}>New agent · limit of {list.limit} reached</span>
+          ? <span className="hc-btn-off" aria-disabled="true" title={`You have ${list.limit} agents, your current limit. Delete one to make another.`} style={{ minHeight: 44, fontSize: 14 }}>New agent · limit of {list.limit} reached</span>
           : <Link className="hc-btn-p" to="/agents/new"><Plus size={15} strokeWidth={2.4} aria-hidden="true" />New agent</Link>)}
       </div>
 

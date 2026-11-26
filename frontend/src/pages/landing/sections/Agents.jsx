@@ -6,7 +6,7 @@ import { Icon2, Reveal } from './parts';
 // 03 — your AI team: a list of agents (sticky on desktop, a tab strip on phones), the
 // orchestration diagram and a sample of the picked agent's work.
 export default function Agents() {
-  const [agent, setAgent] = useState('writer');
+  const [agent, setAgent] = useState('outreach');
   const [miniSaved, setMiniSaved] = useState(false);
   const jump = useJump();
   const cur = AGENTS.find((a) => a.id === agent) || AGENTS[0];
@@ -16,9 +16,9 @@ export default function Agents() {
     <section id="how" aria-labelledby="ag-h" style={{ borderTop: '1px solid #E8E6E3' }}>
       <div className="wrap frame sec">
         <Reveal>
-          <div className="lbl">03 — Your AI team</div>
+          <div className="lbl">Your AI team</div>
           <h2 id="ag-h" className="h2">One goal. <span className="lead">A team of specialized agents.</span></h2>
-          <p className="sub">Each agent does one job well. They share what they know, so you never brief them twice. Pick one to see its work.</p>
+          <p className="sub">Draft a follow-up with Outreach or review your week with Strategist. Select an agent to explore a sample.</p>
 
           <div className="agrid" style={{ marginTop: 36, display: 'grid', gridTemplateColumns: '230px minmax(0,1fr)', gap: 28, alignItems: 'start' }}>
             <div className="alist" role="tablist" aria-label="Agents" aria-orientation="vertical">
@@ -60,7 +60,7 @@ export default function Agents() {
                   {agent === 'analyst' && <AnalystPanel />}
                   {agent === 'advisor' && <AdvisorPanel />}
                   {agent === 'strategist' && <StrategistPanel />}
-                  {agent === 'custom' && <CustomPanel saved={miniSaved} onSave={() => setMiniSaved(true)} onBuild={jump('builder')} />}
+                  {agent === 'custom' && <CustomPanel saved={miniSaved} onSave={() => setMiniSaved(true)} onBuild={jump('pricing')} />}
                 </div>
               </div>
             </div>
@@ -234,7 +234,7 @@ function CustomPanel({ saved, onSave, onBuild }) {
           <button type="button" className="btn-p" onClick={onSave} style={{ minHeight: 40, fontSize: 14 }}>{saved ? 'Saved' : 'Save agent'}</button>
         </div>
       </div>
-      <a href="#builder" onClick={onBuild} style={{ fontSize: 13.5, fontWeight: 600, textDecoration: 'none' }}>Try building one yourself ↓</a>
+      <a href="#pricing" onClick={onBuild} style={{ fontSize: 13.5, fontWeight: 600, textDecoration: 'none' }}>See plans for custom agents ↓</a>
     </div>
   );
 }

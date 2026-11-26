@@ -85,7 +85,7 @@ function Form({ initial, agent, atLimit, limit }) {
 
       <main style={{ flex: 1, width: '100%', maxWidth: 760, margin: '0 auto', padding: '28px 24px 48px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <p style={{ margin: '0 0 4px', fontSize: 13.5, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>Our agents handle CVs, analysis and advice. If you need something else, describe it here — your agent uses your profile and Database, just like ours.</p>
-        {atLimit && <ErrorBanner error={`You have ${limit} agents, the most during the beta. Delete one to make another.`} style={{ marginTop: 0 }} />}
+        {atLimit && <ErrorBanner error={`You have ${limit} agents, your current limit. Delete one to make another.`} style={{ marginTop: 0 }} />}
 
         <section className="hc-card" style={card} aria-labelledby="a-name">
           <h2 id="a-name" style={h2}>Agent name</h2>

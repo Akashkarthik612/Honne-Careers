@@ -22,7 +22,7 @@ export default function Builder() {
         <Reveal>
           <div className="split">
             <div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><span className="lbl">07 — Custom agents</span><span className="pill" style={{ background: '#E6F4EE', color: '#0F7A5C' }}>● Available in beta</span></div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><span className="lbl">07 — Custom agents</span><span className="pill" style={{ background: '#E6F4EE', color: '#0F7A5C' }}>Custom agent</span></div>
               <h2 id="bd-h" className="h2">Your workflow. <span className="lead">Your agents.</span></h2>
             </div>
             <p className="sub" style={{ margin: '0 0 6px' }}>If our agents don&apos;t do it yet, describe it once. Your agent gets the same context as ours, and you call it in chat with @.</p>

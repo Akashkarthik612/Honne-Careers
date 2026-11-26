@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
 import Lenis from 'lenis';
 import { NAV_OFFSET, ScrollContext, useReducedMotion } from './landingHooks';
+import { FitPreview, TrackerPreview, Pricing } from './sections/LaunchSections';
 import Agents from './sections/Agents';
-import Builder from './sections/Builder';
 import Closing from './sections/Closing';
 import Hero from './sections/Hero';
 import HonneIq from './sections/HonneIq';
-import LearningLoop from './sections/LearningLoop';
 import Nav from './sections/Nav';
 import { RibbonDefs } from './sections/parts';
-import Problem from './sections/Problem';
-import Tailoring from './sections/Tailoring';
 import Templates from './sections/Templates';
 import './landing.css';
 
@@ -50,13 +47,12 @@ export default function LandingPage() {
         <Nav />
         <main>
           <Hero />
-          <Templates />
-          <Problem />
-          <Agents />
-          <Tailoring />
           <HonneIq />
-          <LearningLoop />
-          <Builder />
+          <Templates />
+          <FitPreview />
+          <TrackerPreview />
+          <Agents />
+          <Pricing />
         </main>
         <Closing />
       </div>

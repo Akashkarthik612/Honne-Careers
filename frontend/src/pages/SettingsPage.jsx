@@ -12,19 +12,19 @@ import { ApiError, errorText } from '@/services/apiClient';
 import { signOut as forgetSession } from '@/services/authService';
 import { useAuth } from '@/state/auth';
 
-// Settings (design: Settings.dc.html): account, beta limits, preferences, data & privacy.
+// Settings (design: Settings.dc.html): account, usage limits, preferences, data & privacy.
 // Preferences live in GET/PUT /settings and save as they change (no row yet = the defaults).
-// Beta limits show today's usage from GET /me/usage (limits: backend/config/limits.yaml). There are
+// Usage limits show today's usage from GET /me/usage (limits: backend/config/limits.yaml). There are
 // no plans, prices or payment details in the beta, so nothing here mentions them.
 
 const h2 = { margin: '0 0 14px', fontSize: 20, fontWeight: 800 };
 
-function BetaLimits() {
+function UsageLimits() {
   const load = useCallback(() => getUsage().then(toUsage), []);
   const res = useResource(load);
   return (
     <section id="st-limits" className="hc-card hc-sec" aria-labelledby="h-limits">
-      <h2 id="h-limits" className="hc-disp" style={h2}>Beta limits</h2>
+      <h2 id="h-limits" className="hc-disp" style={h2}>Usage limits</h2>
       <p style={{ margin: '0 0 14px', fontSize: 14.5, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>Everyone gets the same limits while we test with real users.</p>
       {res.loading && <PageLoading label="Loading your usage…" />}
       <ErrorBanner error={res.error} style={{ marginTop: 0 }} action={{ label: 'Retry', onClick: res.reload }} />
@@ -163,10 +163,10 @@ function SettingsForm({ initial }) {
       <h1 className="hc-disp" style={{ margin: 0, fontSize: 'clamp(30px,3.4vw,42px)', lineHeight: 1.05, fontWeight: 800, letterSpacing: '-0.035em' }}>
         <span className="hc-serif" style={{ color: 'var(--hc-brand)', fontSize: '1.1em' }}>Settings</span>
       </h1>
-      <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Your account, beta limits and preferences.</p>
+      <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Your account, usage limits and preferences.</p>
 
       <nav aria-label="Settings sections" style={{ marginTop: 16, display: 'flex', gap: 2, overflowX: 'auto', background: '#EEF0F5', borderRadius: 999, padding: 4, width: 'fit-content', maxWidth: '100%' }}>
-        <a className="hc-jump" href="#st-account">Account</a><a className="hc-jump" href="#st-limits">Beta limits</a><a className="hc-jump" href="#st-prefs">Preferences</a><a className="hc-jump" href="#st-data">Data &amp; privacy</a>
+        <a className="hc-jump" href="#st-account">Account</a><a className="hc-jump" href="#st-limits">Usage limits</a><a className="hc-jump" href="#st-prefs">Preferences</a><a className="hc-jump" href="#st-data">Data &amp; privacy</a>
       </nav>
 
       <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -200,7 +200,7 @@ function SettingsForm({ initial }) {
           </div>
         </section>
 
-        <BetaLimits />
+        <UsageLimits />
 
         <section id="st-prefs" className="hc-card hc-sec" aria-labelledby="h-prefs">
           <h2 id="h-prefs" className="hc-disp" style={{ ...h2, marginBottom: 6 }}>Preferences</h2>

@@ -15,7 +15,7 @@ export default function HonneIq() {
       <div className="wrap frame sec">
         <Reveal className="g2" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,5fr) minmax(0,6fr)', gap: 48, alignItems: 'center' }}>
           <div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><span className="lbl">05 — Honne IQ</span><span className="pill" style={{ background: '#F3F1EE', color: '#4A4A4A' }}>Gmail, Drive &amp; Notion: coming soon</span></div>
+            <span className="lbl">Honne IQ</span>
             <h2 id="iq-h" className="h2">Your career context. <span className="lead">Working together.</span></h2>
             <p className="sub">Keep your profile and application records together. When you need to follow up or prepare for an interview, open the job description and the resume you downloaded for that role.</p>
             <div style={{ marginTop: 28, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

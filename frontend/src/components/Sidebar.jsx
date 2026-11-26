@@ -171,11 +171,6 @@ export default function Sidebar() {
         <div style={{ flex: 1 }} />
 
         <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 2, borderTop: '1px solid var(--hc-hairline)' }}>
-          {open && (
-            <div style={{ margin: '2px 0 8px', background: '#E8F5EC', color: 'var(--hc-success)', borderRadius: 12, padding: '10px 12px', fontSize: 12.5, lineHeight: 1.45 }}>
-              <strong>Beta</strong> · free while we test with real users.
-            </div>
-          )}
           {navItem('/settings', 'settings', 'Settings', Settings)}
           <div title={`${user.name} · ${user.email}`} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 52, marginTop: 4, ...(open ? { padding: '0 8px' } : { justifyContent: 'center' }) }}>
             {user.avatarUrl

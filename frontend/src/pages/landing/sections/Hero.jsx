@@ -18,16 +18,15 @@ export default function Hero() {
         <div className="herogrid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,5fr) minmax(0,7fr)', gap: 48, alignItems: 'center' }}>
           <div>
             <h1 id="hero-h" className="h e2" style={{ margin: 0, fontSize: 'clamp(40px,5vw,66px)', lineHeight: 1.02, letterSpacing: '-0.045em', fontWeight: 700 }}>
-              Tailor your resume. <span className="serif" style={{ color: '#6655E8' }}>Track every application.</span>
+              Stop applying blindly. Start searching <span className="serif" style={{ color: '#6655E8' }}>strategically.</span>
             </h1>
             <p className="e3" style={{ margin: '20px 0 0', fontSize: 18, lineHeight: 1.6, color: '#555555', maxWidth: 470 }}>
-              Applying for your first job? Turn your degree, projects and internships into a resume for a specific role. Download the PDF and keep it with the job description.
+              Tailor your CV to the role, check your fit, and keep every application in one place.
             </p>
             <div className="e4" style={{ marginTop: 26, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-              <Link className="btn-p" to="/new/template?template=graduate">Build my resume <Chevron /></Link>
-              <a className="btn-s" href="#templates" onClick={jump('templates')}>Browse templates</a>
+              <Link className="btn-p" to="/new/template?template=graduate">Build my CV <Chevron /></Link>
+              <a className="btn-s" href="#pricing" onClick={jump('pricing')}>View plans</a>
             </div>
-            <p className="e5" style={{ margin: '14px 0 0', fontSize: 14, color: '#555555' }}>Free during beta. No card required.</p>
           </div>
           <HeroDemo />
         </div>

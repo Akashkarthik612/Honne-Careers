@@ -69,7 +69,7 @@ export default function ModePage() {
         <Option
           to="/new/jd" onPick={() => setDraft({ mode: 'jd' })} highlight tone="#3F5FD8"
           icon={<Sparkles size={24} />}
-          badges={<><span style={pill('var(--hc-brand-tint)', 'var(--hc-brand-hover)')}>Recommended</span><span style={pill('#E8F5EC', 'var(--hc-success)')}>Free during beta</span></>}
+          badges={<><span style={pill('var(--hc-brand-tint)', 'var(--hc-brand-hover)')}>Recommended</span></>}
           title="Tailor to a job description"
           blurb="Paste a JD. We match your real experience to it — nothing invented."
           points={['Bullets rewritten for this role, one by one', 'You see every change and keep or revert it', 'Only uses what you wrote']}
