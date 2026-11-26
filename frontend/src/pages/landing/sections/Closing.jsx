@@ -21,7 +21,7 @@ export default function Closing() {
               </h2>
               <p style={{ margin: '20px 0 0', fontSize: 18, lineHeight: 1.6, color: '#4E4E4E' }}>Start with a role you want. Bring the job description and choose your CV template.</p>
               <div style={{ marginTop: 30, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                <Link className="btn-p" to="/new/template?template=graduate">Build my CV <Chevron /></Link>
+                <Link className="btn-p" to="/new/template">Build my CV <Chevron /></Link>
                 <a className="btn-s" href="#pricing" onClick={jump('pricing')}>View plans</a>
               </div>
             </div>
@@ -33,9 +33,9 @@ export default function Closing() {
         <div className="wrap frame" style={{ padding: '40px 32px', display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Wordmark size={16} /><span style={{ fontSize: 13, color: '#6E6B78' }}>© 2026</span></div>
           <nav aria-label="Footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            <a className="navl" href="#how" onClick={jump('how')} style={{ color: '#666666' }}>Agents</a>
+            <a className="navl" href="#multiplayer" onClick={jump('multiplayer')} style={{ color: '#666666' }}>Multiplayer AI</a>
             <a className="navl" href="#fit" onClick={jump('fit')} style={{ color: '#666666' }}>CV fit</a>
-            <a className="navl" href="#templates" onClick={jump('templates')} style={{ color: '#666666' }}>Templates</a>
+            <a className="navl" href="#tailor" onClick={jump('tailor')} style={{ color: '#666666' }}>Tailor</a>
             <Link className="navl" to="/login" style={{ color: '#666666' }}>Sign in</Link>
           </nav>
         </div>

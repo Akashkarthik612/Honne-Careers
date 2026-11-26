@@ -35,6 +35,7 @@ class UsageItem:
     used: int
     limit: int
     daily: bool
+    resets_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,13 +50,16 @@ class QuotaGuard:
 
     async def consume(self, uow: UnitOfWork, user_id: UUID, action: DailyAction) -> None:
         """Checks and records one use inside the caller's transaction. O(1) indexed count."""
-        limit = (await self._limits(uow, user_id)).daily[action]
+        limits = await self._limits(uow, user_id)
+        weekly = action in limits.weekly
+        limit = limits.weekly[action] if weekly else limits.daily[action]
         await uow.usage.lock(user_id, action)
-        used = await uow.usage.count_today(user_id, action)
+        used = await uow.usage.count_period(user_id, action, "week" if weekly else "day")
         if used >= limit:
+            message = (f"You've used this week's {limit} CV tailorings. The limit resets on Monday."
+                       if weekly else _MESSAGES[action].format(limit=limit))
             log.warning("quota_exceeded", action=action.value, limit=limit)
-            raise QuotaExceeded(_MESSAGES[action].format(limit=limit), action=action.value,
-                                limit=limit)
+            raise QuotaExceeded(message, action=action.value, limit=limit)
         await uow.usage.record(user_id, action)
 
     async def total_limit(self, uow: UnitOfWork, user_id: UUID, limit: TotalLimit) -> int:
@@ -63,7 +67,7 @@ class QuotaGuard:
         return (await self._limits(uow, user_id)).total[limit]
 
     async def usage(self, uow: UnitOfWork, user_id: UUID) -> Usage:
-        """Today's counts against the user's limits (Settings panel). One grouped count."""
+        """Current counts and reset dates for the Settings panel."""
         limits = await self._limits(uow, user_id)
         today = await uow.usage.counts_today(user_id)
         totals = {TotalLimit.CUSTOM_AGENTS: await uow.agents.count_active(user_id)}
@@ -71,6 +75,10 @@ class QuotaGuard:
                  for a, n in limits.daily.items()]
         items += [UsageItem(t.value, totals[t], n, False) for t, n in limits.total.items()]
         midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        next_week = midnight + timedelta(days=7 - midnight.weekday())
+        for action, limit in limits.weekly.items():
+            used = await uow.usage.count_period(user_id, action, "week")
+            items.append(UsageItem(action.value, used, limit, False, next_week))
         return Usage(items, midnight + timedelta(days=1))
 
     async def _limits(self, uow: UnitOfWork, user_id: UUID) -> PlanLimits:

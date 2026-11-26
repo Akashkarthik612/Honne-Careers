@@ -1,12 +1,6 @@
 {
   "items": [
     {
-      "key": "full_tailor",
-      "used": 1,
-      "limit": 3,
-      "daily": true
-    },
-    {
       "key": "chat_start",
       "used": 2,
       "limit": 5,
@@ -47,6 +41,13 @@
       "used": 1,
       "limit": 2,
       "daily": false
+    },
+    {
+      "key": "full_tailor",
+      "used": 1,
+      "limit": 5,
+      "daily": false,
+      "resets_at": "2026-10-26T00:00:00+00:00"
     }
   ],
   "resets_at": "2026-10-20T00:00:00+00:00"

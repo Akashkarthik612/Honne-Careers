@@ -285,6 +285,8 @@ def _usage():
     used = {"full_tailor": 1, "chat_start": 2, "custom_agents": 1}
     items = [UsageItem(a.value, used.get(a.value, 0), n, True) for a, n in beta.daily.items()]
     items += [UsageItem(t.value, used.get(t.value, 0), n, False) for t, n in beta.total.items()]
+    items += [UsageItem(a.value, used.get(a.value, 0), n, False,
+                        datetime(2026, 10, 26, tzinfo=UTC)) for a, n in beta.weekly.items()]
     return usage_view(Usage(items, datetime(2026, 10, 20, tzinfo=UTC)))
 
 

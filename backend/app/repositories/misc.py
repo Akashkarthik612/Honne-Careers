@@ -102,14 +102,14 @@ class UsageRepository:
         await self._conn.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
                                  (f"{user_id}:{action}",))
 
-    async def count_today(self, user_id: UUID, action: str) -> int:
-        """Uses the (user_id, action, created_at) index. 'Today' = UTC day."""
+    async def count_period(self, user_id: UUID, action: str, period: str) -> int:
+        """Uses the (user_id, action, created_at) index. Period boundaries use UTC."""
         cur = await self._conn.execute(
             """select count(*) as n from app.usage_events
                 where user_id = %s and action = %s
-                  and created_at >= date_trunc('day', now() at time zone 'utc')
+                  and created_at >= date_trunc(%s::text, now() at time zone 'utc')
                                     at time zone 'utc'""",
-            (user_id, action))
+            (user_id, action, period))
         return (await cur.fetchone())["n"]
 
     async def counts_today(self, user_id: UUID) -> dict[str, int]:

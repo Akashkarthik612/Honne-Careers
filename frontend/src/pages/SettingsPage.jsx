@@ -25,7 +25,7 @@ function UsageLimits() {
   return (
     <section id="st-limits" className="hc-card hc-sec" aria-labelledby="h-limits">
       <h2 id="h-limits" className="hc-disp" style={h2}>Usage limits</h2>
-      <p style={{ margin: '0 0 14px', fontSize: 14.5, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>Everyone gets the same limits while we test with real users.</p>
+      <p style={{ margin: '0 0 14px', fontSize: 14.5, lineHeight: 1.55, color: 'var(--hc-ink-muted)' }}>Review your CV tailorings, chats and custom agents.</p>
       {res.loading && <PageLoading label="Loading your usage…" />}
       <ErrorBanner error={res.error} style={{ marginTop: 0 }} action={{ label: 'Retry', onClick: res.reload }} />
       {res.data && (
@@ -37,7 +37,8 @@ function UsageLimits() {
                 <div style={{ marginTop: 6, fontSize: 22, fontWeight: 800 }}>
                   {r.used} <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--hc-ink-muted)' }}>/ {r.limit}{r.unit ? ` ${r.unit}` : ''}</span>
                 </div>
-                <div role="meter" aria-label={r.label} aria-valuemin={0} aria-valuemax={r.limit} aria-valuenow={r.used} style={{ marginTop: 10, height: 6, borderRadius: 99, background: '#E4E6EE', overflow: 'hidden' }}>
+                {r.resetsAt && <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--hc-ink-muted)' }}>Resets {r.resetsAt.toLocaleDateString('en-IN', { weekday: 'long' })} at {resetTime(r.resetsAt)}</p>}
+                <div role="meter" aria-label={r.label} aria-valuemin={0} aria-valuemax={r.limit} aria-valuenow={Math.min(r.used, r.limit)} style={{ marginTop: 10, height: 6, borderRadius: 99, background: '#E4E6EE', overflow: 'hidden' }}>
                   <div style={{ width: `${r.limit ? Math.min(100, (100 * r.used) / r.limit) : 100}%`, height: '100%', background: r.full ? 'var(--hc-warm)' : 'var(--hc-brand)' }} />
                 </div>
               </div>

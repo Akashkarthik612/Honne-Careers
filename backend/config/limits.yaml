@@ -11,12 +11,13 @@ use_account_plan: false
 plans:
   beta:
     daily:                 # per user per UTC day (resets 05:30 IST); every attempt counts
-      full_tailor: 3       # "Tailor my CV" runs, Retry included
       chat_start: 5        # new AI chats; each "Try it" message in the agent builder too
       chat_message: 125    # safety cap on answers + retries (5 chats x 25 turns)
       bullet_tailor: 150   # per-bullet "Tailor to JD" in the wizard ("Tailor all" uses these)
       pdf: 40              # PDF builds
       analysis: 40         # "Start analysis" runs
       upload: 20           # CV uploads / LaTeX pastes
+    weekly:                # per user, resets Monday at 00:00 UTC
+      full_tailor: 5       # "Tailor my CV" runs, Retry included
     total:                 # never reset
       custom_agents: 2     # active agents a user has made

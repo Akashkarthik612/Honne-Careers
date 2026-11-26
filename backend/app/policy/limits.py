@@ -16,7 +16,7 @@ from app.core.errors import ConfigError
 
 
 class DailyAction(StrEnum):
-    """Counted per user per UTC day in app.usage_events (same values as its check)."""
+    """Metered actions in app.usage_events (same values as its check)."""
     FULL_TAILOR = "full_tailor"
     BULLET_TAILOR = "bullet_tailor"
     PDF = "pdf"
@@ -43,13 +43,16 @@ class _Frozen(BaseModel):
 class PlanLimits(_Frozen):
     daily: dict[DailyAction, Count]
     total: dict[TotalLimit, Count]
+    weekly: dict[DailyAction, Count] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _complete(self) -> "PlanLimits":
-        missing = ([a.value for a in DailyAction if a not in self.daily]
+        missing = ([a.value for a in DailyAction if a not in self.daily and a not in self.weekly]
                    + [t.value for t in TotalLimit if t not in self.total])
         if missing:
             raise ValueError(f"missing limits: {', '.join(missing)}")
+        if self.daily.keys() & self.weekly.keys():
+            raise ValueError("an action must have a single reset period")
         return self
 
 

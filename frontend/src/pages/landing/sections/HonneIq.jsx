@@ -15,9 +15,9 @@ export default function HonneIq() {
       <div className="wrap frame sec">
         <Reveal className="g2" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,5fr) minmax(0,6fr)', gap: 48, alignItems: 'center' }}>
           <div>
-            <span className="lbl">Honne IQ</span>
+            <span className="lbl">01 · Honne IQ</span>
             <h2 id="iq-h" className="h2">Your career context. <span className="lead">Working together.</span></h2>
-            <p className="sub">Keep your profile and application records together. When you need to follow up or prepare for an interview, open the job description and the resume you downloaded for that role.</p>
+            <p className="sub">Keep your profile, CVs, job descriptions and application updates together. Give each agent access to the information it needs.</p>
             <div style={{ marginTop: 28, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div className="card" style={{ padding: 16, background: '#FFFFFF' }}><strong>Application history</strong><p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: '#666666' }}>Update your status as you apply, hear back or get an interview.</p></div>
               <div className="card" style={{ padding: 16, borderColor: '#D9D2FB', background: '#FAF9FF' }}><strong>Advice with context</strong><p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: '#171717' }}>Ask an agent for help using the profile and application activity you’ve saved.</p></div>

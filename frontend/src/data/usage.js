@@ -11,8 +11,10 @@ export const SHOWN = [
 export function toUsage(r) {
   const byKey = Object.fromEntries(r.items.map((i) => [i.key, i]));
   const rows = SHOWN.filter(([key]) => byKey[key]).map(([key, label, unit]) => {
-    const { used, limit } = byKey[key];
-    return { key, label, unit, used, limit, left: Math.max(limit - used, 0), full: used >= limit };
+    const { used, limit, resets_at: weeklyReset } = byKey[key];
+    return { key, label, unit: weeklyReset ? 'this week' : unit, used, limit,
+      left: Math.max(limit - used, 0), full: used >= limit,
+      ...(weeklyReset && { resetsAt: new Date(weeklyReset) }) };
   });
   return { rows, resetsAt: new Date(r.resets_at) };
 }

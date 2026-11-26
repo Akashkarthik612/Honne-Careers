@@ -35,7 +35,7 @@ from app.domain.records import (
     SettingsRow,
 )
 from app.policy.quota import Usage
-from app.render.templates import TemplateInfo
+from app.render.templates import TemplateInfo, active_template_id
 
 
 class CreateResume(Model):
@@ -117,7 +117,8 @@ class ApplicationPatch(Model):
 
 
 def summary_view(s: ResumeSummary) -> dict[str, Any]:
-    return {"id": str(s.id), "title": s.title, "template": s.template, "mode": s.mode,
+    return {"id": str(s.id), "title": s.title, "template": active_template_id(s.template),
+            "mode": s.mode,
             "status": s.status, "wizard_step": s.wizard_step, "company": s.company,
             "role": s.role, "updated_at": s.updated_at.isoformat(),
             "content": s.content.model_dump(mode="json"),
@@ -144,7 +145,8 @@ def resume_view(r: ResumeRow, jd: JdRow | None = None, *, pdf_current: bool
                 ) -> dict[str, Any]:
     """pdf_current: TemplateRegistry.pdf_is_current(r), the one freshness check."""
     return {
-        "id": str(r.id), "title": r.title, "template": r.template, "mode": r.mode,
+        "id": str(r.id), "title": r.title, "template": active_template_id(r.template),
+        "mode": r.mode,
         "section_order": _order_view(r.section_order),
         "status": r.status, "job_step": r.job_step, "error_code": r.error_code,
         "wizard_step": r.wizard_step,
@@ -164,7 +166,8 @@ def settings_view(s: SettingsRow) -> dict[str, Any]:
 
 
 def usage_view(u: Usage) -> dict[str, Any]:
-    return {"items": [{"key": i.key, "used": i.used, "limit": i.limit, "daily": i.daily}
+    return {"items": [{"key": i.key, "used": i.used, "limit": i.limit, "daily": i.daily,
+                       **({"resets_at": i.resets_at.isoformat()} if i.resets_at else {})}
                       for i in u.items],
             "resets_at": u.resets_at.isoformat()}
 

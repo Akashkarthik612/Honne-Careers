@@ -7,8 +7,9 @@ describe('toUsage: the Beta limits panel (contracts/responses/usage.json)', () =
 
   it('shows CV tailorings, new chats and agents, with the limits from the server', () => {
     expect(usage.rows.map((r) => [r.key, r.used, r.limit, r.unit])).toEqual([
-      ['full_tailor', 1, 3, 'today'], ['chat_start', 2, 5, 'today'], ['custom_agents', 1, 2, null],
+      ['full_tailor', 1, 5, 'this week'], ['chat_start', 2, 5, 'today'], ['custom_agents', 1, 2, null],
     ]);
+    expect(usage.rows[0].resetsAt.toISOString()).toBe('2026-10-26T00:00:00.000Z');
     expect(usage.resetsAt.toISOString()).toBe('2026-10-20T00:00:00.000Z');
   });
 

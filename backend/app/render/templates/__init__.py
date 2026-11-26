@@ -23,6 +23,18 @@ log = get_logger(__name__)
 
 S = SectionKey
 
+# Existing drafts keep their content and custom section order when they switch layout.
+_RETIRED_TEMPLATES = {
+    "graduate": "jake",
+    "marketing": "honne_professional",
+    "sales": "customer_success",
+    "project_operations": "honne_professional",
+}
+
+
+def active_template_id(template_id: str) -> str:
+    return _RETIRED_TEMPLATES.get(template_id, template_id)
+
 
 class TemplateRenderer(Protocol):
     def render(self, cv: CvContent, order: SectionOrder) -> str: ...
@@ -48,26 +60,10 @@ class TemplateRegistry:
                          "For experienced professionals", 1,
                          (S.EXPERIENCE, S.PROJECTS, S.SKILLS, S.EDUCATION, S.CERTIFICATIONS,
                           S.LANGUAGES), ProfessionalRenderer()),
-            TemplateInfo("graduate", "Graduate",
-                         "For students and recent graduates", 1,
-                         (S.EDUCATION, S.EXPERIENCE, S.PROJECTS, S.SKILLS,
-                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Academic Projects", "0.17,0.27,0.45")),
-            TemplateInfo("marketing", "Marketing",
-                         "For marketing and growth professionals", 1,
-                         (S.EXPERIENCE, S.PROJECTS, S.SKILLS, S.EDUCATION,
-                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Selected Campaigns", "0.35,0.19,0.43")),
-            TemplateInfo("sales", "Sales",
-                         "For sales and business development professionals", 1,
-                         (S.EXPERIENCE, S.SKILLS, S.EDUCATION, S.PROJECTS,
-                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Projects", "0.14,0.32,0.26")),
             TemplateInfo("customer_success", "Customer Success",
                          "For onboarding and account management professionals", 1,
                          (S.EXPERIENCE, S.SKILLS, S.EDUCATION, S.PROJECTS,
                           S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Projects", "0.10,0.32,0.40")),
-            TemplateInfo("project_operations", "Project & Operations",
-                         "For project delivery and operations professionals", 1,
-                         (S.EXPERIENCE, S.PROJECTS, S.SKILLS, S.EDUCATION,
-                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Selected Projects", "0.34,0.23,0.15")),
         ]
         self._templates = {t.id: t for t in templates}
 
@@ -82,10 +78,9 @@ class TemplateRegistry:
             raise InvalidInput("Unknown template.", reason="template") from exc
 
     def stored(self, template_id: str) -> TemplateInfo:
-        """A resume's stored template: unknown means a template was removed from the code
-        while rows still use it. Fails loudly; never falls back to another template."""
+        """Resolve retired layouts on existing rows. Unrecognized ids still fail."""
         try:
-            return self._templates[template_id]
+            return self._templates[active_template_id(template_id)]
         except KeyError as exc:
             log.error("template_unknown", template=template_id)
             raise RenderFailed(reason="unknown_template") from exc

@@ -21,10 +21,10 @@ export default function Hero() {
               Stop applying blindly. Start searching <span className="serif" style={{ color: '#6655E8' }}>strategically.</span>
             </h1>
             <p className="e3" style={{ margin: '20px 0 0', fontSize: 18, lineHeight: 1.6, color: '#555555', maxWidth: 470 }}>
-              Tailor your CV to the role, check your fit, and keep every application in one place.
+              Tailor your resume for the role. Save it with the job description and build AI agents that work from your application history.
             </p>
             <div className="e4" style={{ marginTop: 26, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-              <Link className="btn-p" to="/new/template?template=graduate">Build my CV <Chevron /></Link>
+              <Link className="btn-p" to="/new/template">Build my CV <Chevron /></Link>
               <a className="btn-s" href="#pricing" onClick={jump('pricing')}>View plans</a>
             </div>
           </div>

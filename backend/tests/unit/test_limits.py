@@ -23,7 +23,7 @@ def write(tmp_path: Path, data: dict) -> Path:
 
 def test_beta_file_has_the_launch_limits():
     beta = ConfiguredLimitPolicy(LimitsConfig.load(BETA)).limits_for(None)
-    assert beta.daily[DailyAction.FULL_TAILOR] == 3
+    assert beta.weekly[DailyAction.FULL_TAILOR] == 5
     assert beta.daily[DailyAction.CHAT_START] == 5
     assert beta.total[TotalLimit.CUSTOM_AGENTS] == 2
 

@@ -1,4 +1,4 @@
-"""Single-column LaTeX presets for the graduate and business CV templates."""
+"""Single-column LaTeX layout for the Customer Success CV template."""
 
 from app.domain.cv import CvContent, ExperienceItem, ProjectItem
 from app.render.latex import escape, escape_url

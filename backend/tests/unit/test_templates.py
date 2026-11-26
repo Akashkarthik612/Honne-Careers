@@ -45,6 +45,18 @@ def test_unknown_template():
         REG.stored("elegant")
 
 
+@pytest.mark.parametrize(("retired", "active"), [
+    ("graduate", "jake"),
+    ("marketing", "honne_professional"),
+    ("sales", "customer_success"),
+    ("project_operations", "honne_professional"),
+])
+def test_retired_template_is_only_available_to_saved_drafts(retired, active):
+    with pytest.raises(InvalidInput):
+        REG.require(retired)
+    assert REG.stored(retired) is REG.require(active)
+
+
 # ---------- layout patch ----------
 
 def test_layout_patch_accepts_a_full_order_or_none():
@@ -249,11 +261,7 @@ async def test_senior_cv_flows_onto_more_pages(template):
 
 
 @pytest.mark.parametrize(("template", "project_heading"), [
-    ("graduate", "Academic Projects"),
-    ("marketing", "Selected Campaigns"),
-    ("sales", "Projects"),
     ("customer_success", "Projects"),
-    ("project_operations", "Selected Projects"),
 ])
 def test_career_template_has_linear_text_and_preserves_sections(template, project_heading):
     from docker.warm_cache import CV

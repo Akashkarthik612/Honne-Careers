@@ -1,48 +1,46 @@
-import { useState } from 'react';
 import { Reveal } from './parts';
 
-const checks = [
-  ['Keyword match', 'Python and PostgreSQL appear in both the job description and your project. Docker is also requested.'],
-  ['Experience match', 'Your placement tracker demonstrates API development. The role also asks for testing experience.'],
-  ['Narrative alignment', 'Lead with the API you built and tested. A recruiter can then connect your project to the backend role.'],
+const fitScreenshot = `${import.meta.env.BASE_URL}images/cv-fit-analysis.png`;
+
+const scoreCards = [
+  ['keywords', 'Keyword match: 50%. Shows terms that appear in the CV and terms that are missing.'],
+  ['experience', 'Experience match: 90%. Shows how well the candidate meets each requirement.'],
+  ['narrative', 'JD–CV narrative alignment: 100%. Compares the job description with the top third of the CV and suggests an edit.'],
 ];
 
 export function FitPreview() {
-  const [selected, setSelected] = useState(0);
   return (
     <section id="fit" className="launch-section fit-section" aria-labelledby="fit-title">
-      <div className="wrap frame sec">
-        <Reveal className="launch-split">
-          <div>
-            <span className="lbl">CV fit</span>
-            <h2 id="fit-title" className="h2">See how your CV reads to recruiters <span className="lead">before you apply.</span></h2>
-            <p className="sub">Compare your CV with the job description. See which requirements your experience supports and which details deserve a clearer example.</p>
-          </div>
-          <div className="review-sheet">
-            <div className="sheet-heading"><strong>Junior Backend Engineer</strong><span className="tag">Sample review</span></div>
-            <div className="review-excerpt"><small>Arjun Mehta · Projects</small><p>Built a placement tracker with <mark>Python</mark> and <mark>PostgreSQL</mark>. Wrote tests for application status changes.</p></div>
-            <div className="check-options" aria-label="Explore sample checks">{checks.map(([name], index) =>
-              <button key={name} type="button" aria-pressed={selected === index} onClick={() => setSelected(index)}>{name}</button>
-            )}</div>
-            <p className="check-result" aria-live="polite">{checks[selected][1]}</p>
-          </div>
-        </Reveal>
-      </div>
+      <div className="wrap frame sec"><Reveal>
+        <span className="lbl">03 · CV fit</span>
+        <h2 id="fit-title" className="h2">See how your CV reads to recruiters <span className="lead">before you apply.</span></h2>
+        <p className="sub">Check keyword coverage for ATS, compare your experience against the job requirements and see what the top of your CV communicates to a recruiter.</p>
+        <figure className="fit-example">
+          <img className="fit-desktop" src={fitScreenshot} width="1561" height="820" loading="lazy"
+            alt={scoreCards.map(([, description]) => description).join(' ')} />
+          <div className="fit-mobile">{scoreCards.map(([key, description]) => (
+            <div key={key} className={`fit-slice fit-${key}`}>
+              <img src={fitScreenshot} width="1561" height="820" loading="lazy" alt={description} />
+            </div>
+          ))}</div>
+          <figcaption>Example analysis for an AI graduate program.</figcaption>
+        </figure>
+      </Reveal></div>
     </section>
   );
 }
 
 const applications = [
-  ['Kaveri Labs', 'Backend Trainee', 'Graduate', 'Interview'],
-  ['Deccan Systems', 'Software Engineer', 'Jake’s Resume', 'Applied'],
-  ['Marina Studio', 'Marketing Associate', 'Marketing', 'Applied'],
+  ['Kaveri Labs', 'Junior Backend Engineer', 'Backend CV', 'Interview'],
+  ['Deccan Systems', 'Software Engineer', 'API CV', 'Applied'],
+  ['Marina Studio', 'Backend Trainee', 'Trainee CV', 'Applied'],
 ];
 
 export function TrackerPreview() {
   return (
     <section id="tracking" className="launch-section" aria-labelledby="tracking-title">
       <div className="wrap frame sec"><Reveal className="launch-split">
-        <div><span className="lbl">Application tracking</span>
+        <div><span className="lbl">04 · Track</span>
           <h2 id="tracking-title" className="h2">Track every application and the CV you prepared for it.</h2>
           <p className="sub">When a recruiter calls, open the role, job description and saved CV together. Update the status as your application moves forward.</p>
         </div>
@@ -57,7 +55,8 @@ export function TrackerPreview() {
 }
 
 const plans = [
-  ['CV Builder', '399', '200 CVs per month', ['All seven templates', 'Tailored CVs and PDF downloads']],
+  ['Free', '0', '5 tailored CVs per week', ['ATS score analysis', 'PDF downloads']],
+  ['CV Builder', '399', '200 CVs per month', ['ATS score analysis', 'Tailored CVs and PDF downloads']],
   ['Job Search', '899', '300 CVs per month', ['Everything in CV Builder', 'Application tracking', 'Outreach and Strategist agents with saved application history']],
   ['Honne Pro', '1,299', 'Unlimited CVs', ['Everything in Job Search', 'Full AI feature access', 'All specialist agents and custom agents']],
 ];
@@ -68,7 +67,7 @@ export function Pricing() {
       <div className="wrap frame sec"><Reveal>
         <span className="lbl">Monthly pricing</span>
         <h2 id="pricing-title" className="h2">Choose your job search plan.</h2>
-        <p className="sub">Planned launch prices in India. You can try the app before billing opens.</p>
+        <p className="sub">Start on Free. Paid plans show planned launch pricing in India.</p>
         <div className="launch-plans">{plans.map(([name, price, quota, features]) =>
           <article key={name} className="plan-card"><h3>{name}</h3><p className="plan-price">₹{price}<small> / month</small></p>
             <strong>{quota}</strong><ul>{features.map(feature => <li key={feature}>{feature}</li>)}</ul>

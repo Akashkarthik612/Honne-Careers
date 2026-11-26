@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef } from 'react';
 import Lenis from 'lenis';
 import { NAV_OFFSET, ScrollContext, useReducedMotion } from './landingHooks';
 import { FitPreview, TrackerPreview, Pricing } from './sections/LaunchSections';
-import Agents from './sections/Agents';
+import Multiplayer from './sections/Multiplayer';
 import Closing from './sections/Closing';
 import Hero from './sections/Hero';
 import HonneIq from './sections/HonneIq';
 import Nav from './sections/Nav';
 import { RibbonDefs } from './sections/parts';
-import Templates from './sections/Templates';
+import Tailoring from './sections/Tailoring';
 import './landing.css';
 
 const SCROLL_S = 1.1;
@@ -48,10 +48,10 @@ export default function LandingPage() {
         <main>
           <Hero />
           <HonneIq />
-          <Templates />
+          <Tailoring />
           <FitPreview />
           <TrackerPreview />
-          <Agents />
+          <Multiplayer />
           <Pricing />
         </main>
         <Closing />

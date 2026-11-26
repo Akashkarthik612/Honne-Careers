@@ -1,4 +1,4 @@
-"""Beta limits from config/limits.yaml (PLAN-2, CUST-4): 3 CV tailorings and 5 new AI chats
+"""Beta limits from config/limits.yaml (PLAN-2, CUST-4): 5 CV tailorings per week, 5 new AI chats
 per day, 2 custom agents per user. Every attempt counts; the numbers come from the file."""
 
 import pytest
@@ -22,23 +22,27 @@ async def usage(api, h):
     return {i["key"]: (i["used"], i["limit"]) for i in body["items"]}, body["resets_at"]
 
 
-async def test_three_cv_tailorings_a_day(beta_api):
+async def test_five_cv_tailorings_a_week(beta_api):
     api = beta_api
     h = api.new_user()
     await api.client.put("/profile", json={"content": profile_in()}, headers=h)
     rid = (await api.client.post("/resumes", json={"template": "jake", "mode": "tailored"},
                                  headers=h)).json()["id"]
     await api.client.put(f"/resumes/{rid}/jd", json={"text": SAMPLE_JD}, headers=h)
-    await used_today(api, h, "full_tailor", 2)
+    sql(api, "insert into app.usage_events (user_id, action, created_at) "
+             "select %s, 'full_tailor', date_trunc('week', now() at time zone 'utc') "
+             "at time zone 'utc' from generate_series(1, 4)", uid(h))
+    sql(api, "insert into app.usage_events (user_id, action, created_at) "
+             "values (%s, 'full_tailor', now() - interval '7 days')", uid(h))
     api.provider.push(honest_tailor)
     assert (await api.client.post(f"/resumes/{rid}/tailor", json={},
-                                  headers=h)).status_code == 202   # the 3rd
+                                  headers=h)).status_code == 202   # the 5th this week
     over = await api.client.post(f"/resumes/{rid}/tailor", json={}, headers=h)
     err = over.json()["error"]
     assert over.status_code == 429 and err["code"] == "quota_exceeded"
-    assert err["details"] == {"action": "full_tailor", "limit": 3}
-    assert "3 CV tailorings" in err["message"]
-    assert (await usage(api, h))[0]["full_tailor"] == (3, 3)
+    assert err["details"] == {"action": "full_tailor", "limit": 5}
+    assert "this week's 5 CV tailorings" in err["message"]
+    assert (await usage(api, h))[0]["full_tailor"] == (5, 5)
 
 
 async def test_five_new_chats_a_day_but_open_chats_keep_going(beta_api):
@@ -91,9 +95,9 @@ async def test_usage_is_per_user_and_lists_every_limit(beta_api):
     await used_today(api, a, "full_tailor", 2)
     await make_agent(api, a)
     items, resets_at = await usage(api, a)
-    assert items == {"full_tailor": (2, 3), "chat_start": (0, 5), "chat_message": (0, 125),
+    assert items == {"full_tailor": (2, 5), "chat_start": (0, 5), "chat_message": (0, 125),
                      "bullet_tailor": (0, 150), "pdf": (0, 40), "analysis": (0, 40),
                      "upload": (0, 20), "custom_agents": (1, 2)}
     assert resets_at.endswith("T00:00:00+00:00")
     other, _ = await usage(api, b)   # RLS + user filter: b sees none of a's usage
-    assert other["full_tailor"] == (0, 3) and other["custom_agents"] == (0, 2)
+    assert other["full_tailor"] == (0, 5) and other["custom_agents"] == (0, 2)

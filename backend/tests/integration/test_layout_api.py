@@ -27,11 +27,7 @@ async def test_templates_lists_all_with_default_orders(api):
             for template in response.json()] == [
         ("jake", "education"),
         (PRO, "experience"),
-        ("graduate", "education"),
-        ("marketing", "experience"),
-        ("sales", "experience"),
         ("customer_success", "experience"),
-        ("project_operations", "experience"),
     ]
 
 
