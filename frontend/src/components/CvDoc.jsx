@@ -5,7 +5,7 @@
 // being edited in the wizard's live preview.
 import { Fragment } from 'react';
 import { boldParts } from '@/data/cvModel';
-import { sectionOrderOf } from '@/data/templates';
+import { CAREER_STYLES, sectionOrderOf } from '@/data/templates';
 
 const row = { display: 'flex', justifyContent: 'space-between', gap: 12 };
 const list = { margin: '3px 0 6px', paddingLeft: 16 };
@@ -24,17 +24,18 @@ function templateStyles(template) {
       small: { fontSize: 10.3 },
     };
   }
-  const elegant = template === 'elegant';
-  const ink = elegant ? '#1F3A8A' : '#111111';
+  const career = Object.hasOwn(CAREER_STYLES, template) ? CAREER_STYLES[template] : null;
+  const ink = career?.accent ?? '#111111';
   return {
     pro: false,
+    career,
     page: { padding: '36px 40px', fontFamily: '"Times New Roman", Times, Georgia, serif', fontSize: 11.5, lineHeight: 1.38 },
-    name: { textAlign: 'center', fontSize: 26, letterSpacing: '.01em', lineHeight: 1.1, color: ink, fontWeight: 700, fontStyle: elegant ? 'italic' : 'normal' },
-    contact: { textAlign: 'center', fontSize: 10.5, marginTop: 6, color: ink, fontStyle: elegant ? 'italic' : 'normal' },
+    name: { textAlign: 'center', fontSize: 26, letterSpacing: '.01em', lineHeight: 1.1, color: '#111111', fontWeight: 700 },
+    contact: { textAlign: 'center', fontSize: 10.5, marginTop: 6, color: '#111111' },
     head: {
       marginTop: 12, paddingBottom: 2, fontSize: 13.5, color: ink,
-      borderBottom: elegant ? '1px solid #8FA3D9' : '1px solid #111111',
-      ...(elegant ? { fontStyle: 'italic', fontWeight: 700 } : { fontVariant: 'small-caps', letterSpacing: '.04em' }),
+      borderBottom: `1px solid ${ink}`,
+      ...(career ? { fontWeight: 700 } : { fontVariant: 'small-caps', letterSpacing: '.04em' }),
     },
     bullets: list,
     small: null,
@@ -61,6 +62,8 @@ function Contact({ items, style }) {
   );
 }
 
+const inlineDetails = (...parts) => parts.filter(Boolean).join(' – ');
+
 function Section({ id, focus, children }) {
   const on = focus === id;
   return (
@@ -82,7 +85,12 @@ const SECTIONS = {
       <div style={s.head}>{s.pro ? 'Professional Experience' : 'Experience'}</div>
       {cv.experience.map((job, i) => (
         <div key={i} style={{ marginTop: s.pro ? 6 : (i === 0 ? 4 : 2) }}>
-          {s.pro ? (
+          {s.career ? (
+            <>
+              <div><b>{job.role}</b></div>
+              <div>{inlineDetails(job.company, job.dates, job.location)}</div>
+            </>
+          ) : s.pro ? (
             <>
               <div style={row}><b>{job.company}</b><span style={s.small}>{job.dates}</span></div>
               <div style={{ ...row, ...s.small }}><i>{job.role}</i><span>{job.location}</span></div>
@@ -100,16 +108,16 @@ const SECTIONS = {
   ),
   projects: (cv, s, focus) => cv.projects.length > 0 && (
     <Section id="projects" focus={focus}>
-      <div style={s.head}>Projects</div>
+      <div style={s.head}>{s.career?.projects ?? 'Projects'}</div>
       {cv.projects.map((p, i) => (
         <div key={i} style={{ marginTop: 4 }}>
-          <div style={row}>
+          <div style={s.career ? undefined : row}>
             <span>
               <b>{p.name}</b>
-              {p.link && <> | <a href={p.link} target="_blank" rel="noopener noreferrer" style={link}>{s.pro ? 'View project' : 'Click here'}</a></>}
+              {p.link && <> | <a href={p.link} target="_blank" rel="noopener noreferrer" style={link}>{s.pro || s.career ? 'View project' : 'Click here'}</a></>}
               {!s.pro && p.tech && <> | <span style={{ fontStyle: 'italic' }}>{p.tech}</span></>}
             </span>
-            <span style={s.small}>{p.year}</span>
+            <span style={s.small}>{s.career && p.year && ' – '}{p.year}</span>
           </div>
           <Bullets items={p.bullets} style={s.bullets} />
         </div>
@@ -121,7 +129,12 @@ const SECTIONS = {
       <div style={s.head}>Education</div>
       {cv.education.map((e, i) => (
         <div key={i} style={{ marginTop: 4 }}>
-          {s.pro ? (
+          {s.career ? (
+            <>
+              <div><b>{e.school}</b></div>
+              <div>{inlineDetails(e.degree, e.years, e.location)}</div>
+            </>
+          ) : s.pro ? (
             <>
               <div style={row}><b>{e.school}</b><span style={s.small}>{e.years}</span></div>
               <div style={{ ...row, ...s.small }}><span>{e.degree}</span><span>{e.location}</span></div>
@@ -138,9 +151,10 @@ const SECTIONS = {
   ),
   skills: (cv, s, focus) => cv.skills.length > 0 && (
     <Section id="skills" focus={focus}>
-      <div style={s.head}>Technical Skills</div>
+      <div style={s.head}>{s.career ? 'Skills' : 'Technical Skills'}</div>
       <div style={{ marginTop: 4, ...s.small }}>
-        {cv.skills.map(([label, value]) => <div key={label}><b>{label}:</b> {value}</div>)}
+        {s.career ? cv.skills.map(([, value]) => value).join(', ')
+          : cv.skills.map(([label, value]) => <div key={label}><b>{label}:</b> {value}</div>)}
       </div>
     </Section>
   ),

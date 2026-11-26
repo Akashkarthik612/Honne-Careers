@@ -5,7 +5,7 @@ import {
 import { useOnScreen, useReducedMotion } from '../landingHooks';
 import { Check } from './parts';
 
-const ARIA = 'Sample demo in three steps: a job description is pasted and the CV is tailored to it; the JD and the exact CV sent are saved together in one row; then your week at a glance.';
+const ARIA = 'Sample demo in three steps: a job description is pasted and the CV is tailored to it; the job description and the downloaded resume are saved together in one row; then your week at a glance.';
 const FLIP_OUT_MS = 340;
 const FLIP_SWAP_MS = 40;
 const FIRST_DELAY_MS = 1300; // let the entrance animation finish before the demo starts
@@ -113,9 +113,9 @@ function SceneA({ HS, kw, kwGap, done }) {
               <span style={{ fontSize: 12.5, color: '#6E6B78' }}>Paste the job description here<span className="caret"></span></span>
             ) : (
               <div className="rise">
-                <div style={{ fontSize: 13, fontWeight: 700 }}>SDE-2, Backend · Company 1</div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>Junior Backend Engineer · Company 1</div>
                 <p style={{ margin: '6px 0 0', fontSize: 12, lineHeight: 1.65, color: '#3A3A3A' }}>
-                  You’ll <span style={kw}>design event-driven services</span> in <span style={kw}>Java and Kafka</span> on AWS, <span style={kw}>improve reliability and latency</span>, and <span style={kw}>mentor junior engineers</span>. 3+ years of backend experience. <span style={kwGap}>Kubernetes</span> is a plus.
+                  Build <span style={kw}>REST APIs in Python</span>, work with <span style={kw}>PostgreSQL</span>, and <span style={kw}>test your code</span>. Final-year projects and internships count. <span style={kwGap}>Docker</span> is a plus.
                 </p>
               </div>
             )}
@@ -131,9 +131,10 @@ function SceneA({ HS, kw, kwGap, done }) {
           <div style={{ height: 238, background: '#FFFFFF', border: '1px solid #E8E6E3', borderRadius: 6, padding: '12px 14px', fontFamily: "'Times New Roman',Georgia,serif", color: '#111111', boxShadow: '0 8px 22px rgba(23,23,23,.06)', overflow: 'hidden' }}>
             <div style={{ textAlign: 'center', fontSize: 15, letterSpacing: '.04em', fontVariant: 'small-caps' }}>Arjun Mehta</div>
             <div style={{ textAlign: 'center', fontSize: 9.5, marginTop: 1 }}>Chennai · arjun.mehta@mail.com</div>
-            <div style={cvHead}>Experience</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10.5 }}><strong>Software Engineer</strong><span>2021 – Now</span></div>
-            <div style={{ fontSize: 10, fontStyle: 'italic' }}>Northwind Fintech</div>
+            <div style={cvHead}>Education</div>
+            <div style={{ fontSize: 10, marginTop: 3 }}>B.E. Computer Science · 2022–2026</div>
+            <div style={cvHead}>Academic Projects</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10.5 }}><strong>Campus Placement Tracker</strong><span>2026</span></div>
             <ul style={{ margin: '4px 0 0', paddingLeft: 14, fontSize: 10.5, lineHeight: 1.45 }}>
               {HERO_BULLETS.map((b, i) => {
                 const tailored = i < (HS.b || 0);
@@ -145,7 +146,7 @@ function SceneA({ HS, kw, kwGap, done }) {
               })}
             </ul>
             <div style={cvHead}>Skills</div>
-            <div style={{ marginTop: 3, fontSize: 10 }}>Java, Kafka Streams, Spring Boot, AWS, SQL</div>
+            <div style={{ marginTop: 3, fontSize: 10 }}>Python, FastAPI, PostgreSQL, pytest</div>
           </div>
         </div>
       </div>
@@ -177,12 +178,12 @@ function SceneB({ HS }) {
   return (
     <div style={{ position: 'absolute', inset: 0, padding: 16 }}>
       <div style={{ height: 48, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div><div className="h" style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em' }}>Database</div><div style={{ fontSize: 11.5, color: '#666666' }}>Every job saved with its JD and the exact CV you sent</div></div>
+        <div><div className="h" style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em' }}>Database</div><div style={{ fontSize: 11.5, color: '#666666' }}>Each job description saved with the resume you downloaded</div></div>
         <span className="mono" style={{ fontSize: 10.5, color: '#6E6B78', whiteSpace: 'nowrap' }}>20 APPLICATIONS</span>
       </div>
       <div style={{ marginTop: 12, border: '1px solid #F1EFEC', borderRadius: 10, overflow: 'hidden' }}>
         <div className="dbgrid" style={{ height: 30, background: '#FCFCFB', borderBottom: '1px solid #F1EFEC', fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, letterSpacing: '.05em', color: '#6E6B78' }}>
-          <span>DATE</span><span>COMPANY</span><span>ROLE</span><span style={{ color: '#5847D6' }}>JD</span><span style={{ color: '#5847D6' }}>CV SENT</span><span>STATUS</span>
+          <span>DATE</span><span>COMPANY</span><span>ROLE</span><span style={{ color: '#5847D6' }}>JD</span><span style={{ color: '#5847D6' }}>RESUME</span><span>STATUS</span>
         </div>
         {heroDbRows(!!HS.newRow).map(([date, co, role, cv, st, [bg, fg], isNew]) => (
           <div key={co} className={`dbgrid${isNew ? ' rise' : ''}`} style={{ height: 40, borderBottom: '1px solid #F7F6F4', fontSize: 12, ...(isNew ? { background: '#F7F5FF', boxShadow: 'inset 3px 0 0 #6655E8' } : {}) }}>
@@ -196,25 +197,23 @@ function SceneB({ HS }) {
         ))}
       </div>
       <div style={{ position: 'absolute', left: 16, right: 16, bottom: 16, display: 'flex', gap: 8, alignItems: 'center', borderRadius: 10, padding: '9px 12px', fontSize: 12, lineHeight: 1.4, transition: 'background .3s ease,color .3s ease', ...(HS.cap ? { background: '#171717', color: '#FFFFFF' } : { background: '#F4F2FF', color: '#4A3BC4' }) }}>
-        <Check style={{ flex: 'none' }} /><span>One row: the job, the JD and the exact CV you sent. No spreadsheet. No lost files.</span>
+        <Check style={{ flex: 'none' }} /><span>One row holds the job, its description and the exact resume PDF you downloaded.</span>
       </div>
       {HS.cvPop ? (
         <div className="rise" style={{ ...popCard, right: 16, width: '46%' }}>
-          <div style={popHead}><span style={docChip('#F0EDFF', '#5847D6')}>PDF</span><strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>CV_Company1_SDE2_v4.pdf</strong></div>
+          <div style={popHead}><span style={docChip('#F0EDFF', '#5847D6')}>PDF</span><strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>CV_Company1_JuniorBackend_v4.pdf</strong></div>
           <div style={{ padding: '10px 12px', fontFamily: "'Times New Roman',Georgia,serif", fontSize: 10, lineHeight: 1.45, color: '#111111' }}>
             <div style={{ textAlign: 'center', fontSize: 12, fontVariant: 'small-caps', letterSpacing: '.04em' }}>Arjun Mehta</div>
-            <div style={{ marginTop: 4, fontVariant: 'small-caps', borderBottom: '1px solid #111111' }}>Experience</div>
-            <div style={{ marginTop: 3 }}>• Cut payment-event latency 38% (p95) with event-driven Kafka Streams in Java.</div>
-            <div>• Owned a 2M events/day settlement pipeline end to end, with no data loss.</div>
-            <div>• Mentored 2 interns through their first production launch.</div>
+            <div style={{ marginTop: 4, fontVariant: 'small-caps', borderBottom: '1px solid #111111' }}>Academic Projects</div>
+            {HERO_BULLETS.map(([, tailored]) => <div key={tailored} style={{ marginTop: 3 }}>• {tailored}</div>)}
           </div>
-          <div style={popFoot}>Sent 25 Oct · the exact version they saw</div>
+          <div style={popFoot}>Downloaded 25 Oct</div>
         </div>
       ) : null}
       {HS.jdPop ? (
         <div className="rise" style={{ ...popCard, left: '18%', width: '50%' }}>
-          <div style={popHead}><span style={docChip('#EAF0FD', '#2F5FD0')}>JD</span><strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>SDE-2, Backend · Company 1</strong></div>
-          <div style={{ padding: '10px 12px', fontSize: 11, lineHeight: 1.55, color: '#3A3A3A' }}>Design and own event-driven services in Java and Kafka on AWS. Improve reliability and latency. Mentor junior engineers. 3+ years of backend experience.</div>
+          <div style={popHead}><span style={docChip('#EAF0FD', '#2F5FD0')}>JD</span><strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Junior Backend Engineer · Company 1</strong></div>
+          <div style={{ padding: '10px 12px', fontSize: 11, lineHeight: 1.55, color: '#3A3A3A' }}>Build REST APIs in Python, work with PostgreSQL, and test your code. Final-year projects and internships count. Docker is a plus.</div>
           <div style={popFoot}>Saved 25 Oct · even if the posting is taken down</div>
         </div>
       ) : null}

@@ -1,11 +1,13 @@
 // Template names and blurbs (UI copy). Which ones are live, and each one's default section order, come
-// from GET /templates (the backend's TemplateRegistry); any not listed there show as "Coming soon".
+// from GET /templates (the backend's TemplateRegistry).
 export const TEMPLATES = [
-  { id: 'jake', name: 'Jake’s Resume', blurb: 'For entry-level candidates · one page, single column' },
-  { id: 'honne_professional', name: 'Honne Professional', blurb: 'For experienced professionals · experience first' },
-  { id: 'elegant', name: 'Elegant', blurb: 'Formal, with clear section rules' },
-  { id: 'classic', name: 'Classic', blurb: 'Traditional, centred header' },
-  { id: 'modern', name: 'Modern', blurb: 'Accent headings, skill chips' },
+  { id: 'graduate', name: 'Graduate', audience: 'Students and recent graduates', blurb: 'Lead with your degree, internships, and academic projects.' },
+  { id: 'jake', name: 'Jake’s Resume', audience: 'Early-career tech applicants', blurb: 'Use a compact layout for technical projects, internships, and skills.' },
+  { id: 'honne_professional', name: 'Honne Professional', audience: 'Candidates with work experience', blurb: 'Lead with past roles, responsibilities, and results.' },
+  { id: 'marketing', name: 'Marketing', audience: 'Marketing interns and professionals', blurb: 'Give campaigns, launches, and growth results their own section.' },
+  { id: 'sales', name: 'Sales', audience: 'Business development and sales applicants', blurb: 'Put prospecting, pipeline, and sales results up front.' },
+  { id: 'customer_success', name: 'Customer Success', audience: 'Onboarding and customer-facing applicants', blurb: 'Show how you supported customers, improved adoption, or helped retain accounts.' },
+  { id: 'project_operations', name: 'Project & Operations', audience: 'Project and operations applicants', blurb: 'Highlight what you delivered, how you coordinated it, and which processes improved.' },
 ];
 
 export const templateName = (id) => TEMPLATES.find((t) => t.id === id)?.name ?? id;
@@ -17,9 +19,22 @@ export const SECTION_LABELS = {
 };
 
 // Shown until GET /templates answers; must equal the backend's defaults (TemplateRegistry).
+export const CAREER_STYLES = {
+  graduate: { projects: 'Academic Projects', accent: '#2B4573' },
+  marketing: { projects: 'Selected Campaigns', accent: '#59306E' },
+  sales: { projects: 'Projects', accent: '#245242' },
+  customer_success: { projects: 'Projects', accent: '#1A5266' },
+  project_operations: { projects: 'Selected Projects', accent: '#573B26' },
+};
+
 const FALLBACK_ORDER = {
   jake: ['education', 'experience', 'projects', 'skills', 'certifications', 'languages'],
   honne_professional: ['experience', 'projects', 'skills', 'education', 'certifications', 'languages'],
+  graduate: ['education', 'experience', 'projects', 'skills', 'certifications', 'languages'],
+  marketing: ['experience', 'projects', 'skills', 'education', 'certifications', 'languages'],
+  sales: ['experience', 'skills', 'education', 'projects', 'certifications', 'languages'],
+  customer_success: ['experience', 'skills', 'education', 'projects', 'certifications', 'languages'],
+  project_operations: ['experience', 'projects', 'skills', 'education', 'certifications', 'languages'],
 };
 
 // The order a resume prints in: its own, else its template's default (from GET /templates when loaded).

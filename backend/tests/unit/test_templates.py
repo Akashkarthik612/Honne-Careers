@@ -246,3 +246,26 @@ async def test_senior_cv_flows_onto_more_pages(template):
     assert PdfInspector().page_count(pdf) >= 2
     text = PdfExtractor(5).extract(pdf)
     assert text.count("on-call pages by half") == 40  # every bullet printed, none clipped
+
+
+@pytest.mark.parametrize(("template", "project_heading"), [
+    ("graduate", "Academic Projects"),
+    ("marketing", "Selected Campaigns"),
+    ("sales", "Projects"),
+    ("customer_success", "Projects"),
+    ("project_operations", "Selected Projects"),
+])
+def test_career_template_has_linear_text_and_preserves_sections(template, project_heading):
+    from docker.warm_cache import CV
+
+    info = REG.require(template)
+    order = tuple(reversed(info.default_order))
+    tex = render(CV, template, order)
+    assert r"\begin{tabular" not in tex
+    assert rf"\section{{{project_heading}}}" in tex
+    assert r"\section{Skills}" in tex
+    assert tex.index(r"\section{Languages}") < tex.index(r"\section{Experience}")
+    assert r"38\% \& shipped" in tex
+    assert "View project" in tex
+    assert "Python, C++, FastAPI, .NET, AWS, CI/CD" in tex
+    assert r"\section{" not in render(CvContent(), template).split(r"\begin{document}", 1)[1]

@@ -6,8 +6,12 @@ const templates = response('templates.json');
 
 describe('templates (PDF-1)', () => {
   it('every live template has UI copy, and every default order uses known sections', () => {
+    expect(TEMPLATES.map((t) => t.id).sort()).toEqual(templates.map((t) => t.id).sort());
+    for (const { audience, blurb } of TEMPLATES) {
+      expect(audience).toBeTruthy();
+      expect(blurb).toBeTruthy();
+    }
     for (const t of templates) {
-      expect(TEMPLATES.map((x) => x.id)).toContain(t.id);
       expect([...t.default_order].sort()).toEqual(Object.keys(SECTION_LABELS).sort());
     }
   });

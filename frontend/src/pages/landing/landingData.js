@@ -50,9 +50,9 @@ export const HERO_CURSOR = {
 export const nextHeroStep = (hs) => (hs + 1) % HERO_STEPS.length;
 
 export const HERO_BULLETS = [
-  ['Moved the ledger service to Kafka Streams; p95 latency went down about 38%.', 'Cut payment-event latency 38% (p95) with event-driven Kafka Streams in Java.'],
-  ['Owned the settlement pipeline. 2M events/day, no data loss.', 'Owned a 2M events/day settlement pipeline end to end, with no data loss.'],
-  ['Mentored 2 interns to their first launch.', 'Mentored 2 interns through their first production launch.'],
+  ['Made a campus placement tracker with Python and FastAPI.', 'Built a REST API in Python and FastAPI to track campus placement applications.'],
+  ['Stored student and application records in PostgreSQL.', 'Modelled student and application records in PostgreSQL.'],
+  ['Wrote pytest tests for application status changes.', 'Tested application status updates with pytest.'],
 ];
 
 const DB_ROWS = [
@@ -61,20 +61,18 @@ const DB_ROWS = [
   ['15 Oct', 'Company 4', 'SDE-2', 'CV v3', 'No reply', ['#FFF2E8', '#B4500F']],
   ['12 Oct', 'Company 5', 'Data Eng.', 'CV v1', 'Applied', ['#F3F1EE', '#4A4A4A']],
 ];
-const NEW_ROW = ['25 Oct', 'Company 1', 'SDE-2 Backend', 'CV v4', 'Applied today', ['#F0EDFF', '#5847D6'], true];
+const NEW_ROW = ['25 Oct', 'Company 1', 'Junior Backend', 'CV v4', 'Applied today', ['#F0EDFF', '#5847D6'], true];
 
 // The Database rows in scene B; the Company 1 row slides in on top once it's saved.
 export const heroDbRows = (withNew) => (withNew ? [NEW_ROW, ...DB_ROWS.slice(0, 3)] : DB_ROWS);
 
 export const DASH_APPS = [
-  { co: 'Company 1', role: 'SDE-2 Backend', status: 'Tailoring', style: statusPill('#F0EDFF', '#5847D6') },
+  { co: 'Company 1', role: 'Junior Backend', status: 'Applied', style: statusPill('#F0EDFF', '#5847D6') },
   { co: 'Company 2', role: 'Backend Engineer', status: 'Interview', style: statusPill('#EAF0FD', '#2F5FD0') },
   { co: 'Company 3', role: 'Platform Eng.', status: 'Replied', style: statusPill('#E6F4EE', '#0F7A5C') },
   { co: 'Company 4', role: 'SDE-2', status: 'No reply · 13d', style: statusPill('#FFF2E8', '#B4500F') },
   { co: 'Company 5', role: 'Data Engineer', status: 'Applied', style: statusPill('#F3F1EE', '#4A4A4A') },
 ];
-
-export const ATS_NAMES = ['Workday', 'Greenhouse', 'Lever'];
 
 /* ---------- 02 problem ---------- */
 
@@ -82,7 +80,7 @@ export const PAINS = [
   { n: '01', tag: 'TAILORING', t: 'You rewrite your CV for every job.', d: 'Hours of copy-paste, guessing what each company wants. Then you do it all again for the next one.' },
   { n: '02', tag: 'MATCHING', t: 'You don’t know if you even fit the job.', d: 'So you apply anyway and hope someone reads it.' },
   { n: '03', tag: 'CHOOSING', t: 'You apply everywhere, because you don’t know where to focus.', d: 'No referrals, no plan. Most of those jobs were never a real match for you.' },
-  { n: '04', tag: 'TRACKING', t: 'You forget which CV you sent where.', d: 'Your spreadsheet or AI chat has the company and the date. Not the job description. Not the exact CV you sent. So when a recruiter finally calls, you don’t know what they read.', hot: true },
+  { n: '04', tag: 'TRACKING', t: 'You forget which CV you sent where.', d: 'When your CVs and job descriptions are saved separately, it is easy to lose track of which version a recruiter saw.', hot: true },
   { n: '05', tag: 'LEARNING', t: 'Nobody tells you why you got no reply.', d: 'So next week you make the same mistakes again, starting from zero.' },
 ];
 
@@ -222,7 +220,7 @@ export function gapNote(jd) {
 /* ---------- 06 learning loop ---------- */
 
 export const LOOP_STEPS = [
-  { t: 'Applications', d: 'Every application is saved with the JD and the exact CV you sent.', panel: 'kpi' },
+  { t: 'Applications', d: 'When you download a tailored CV, Honne saves it with the job description.', panel: 'kpi' },
   { t: 'Outcomes', d: 'Replies, interviews and silence are logged by you now, and from Gmail once it’s connected.', panel: 'funnel' },
   { t: 'Analysis', d: 'The Strategist looks for patterns in your own data, like which applications got replies.', panel: 'src' },
   { t: 'Recommendations', d: 'You get a short list for next week, not a lecture.', panel: 'recs' },

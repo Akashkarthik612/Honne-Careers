@@ -1,55 +1,23 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, FileText } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import SetupSteps from '@/components/SetupSteps';
 import { CvThumb } from '@/components/CvDoc';
 import { countWords, profileToCv } from '@/data/cvModel';
-import { PREVIEW_PROFILE } from '@/data/templatePreview';
+import { templatePreviewProfile } from '@/data/templatePreview';
 import { TEMPLATES, templateName } from '@/data/templates';
 import useResource from '@/hooks/useResource';
 import { listTemplates } from '@/services/api';
 import { ErrorBanner, PageLoading } from '@/components/Status';
 import { useAppStore } from '@/state/appStore';
-import elegantTemplate from '@/assets/elegant-template.png';
 
 // Step 1 of new-resume setup (design: TemplatePicker.dc.html). Which templates are live comes from
-// GET /templates (Jake's Resume and Honne Professional); the others show as "Coming soon".
+// GET /templates.
 // The picked id goes into draft.template, which ModePage/JdPage send to POST /resumes.
 // With a JD pasted on Home (draft.jdFromHome) the Mode step is skipped: Continue goes to the JD page.
 
-const SAMPLE = profileToCv(PREVIEW_PROFILE);
 const tileName = (muted) => ({ fontSize: 18, fontWeight: 700, color: muted ? 'var(--hc-ink-muted)' : 'var(--hc-ink)' });
-const well = { height: 300, overflow: 'hidden', background: '#EEF0F5', borderRadius: 12, display: 'flex', justifyContent: 'center', paddingTop: 16 };
-
-function Skeleton({ accent, centred }) {
-  const bar = (w, extra) => <div className="hc-skel" style={{ width: w, ...extra }} />;
-  return (
-    <div style={{ width: 238, height: 300, background: '#FFFFFF', padding: 18, display: 'flex', flexDirection: 'column', gap: 7, opacity: .45 }}>
-      {centred ? (
-        <>
-          {bar('52%', { height: 10, margin: '0 auto', background: accent })}
-          {bar('70%', { margin: '0 auto 6px' })}
-          <div style={{ height: 1, background: accent }} />
-        </>
-      ) : (
-        <>
-          {bar('58%', { height: 11, background: accent })}
-          {bar('44%', { marginBottom: 8 })}
-        </>
-      )}
-      {bar('30%', { background: accent, marginTop: 6 })}{bar('100%')}{bar('88%')}{bar('76%')}
-      {bar('30%', { background: accent, marginTop: 6 })}{bar('90%')}{bar('82%')}
-    </div>
-  );
-}
-
-const PREVIEWS = {
-  elegant: <img src={elegantTemplate} alt="Elegant template preview" style={{ width: 238, height: 'auto', alignSelf: 'flex-start', opacity: .45, boxShadow: '0 10px 30px rgba(22,26,43,.12)' }} />,
-  classic: <Skeleton accent="#161A2B" centred />,
-  modern: <Skeleton accent="#3F5FD8" />,
-};
-
 function TileFoot({ name, blurb, muted, badge }) {
   return (
     <>
@@ -64,14 +32,17 @@ function TileFoot({ name, blurb, muted, badge }) {
 
 export default function TemplatePage() {
   const { draft, setDraft } = useAppStore();
-  const [picked, setPicked] = useState(draft.template);
+  const [selection, setSelection] = useState(null);
+  const [searchParams] = useSearchParams();
   const templates = useResource(listTemplates);
   const live = new Set((templates.data ?? []).map((t) => t.id));
+  const requested = searchParams.get('template');
+  const picked = selection ?? (live.has(requested) ? requested : draft.template);
   const fromHome = draft.jdFromHome && Boolean(draft.jd.trim());
   const jdTitle = [draft.role, draft.company].filter(Boolean).join(' · ') || 'Your job description';
 
   function pick(id) {
-    setPicked(id);
+    setSelection(id);
     setDraft({ template: id });
   }
 
@@ -86,13 +57,13 @@ export default function TemplatePage() {
         </div>
       )}
       <PageTitle before="Pick a" accent="template" style={{ marginTop: 24 }} />
-      <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Every template is built for ATS. You can switch later.</p>
+      <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Designed for ATS readability. You can switch templates later.</p>
 
       <ErrorBanner error={templates.error} action={{ label: 'Retry', onClick: templates.reload }} />
       {templates.loading && <PageLoading label="Loading templates…" />}
       {templates.data && (
       <div role="radiogroup" aria-label="Templates" style={{ marginTop: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 18 }}>
-        {TEMPLATES.map((t) => (live.has(t.id) ? (
+        {TEMPLATES.filter((t) => live.has(t.id)).map((t) => (
           <button
             key={t.id} type="button" role="radio" aria-checked={picked === t.id} onClick={() => pick(t.id)}
             style={{
@@ -102,28 +73,23 @@ export default function TemplatePage() {
             }}
           >
             <div style={{ position: 'relative' }}>
-              <CvThumb cv={SAMPLE} template={t.id} height={300} radius={12} />
+              <CvThumb cv={profileToCv(templatePreviewProfile(t.id))} template={t.id} height={300} radius={12} />
               {picked === t.id && (
                 <span style={{ position: 'absolute', top: 12, right: 12, width: 28, height: 28, borderRadius: 99, background: 'var(--hc-brand)', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Check size={14} strokeWidth={3} aria-hidden="true" />
                 </span>
               )}
             </div>
-            <TileFoot name={t.name} blurb={t.blurb} badge={<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--hc-success)', background: '#E8F5EC', borderRadius: 999, padding: '4px 10px' }}>ATS-safe</span>} />
+            <TileFoot name={t.name} blurb={t.blurb} badge={<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--hc-success)', background: '#E8F5EC', borderRadius: 999, padding: '4px 10px' }}>ATS-friendly</span>} />
           </button>
-        ) : (
-          <div key={t.id} aria-disabled="true" style={{ background: '#FFFFFF', border: '1.5px solid var(--hc-hairline)', borderRadius: 20, padding: 14 }}>
-            <div style={well}>{PREVIEWS[t.id]}</div>
-            <TileFoot name={t.name} blurb={t.blurb} muted badge={<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--hc-ink-muted)', background: '#F3F4F8', borderRadius: 999, padding: '4px 10px' }}>Coming soon</span>} />
-          </div>
-        )))}
+        ))}
       </div>
       )}
 
       <div style={{ marginTop: 28, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <Link className="hc-back" to={fromHome ? '/home' : '/resumes'}><ArrowLeft size={16} aria-hidden="true" />{fromHome ? 'Back to Home' : 'Back to resumes'}</Link>
         {live.has(picked)
-          ? <Link className="hc-btn-p is-lg" to={fromHome ? '/new/jd' : '/new/mode'}>Continue with {templateName(picked)}<ArrowRight size={16} aria-hidden="true" /></Link>
+          ? <Link className="hc-btn-p is-lg" to={fromHome ? '/new/jd' : '/new/mode'} onClick={() => setDraft({ template: picked })}>Continue with {templateName(picked)}<ArrowRight size={16} aria-hidden="true" /></Link>
           : <span className="hc-btn-off" aria-disabled="true">Pick a template to continue</span>}
       </div>
     </main>

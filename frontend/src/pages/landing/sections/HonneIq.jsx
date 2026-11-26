@@ -17,10 +17,10 @@ export default function HonneIq() {
           <div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><span className="lbl">05 — Honne IQ</span><span className="pill" style={{ background: '#F3F1EE', color: '#4A4A4A' }}>Gmail, Drive &amp; Notion: coming soon</span></div>
             <h2 id="iq-h" className="h2">Your career context. <span className="lead">Working together.</span></h2>
-            <p className="sub">Your profile, your CVs, every JD and every application live in one place. Every agent reads from it, so you stop explaining your career from scratch.</p>
+            <p className="sub">Keep your profile and application records together. When you need to follow up or prepare for an interview, open the job description and the resume you downloaded for that role.</p>
             <div style={{ marginTop: 28, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div className="card" style={{ padding: 16, background: '#FFFFFF' }}><div className="mono" style={{ fontSize: 10.5, color: '#6E6B78' }}>A GENERAL CHATBOT</div><p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: '#666666' }}>Starts from zero every chat. You paste your CV, the JD and your history again, and it forgets what happened next.</p></div>
-              <div className="card" style={{ padding: 16, borderColor: '#D9D2FB', background: '#FAF9FF' }}><div className="mono" style={{ fontSize: 10.5, color: '#6655E8' }}>HONNE&apos;S AGENTS</div><p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: '#171717' }}>Already know your profile, every application, and what came back. You tell it once.</p></div>
+              <div className="card" style={{ padding: 16, background: '#FFFFFF' }}><strong>Application history</strong><p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: '#666666' }}>Update your status as you apply, hear back or get an interview.</p></div>
+              <div className="card" style={{ padding: 16, borderColor: '#D9D2FB', background: '#FAF9FF' }}><strong>Advice with context</strong><p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: '#171717' }}>Ask an agent for help using the profile and application activity you’ve saved.</p></div>
             </div>
           </div>
           <div className="card" style={{ padding: 12, background: 'rgba(255,255,255,.75)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}>

@@ -15,7 +15,7 @@ export default function Closing() {
               “The hardest thing? Applying to hundreds every day and hearing nothing back. No dopamine hit. Just slowly losing your confidence.”
             </blockquote>
             <p style={{ margin: '24px 0 0', fontSize: 18, lineHeight: 1.6, color: '#666666', maxWidth: 640 }}>So stay conscious. Apply where you have a real shot. Get referrals. Track what you’re doing, and start again from where it didn’t work, not from scratch.</p>
-            <figcaption style={{ marginTop: 22, fontSize: 14, fontWeight: 600 }}>The founders of Honne Careers <span style={{ fontWeight: 400, color: '#666666' }}>· learned from 2,000+ applications, ours and our friends’</span></figcaption>
+            <figcaption style={{ marginTop: 22, fontSize: 14, fontWeight: 600 }}>The founders of Honne Careers <span style={{ fontWeight: 400, color: '#666666' }}>· inspired by our own job searches</span></figcaption>
           </Reveal>
         </div>
       </section>

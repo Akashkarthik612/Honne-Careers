@@ -16,7 +16,7 @@ from app.domain.cv import Certification, CvContent, ExperienceItem, ProjectItem,
 from app.domain.layout import SectionKey, SectionOrder
 from app.render.latex import escape, escape_url, link_label, rich
 
-PREAMBLE = r"""\documentclass[letterpaper,10pt]{article}
+BASE_PREAMBLE = r"""\documentclass[letterpaper,10pt]{article}
 \usepackage[empty]{fullpage}
 \usepackage{titlesec}
 \usepackage{enumitem}
@@ -41,7 +41,9 @@ PREAMBLE = r"""\documentclass[letterpaper,10pt]{article}
 \emergencystretch=1em
 \titleformat{\section}{\normalsize\bfseries\scshape}{}{0em}{}[\titlerule]
 \titlespacing*{\section}{0pt}{8pt}{4pt}
-\newcommand{\experience}[4]{%
+"""
+
+PREAMBLE = BASE_PREAMBLE + r"""\newcommand{\experience}[4]{%
   \par\addvspace{8pt}\needspace{48pt}%
   \begin{tabular*}{\linewidth}{@{}p{0.79\linewidth}@{\extracolsep{\fill}}r@{}}%
     \textbf{#1} & {\footnotesize #2}\\[-1pt]
@@ -76,8 +78,10 @@ class ProfessionalRenderer:
     """Strategy for template "honne_professional". Sections print in `order`; an empty one
     is skipped. Employers print in their stored order (never re-sorted here)."""
 
+    preamble = PREAMBLE
+
     def render(self, cv: CvContent, order: SectionOrder) -> str:
-        parts = [PREAMBLE, r"\begin{document}", self._header(cv)]
+        parts = [self.preamble, r"\begin{document}", self._header(cv)]
         for key in order:
             if section := self._section(cv, key):
                 parts.append(section)

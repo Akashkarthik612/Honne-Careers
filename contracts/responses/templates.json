@@ -24,5 +24,70 @@
       "certifications",
       "languages"
     ]
+  },
+  {
+    "id": "graduate",
+    "name": "Graduate",
+    "description": "For students and recent graduates",
+    "default_order": [
+      "education",
+      "experience",
+      "projects",
+      "skills",
+      "certifications",
+      "languages"
+    ]
+  },
+  {
+    "id": "marketing",
+    "name": "Marketing",
+    "description": "For marketing and growth professionals",
+    "default_order": [
+      "experience",
+      "projects",
+      "skills",
+      "education",
+      "certifications",
+      "languages"
+    ]
+  },
+  {
+    "id": "sales",
+    "name": "Sales",
+    "description": "For sales and business development professionals",
+    "default_order": [
+      "experience",
+      "skills",
+      "education",
+      "projects",
+      "certifications",
+      "languages"
+    ]
+  },
+  {
+    "id": "customer_success",
+    "name": "Customer Success",
+    "description": "For onboarding and account management professionals",
+    "default_order": [
+      "experience",
+      "skills",
+      "education",
+      "projects",
+      "certifications",
+      "languages"
+    ]
+  },
+  {
+    "id": "project_operations",
+    "name": "Project & Operations",
+    "description": "For project delivery and operations professionals",
+    "default_order": [
+      "experience",
+      "projects",
+      "skills",
+      "education",
+      "certifications",
+      "languages"
+    ]
   }
 ]

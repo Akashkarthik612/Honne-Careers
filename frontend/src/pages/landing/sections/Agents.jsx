@@ -40,7 +40,7 @@ export default function Agents() {
 
             <div className="g2" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,5fr) minmax(0,7fr)', gap: 18, alignItems: 'stretch' }}>
               <div className="card hideM" style={{ padding: 16, position: 'relative', background: 'radial-gradient(circle at 50% 46%,#F4F1FF 0,#FFFFFF 62%)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span className="mono" style={{ fontSize: 11, color: '#6E6B78' }}>HOW THEY CONNECT</span><span className="tag">LIVE DEMO</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span className="mono" style={{ fontSize: 11, color: '#6E6B78' }}>HOW THEY CONNECT</span><span className="tag">SAMPLE DEMO</span></div>
                 <Diagram agent={agent} curName={cur.name} onPick={pick} />
               </div>
 

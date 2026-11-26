@@ -15,6 +15,7 @@ from app.core.logging import get_logger
 from app.domain.cv import CvContent
 from app.domain.layout import SectionKey, SectionOrder
 from app.domain.records import ResumeRow
+from app.render.templates.career import CareerRenderer
 from app.render.templates.jake import JakeRenderer
 from app.render.templates.professional import ProfessionalRenderer
 
@@ -47,6 +48,26 @@ class TemplateRegistry:
                          "For experienced professionals", 1,
                          (S.EXPERIENCE, S.PROJECTS, S.SKILLS, S.EDUCATION, S.CERTIFICATIONS,
                           S.LANGUAGES), ProfessionalRenderer()),
+            TemplateInfo("graduate", "Graduate",
+                         "For students and recent graduates", 1,
+                         (S.EDUCATION, S.EXPERIENCE, S.PROJECTS, S.SKILLS,
+                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Academic Projects", "0.17,0.27,0.45")),
+            TemplateInfo("marketing", "Marketing",
+                         "For marketing and growth professionals", 1,
+                         (S.EXPERIENCE, S.PROJECTS, S.SKILLS, S.EDUCATION,
+                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Selected Campaigns", "0.35,0.19,0.43")),
+            TemplateInfo("sales", "Sales",
+                         "For sales and business development professionals", 1,
+                         (S.EXPERIENCE, S.SKILLS, S.EDUCATION, S.PROJECTS,
+                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Projects", "0.14,0.32,0.26")),
+            TemplateInfo("customer_success", "Customer Success",
+                         "For onboarding and account management professionals", 1,
+                         (S.EXPERIENCE, S.SKILLS, S.EDUCATION, S.PROJECTS,
+                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Projects", "0.10,0.32,0.40")),
+            TemplateInfo("project_operations", "Project & Operations",
+                         "For project delivery and operations professionals", 1,
+                         (S.EXPERIENCE, S.PROJECTS, S.SKILLS, S.EDUCATION,
+                          S.CERTIFICATIONS, S.LANGUAGES), CareerRenderer("Selected Projects", "0.34,0.23,0.15")),
         ]
         self._templates = {t.id: t for t in templates}
 

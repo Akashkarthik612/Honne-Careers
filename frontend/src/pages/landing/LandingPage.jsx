@@ -50,13 +50,13 @@ export default function LandingPage() {
         <Nav />
         <main>
           <Hero />
+          <Templates />
           <Problem />
           <Agents />
           <Tailoring />
           <HonneIq />
           <LearningLoop />
           <Builder />
-          <Templates />
         </main>
         <Closing />
       </div>
