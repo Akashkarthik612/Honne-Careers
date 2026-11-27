@@ -17,7 +17,7 @@ export default function Closing() {
             </svg>
             <div style={{ position: 'relative', maxWidth: 640 }}>
               <h2 id="cta-h" className="h" style={{ margin: 0, fontSize: 'clamp(36px,4.8vw,60px)', lineHeight: 1.02, letterSpacing: '-0.045em', fontWeight: 700 }}>
-                Your career deserves a <span className="serif" style={{ color: '#6655E8', fontSize: '1.08em' }}>better strategy.</span>
+                Stay ahead of your crowd <span className="serif" style={{ color: '#6655E8', fontSize: '1.08em' }}>to be visible to recruiters.</span>
               </h2>
               <p style={{ margin: '20px 0 0', fontSize: 18, lineHeight: 1.6, color: '#4E4E4E' }}>Start with a role you want. Bring the job description and choose your CV template.</p>
               <div style={{ marginTop: 30, display: 'flex', flexWrap: 'wrap', gap: 12 }}>

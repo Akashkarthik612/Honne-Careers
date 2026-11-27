@@ -152,13 +152,25 @@
 .hc-landing :is(.interview-state,.applied-state) { display: inline-block; padding: 4px 7px; border-radius: 6px; font-size: 12px; }
 .hc-landing .interview-state { background: #e6f3eb; color: #245e45; }
 .hc-landing .applied-state { background: #eeebfe; color: #51429f; }
-.hc-landing .launch-plans { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; margin-top: 32px; }
-.hc-landing .plan-card:nth-child(3) { background: #f6f4ff; border-color: #c9bff9; }
-.hc-landing .plan-card h3 { margin: 0; }
-.hc-landing .plan-price { font-size: clamp(32px,4vw,46px); font-weight: 700; margin: 20px 0; letter-spacing: -.04em; }
+.hc-landing .pricing-section { background: linear-gradient(170deg, #fbfaf8 12%, #f0ebfc 100%); }
+.hc-landing .launch-plans { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin-top: 32px; }
+.hc-landing .plan-card-featured { background: #f9f6ff; border: 1px solid #9882e4; box-shadow: 0 14px 34px -24px #5940a6; }
+.hc-landing .plan-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.hc-landing .plan-heading h3 { margin: 0; font-size: 22px; }
+.hc-landing .plan-heading .tag { background: #ede6ff; border-color: #ded1fa; color: #4b3288; }
+.hc-landing .plan-description, .hc-landing .plan-standard { color: #514c59; margin: 8px 0 0; font-size: 14px; line-height: 1.5; }
+.hc-landing .plan-price { font-size: clamp(36px,4vw,50px); font-weight: 700; margin: 16px 0 0; letter-spacing: -.05em; }
 .hc-landing .plan-price small { font-size: 14px; font-weight: 400; letter-spacing: normal; color: #615d68; }
-.hc-landing .plan-card ul { padding-left: 20px; line-height: 1.55; color: #514c59; }
-.hc-landing .plan-card li + li { margin-top: 6px; }
+.hc-landing .plan-action { margin-top: 16px; }
+.hc-landing .plan-availability { margin: 16px 0 0; font-size: 13px; font-weight: 600; color: #564477; }
+.hc-landing .plan-features { display: grid; gap: 14px; list-style: none; border-top: 1px solid #e2dfeb; margin: 20px 0 0; padding: 20px 0 0; }
+.hc-landing .plan-features li { display: grid; grid-template-columns: 16px minmax(0,1fr); gap: 8px; font-size: 14px; line-height: 1.5; }
+.hc-landing .plan-features svg { color: #5c40a7; margin-top: 3px; }
+.hc-landing .plan-features span { display: block; color: #514c59; margin-top: 2px; }
+.hc-landing .pricing-questions { max-width: 740px; margin: 26px auto 0; }
+.hc-landing .pricing-questions details { padding: 12px 0; border-bottom: 1px solid #e2dfeb; }
+.hc-landing .pricing-questions summary { cursor: pointer; font-weight: 600; }
+.hc-landing .pricing-questions p { color: #514c59; line-height: 1.5; margin: 10px 0 0; }
 @media (max-width: 800px) {
   .hc-landing .launch-split { grid-template-columns: minmax(0,1fr); }
 }
@@ -180,7 +192,6 @@
 .hc-landing .multiplayer-stage dd { margin: 0 0 7px; }
 .hc-landing .multiplayer-stage p + p { margin-top: 10px; }
 @media (max-width: 950px) {
-  .hc-landing .launch-plans { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .hc-landing .fit-desktop { display: none; }
   .hc-landing .fit-mobile { display: grid; gap: 12px; max-width: 430px; margin-inline: auto; }
   .hc-landing .fit-slice { position: relative; overflow: hidden; aspect-ratio: 430 / 599; border-radius: 18px; }
@@ -189,6 +200,6 @@
   .hc-landing .fit-experience img { left: -129.30%; }
   .hc-landing .fit-narrative img { left: -233.72%; }
 }
-@media (max-width: 560px) {
+@media (max-width: 760px) {
   .hc-landing .launch-plans { grid-template-columns: 1fr; }
 }
