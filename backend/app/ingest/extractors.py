@@ -8,6 +8,8 @@ Adding a format = one strategy + one dict entry (OCP).
 
 import asyncio
 import re
+import shutil
+import subprocess  # nosec B404 - fixed Poppler CLI, input is sent on stdin
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
@@ -48,8 +50,9 @@ class Extractor(Protocol):
 class PdfExtractor:
     source_type, ext = "pdf", "pdf"
 
-    def __init__(self, max_pages: int) -> None:
+    def __init__(self, max_pages: int, timeout_s: int = 30) -> None:
         self._max_pages = max_pages
+        self._timeout_s = timeout_s
 
     def extract(self, data: bytes) -> str:
         try:
@@ -59,13 +62,24 @@ class PdfExtractor:
             if len(reader.pages) > self._max_pages:
                 raise UnreadableUpload(f"CVs up to {self._max_pages} pages, please.",
                                        reason="too_many_pages")
-            # Layout mode places glyphs by position. The default mode drops the space at a
-            # font switch ("through **Python**" -> "throughPython") and splits kerned pairs
-            # ("T echnology"); the parser copies verbatim, so those would reach the CV.
-            text = "\n".join(_tidy(page.extract_text(extraction_mode="layout") or "")
-                             for page in reader.pages)
         except PdfReadError as exc:
             raise UnreadableUpload("This PDF looks corrupt.", reason="corrupt_pdf") from exc
+
+        # Poppler reconstructs spaces across font changes. Its default reading-order mode
+        # keeps columns separate where the physical layout mode can interleave them.
+        executable = shutil.which("pdftotext")
+        if executable is None:
+            raise RuntimeError("PDF extraction requires Poppler's pdftotext")
+        try:
+            result = subprocess.run(  # noqa: S603  # nosec B603
+                [executable, "-enc", "UTF-8", "-", "-"],
+                input=data, capture_output=True, timeout=self._timeout_s, check=True,
+            )
+        except subprocess.TimeoutExpired:
+            raise UnreadableUpload("This PDF took too long to read.", reason="timeout") from None
+        except subprocess.CalledProcessError:
+            raise UnreadableUpload("This PDF looks corrupt.", reason="corrupt_pdf") from None
+        text = _tidy(result.stdout.decode("utf-8", errors="replace"))
         if len(text.strip()) < MIN_TEXT_CHARS:
             raise UnreadableUpload("This PDF has no selectable text (a scan?). Upload a text "
                                    "PDF or DOCX.", reason="image_only")
@@ -120,7 +134,7 @@ class TextExtractor:
         self._max_bytes = max_bytes
         self._timeout_s = timeout_s
         self._by_type: dict[str, Extractor] = {
-            "pdf": PdfExtractor(max_pages),
+            "pdf": PdfExtractor(max_pages, timeout_s),
             "docx": DocxExtractor(max_uncompressed),
             "latex": LatexTextExtractor(),
         }
