@@ -7,10 +7,12 @@ from app.analysis.scores import ScoreCalculator, years_of_experience
 from app.core.errors import InvalidInput, UnreadableUpload
 from app.domain.analysis import AnalysisJudgment
 from app.ingest.extractors import TextExtractor
+from app.services.uploads import _bullets
 from tests.docs import (
     SPACING_BROKEN,
     SPACING_PHRASES,
     TECH_TERMS,
+    _assemble,
     docx,
     kerned_bold_pdf,
     text_pdf,
@@ -112,3 +114,45 @@ def test_no_skills_in_jd_is_zero_with_reason():
                       "jd_story": "", "cv_story": "", "suggestion": ""}})
     scores = ScoreCalculator().compute(judgment, sample_cv())
     assert scores.keyword == 0 and scores.details["keyword"]["reason"] == "no_skills_in_jd"
+
+
+async def test_two_column_pdf_keeps_each_column_in_reading_order():
+    columns = [
+        ["Work experience heading",
+         "Built automated pipelines and scheduled reusable deployment checks.",
+         "Maintained service reliability and automated production release reporting."],
+        ["Technical skills heading",
+         "Python for workflow tools.",
+         "Docker for deployment."],
+    ]
+    content = " ".join(
+        f"BT /F1 9 Tf 1 0 0 1 {x} {760 - i * 11} Tm ({line}) Tj ET"
+        for i in range(3)
+        for x, column in zip((35, 365), columns, strict=True)
+        for line in (column[i],)
+    ).encode()
+    pdf = _assemble([
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources "
+        b"<< /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ])
+    lines = (await EXTRACTOR.extract(pdf)).text.splitlines()
+    assert [line for line in lines if line] == columns[0] + columns[1]
+
+
+def test_imported_list_markers_removed_without_changing_bullet_content():
+    values = [
+        "–Built CI/CD pipelines using Jenkins\nwith audit reports.",
+        "- Maintained cloud-native services from 2022–2024.",
+        "•Improved reliability by 40%.",
+        "-5 was the initial threshold.",
+    ]
+    assert [bullet.text for bullet in _bullets(values)] == [
+        "Built CI/CD pipelines using Jenkins with audit reports.",
+        "Maintained cloud-native services from 2022–2024.",
+        "Improved reliability by 40%.",
+        "-5 was the initial threshold.",
+    ]

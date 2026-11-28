@@ -2,6 +2,8 @@
 
 FastAPI + Tectonic (LaTeX) in one Docker image, on Render. Supabase for Postgres (RLS), Auth and Storage. Design: [Day_1.md](../Day_1.md). Rules: [CLAUDE.md](../CLAUDE.md).
 
+PDF imports require Poppler’s `pdftotext` (`poppler-utils` on Debian/Ubuntu). The Docker image includes it.
+
 ## One-time Supabase setup
 
 1. **Region**: Singapore (`ap-southeast-1`), the same region as the Render API. Render has no Mumbai region, and the API makes several DB round trips per request, so the DB must sit next to it.

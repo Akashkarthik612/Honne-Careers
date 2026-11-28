@@ -29,7 +29,7 @@ RUN curl -fsSL -o /tmp/tectonic.tar.gz \
 
 # ---- 3. Runtime ----
 FROM python:3.12-slim-bookworm AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends fontconfig ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends fontconfig ca-certificates poppler-utils \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --create-home --uid 10001 --shell /usr/sbin/nologin app
 COPY --from=builder /venv /venv

@@ -27,6 +27,9 @@ from app.policy.quota import QuotaGuard
 from app.storage.file_store import UPLOAD_EXTENSIONS, upload_path
 
 log = get_logger(__name__)
+# The parser has already identified list items. Strip one list prefix without
+# touching hyphenated words, date ranges, or negative values.
+_LIST_PREFIX = re.compile(r"^\s*(?:[-–—]\s+|[–—•▪●](?=[^\W\d_]|\s)|[•▪●]$)")
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._ -]")
 
 
@@ -42,7 +45,8 @@ def _new_id() -> str:
 
 
 def _bullets(texts: list[str]) -> list[PrefillBullet]:
-    return [PrefillBullet(id=_new_id(), text=t) for t in texts]
+    cleaned = [" ".join(_LIST_PREFIX.sub("", text, count=1).split()) for text in texts]
+    return [PrefillBullet(id=_new_id(), text=text) for text in cleaned if text]
 
 
 def to_prefill(parsed: ParsedCv) -> PrefillCv:
