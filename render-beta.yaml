@@ -3,20 +3,6 @@
 # Region: Singapore is Render's closest to India (it has no Mumbai). The Supabase project is
 # in the same region (ap-southeast-1) so the API's many DB round trips stay ~1-2 ms.
 
-envVarGroups:
-  - name: honne-careers-beta-api-secrets
-    envVars:
-      - key: DATABASE_URL          # Supabase session pooler (IPv4), user honne_backend
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY   # used only to delete an account (AUTH-3)
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-
 services:
   - type: web
     name: honne-careers-beta-api
@@ -30,7 +16,16 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: checksPass   # deploy this beta branch once CI passes
     envVars:
-      - fromGroup: honne-careers-beta-api-secrets
+      - key: DATABASE_URL          # Supabase session pooler (IPv4), user honne_backend
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY   # used only to delete an account (AUTH-3)
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
       - key: ENV
         value: prod
       - key: CLOSED_BETA
