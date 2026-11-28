@@ -3,10 +3,11 @@ Every attempt counts, including ones that later fail, so failing requests can't 
 burn LLM calls. Callers name an action; the numbers and plans live in the YAML only."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
-from app.core.errors import QuotaExceeded
+from app.core.errors import JobAlreadyRunning, QuotaExceeded
 from app.core.logging import get_logger
 from app.db.unit_of_work import UnitOfWork
 from app.policy.limits import DailyAction, LimitPolicy, PlanLimits, TotalLimit
@@ -45,8 +46,20 @@ class Usage:
 
 
 class QuotaGuard:
-    def __init__(self, policy: LimitPolicy) -> None:
+    def __init__(self, policy: LimitPolicy, beta_timeout_s: int = 0) -> None:
         self._policy = policy
+        self.beta_timeout_s = beta_timeout_s
+        self._timezone = "Asia/Kolkata" if beta_timeout_s else "UTC"
+
+    async def check_beta_cv(self, uow: UnitOfWork, user_id: UUID) -> None:
+        await uow.usage.lock(user_id, DailyAction.FULL_TAILOR)
+        used, pending = await uow.usage.beta_cv_count(user_id, self._timezone, self.beta_timeout_s)
+        limit = (await self._limits(uow, user_id)).daily[DailyAction.FULL_TAILOR]
+        if used >= limit:
+            raise QuotaExceeded(action=DailyAction.FULL_TAILOR.value, limit=limit)
+        if used + pending >= limit:
+            raise JobAlreadyRunning("Wait for a CV tailoring to finish, then try again.")
+
 
     async def consume(self, uow: UnitOfWork, user_id: UUID, action: DailyAction) -> None:
         """Checks and records one use inside the caller's transaction. O(1) indexed count."""
@@ -54,7 +67,8 @@ class QuotaGuard:
         weekly = action in limits.weekly
         limit = limits.weekly[action] if weekly else limits.daily[action]
         await uow.usage.lock(user_id, action)
-        used = await uow.usage.count_period(user_id, action, "week" if weekly else "day")
+        used = await uow.usage.count_period(
+            user_id, action, "week" if weekly else "day", self._timezone)
         if used >= limit:
             message = (f"You've used this week's {limit} CV tailorings. The limit resets on Monday."
                        if weekly else _MESSAGES[action].format(limit=limit))
@@ -69,12 +83,16 @@ class QuotaGuard:
     async def usage(self, uow: UnitOfWork, user_id: UUID) -> Usage:
         """Current counts and reset dates for the Settings panel."""
         limits = await self._limits(uow, user_id)
-        today = await uow.usage.counts_today(user_id)
+        today = await uow.usage.counts_today(user_id, self._timezone)
+        if self.beta_timeout_s:
+            today[DailyAction.FULL_TAILOR], _ = await uow.usage.beta_cv_count(
+                user_id, self._timezone, self.beta_timeout_s)
         totals = {TotalLimit.CUSTOM_AGENTS: await uow.agents.count_active(user_id)}
         items = [UsageItem(a.value, today.get(a.value, 0), n, True)
                  for a, n in limits.daily.items()]
         items += [UsageItem(t.value, totals[t], n, False) for t, n in limits.total.items()]
-        midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        midnight = datetime.now(ZoneInfo(self._timezone)).replace(
+            hour=0, minute=0, second=0, microsecond=0)
         next_week = midnight + timedelta(days=7 - midnight.weekday())
         for action, limit in limits.weekly.items():
             used = await uow.usage.count_period(user_id, action, "week")

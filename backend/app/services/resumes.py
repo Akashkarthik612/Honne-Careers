@@ -24,12 +24,13 @@ JD_MAX_WORDS = 1000  # TAIL-1
 
 class ResumeService:
     def __init__(self, uow: UnitOfWorkFactory, templates: TemplateRegistry, files,
-                 tailor_job_timeout_s: int) -> None:
+                 tailor_job_timeout_s: int, closed_beta: bool = False) -> None:
         self._uow = uow
         self._templates = templates
         self._files = files
         self._stamper = EditStamper(Origin.USER)
         self._job_timeout_s = tailor_job_timeout_s
+        self._closed_beta = closed_beta
 
     async def list(self, user: AuthUser) -> list[ResumeSummary]:
         async with self._uow(user.id) as uow:
@@ -71,6 +72,22 @@ class ResumeService:
             if row.row_version != patch.expected_version:
                 raise StaleVersion(reason="resume", current_version=row.row_version)
             content = self._stamper.apply_patch(row.content, patch.change)
+            section = patch.change.section
+            if self._closed_beta and section in ("experience", "projects"):
+                uploads = await uow.uploads.list_parsed(user.id)
+                sources = {b.id: b.text for upload in uploads if upload.parsed is not None
+                           for entry in getattr(upload.parsed, section) for b in entry.bullets}
+                existing = {b.id for entry in getattr(row.content, section)
+                            for b in entry.bullets}
+                entries = []
+                for entry in getattr(content, section):
+                    bullets = [
+                        b.model_copy(update={"origin": Origin.PROFILE, "locked": False})
+                        if b.id not in existing and sources.get(b.id) == b.text else b
+                        for b in entry.bullets
+                    ]
+                    entries.append(entry.model_copy(update={"bullets": bullets}))
+                content = content.model_copy(update={section: entries})
             chash = content_hash(content)
             # A JD suggestion the user typed into Skills (wizard "+ add") is no longer missing.
             missing = (_still_missing(row.missing_skills, content)

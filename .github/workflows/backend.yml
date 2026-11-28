@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ["backend/**", "supabase/**", "contracts/**", ".github/workflows/backend.yml"]
   push:
-    branches: [test, main]
+    branches: [test, main, beta/dec-7]
     paths: ["backend/**", "supabase/**", "contracts/**", ".github/workflows/backend.yml"]
 
 permissions:

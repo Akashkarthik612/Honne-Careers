@@ -135,19 +135,19 @@ class ResumeRepository:
             (jd_id, user_id, resume_id))
         return cur.rowcount == 1
 
-    async def start_tailoring(self, user_id: UUID, resume_id: UUID, timeout_s: int
-                              ) -> int | None:
+    async def start_tailoring(self, user_id: UUID, resume_id: UUID, timeout_s: int,
+                              *, new_version: bool = False) -> int | None:
         """Atomic guard: only one job per resume. A job older than timeout counts as dead.
         Returns the row_version the job started from, or None if a live job exists."""
         cur = await self._conn.execute(
             """update app.resumes
                   set status = 'tailoring', job_step = 'reading', job_started_at = now(),
-                      error_code = null
+                      error_code = null, row_version = row_version + %s
                 where user_id = %s and id = %s
                   and (status <> 'tailoring'
                        or job_started_at < now() - make_interval(secs => %s))
             returning row_version""",
-            (user_id, resume_id, timeout_s))
+            (int(new_version), user_id, resume_id, timeout_s))
         row = await cur.fetchone()
         return row["row_version"] if row else None
 
@@ -170,13 +170,15 @@ class ResumeRepository:
         row = await cur.fetchone()
         return row["row_version"] if row else None
 
-    async def fail_tailoring(self, user_id: UUID, resume_id: UUID, error_code: str) -> bool:
+    async def fail_tailoring(self, user_id: UUID, resume_id: UUID, error_code: str,
+                             version: int | None = None) -> bool:
         cur = await self._conn.execute(
             """update app.resumes
                   set status = 'failed', job_step = null, job_started_at = null,
                       error_code = %s
-                where user_id = %s and id = %s and status = 'tailoring'""",
-            (error_code, user_id, resume_id))
+                where user_id = %s and id = %s and status = 'tailoring'
+                  and (%s::int is null or row_version = %s)""",
+            (error_code, user_id, resume_id, version, version))
         return cur.rowcount == 1
 
     async def set_job_step(self, user_id: UUID, resume_id: UUID, step: JobStep) -> bool:

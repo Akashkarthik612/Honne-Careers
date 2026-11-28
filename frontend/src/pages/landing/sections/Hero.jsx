@@ -1,10 +1,8 @@
 import { Link } from 'react-router-dom';
-import { useJump } from '../landingHooks';
 import HeroDemo from './HeroDemo';
 import { Chevron } from './parts';
 
 export default function Hero() {
-  const jump = useJump();
   return (
     <section id="top" aria-labelledby="hero-h" style={{ position: 'relative', overflow: 'hidden' }}>
       <svg viewBox="0 0 900 1000" aria-hidden="true" className="e0" style={{ position: 'absolute', top: -180, right: -220, width: 980, height: 1090, pointerEvents: 'none', WebkitMaskImage: 'linear-gradient(to left,#000 50%,transparent 95%)', maskImage: 'linear-gradient(to left,#000 50%,transparent 95%)' }}>
@@ -25,7 +23,7 @@ export default function Hero() {
             </p>
             <div className="e4" style={{ marginTop: 26, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
               <Link className="btn-p" to="/new/template">Build my CV <Chevron /></Link>
-              <a className="btn-s" href="#pricing" onClick={jump('pricing')}>View plans</a>
+              <span className="pill">Free invite-only beta</span>
             </div>
           </div>
           <HeroDemo />

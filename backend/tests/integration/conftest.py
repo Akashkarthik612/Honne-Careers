@@ -120,12 +120,14 @@ def make_settings(database_url: str, limits_file: Path = TEST_LIMITS) -> Setting
     )
 
 
-async def _harness(database: str, admin_url: str, limits_file: Path) -> AsyncIterator[Api]:
+async def _harness(database: str, admin_url: str, limits_file: Path,
+                   *, settings: Settings | None = None,
+                   verifier: FakeVerifier | None = None) -> AsyncIterator[Api]:
     provider, files, compiler = FakeProvider(), FakeFileStore(), FakeLatexCompiler()
     storage_admin = FakeStorageAdmin(files)
-    container = build_container(make_settings(database, limits_file),
+    container = build_container(settings or make_settings(database, limits_file),
                                 providers={"fake": provider},
-                                jwt_verifier=FakeVerifier(), files=files,
+                                jwt_verifier=verifier or FakeVerifier(), files=files,
                                 admin=FakeAdmin(admin_url), compiler=compiler,
                                 storage_admin=storage_admin)
     await container.start()

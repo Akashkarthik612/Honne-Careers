@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ADVISOR_RECS, AGENTS, AGENT_HUB as HUB, ANALYST_ROWS, FIT_ROWS, OUTREACH_ASKS, STRATEGIST_BARS, agentPos } from '../landingData';
-import { useJump } from '../landingHooks';
 import { Icon2, Reveal } from './parts';
 
 // 03 — your AI team: a list of agents (sticky on desktop, a tab strip on phones), the
@@ -8,7 +7,6 @@ import { Icon2, Reveal } from './parts';
 export default function Agents() {
   const [agent, setAgent] = useState('outreach');
   const [miniSaved, setMiniSaved] = useState(false);
-  const jump = useJump();
   const cur = AGENTS.find((a) => a.id === agent) || AGENTS[0];
   const pick = (id) => { setAgent(id); setMiniSaved(false); };
 
@@ -60,7 +58,7 @@ export default function Agents() {
                   {agent === 'analyst' && <AnalystPanel />}
                   {agent === 'advisor' && <AdvisorPanel />}
                   {agent === 'strategist' && <StrategistPanel />}
-                  {agent === 'custom' && <CustomPanel saved={miniSaved} onSave={() => setMiniSaved(true)} onBuild={jump('pricing')} />}
+                  {agent === 'custom' && <CustomPanel saved={miniSaved} onSave={() => setMiniSaved(true)} />}
                 </div>
               </div>
             </div>
@@ -219,7 +217,7 @@ function StrategistPanel() {
 
 const fieldBox = { marginTop: 4, border: '1px solid #E8E6E3', borderRadius: 10, padding: '10px 12px', background: '#FBFAF8' };
 
-function CustomPanel({ saved, onSave, onBuild }) {
+function CustomPanel({ saved, onSave }) {
   return (
     <div className="rise" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -234,7 +232,6 @@ function CustomPanel({ saved, onSave, onBuild }) {
           <button type="button" className="btn-p" onClick={onSave} style={{ minHeight: 40, fontSize: 14 }}>{saved ? 'Saved' : 'Save agent'}</button>
         </div>
       </div>
-      <a href="#pricing" onClick={onBuild} style={{ fontSize: 13.5, fontWeight: 600, textDecoration: 'none' }}>See plans for custom agents ↓</a>
     </div>
   );
 }

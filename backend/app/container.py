@@ -142,7 +142,10 @@ def build_container(settings: Settings, *, providers: dict[str, LlmProvider] | N
         settings.tectonic_cache_dir)
     entitlements = Entitlements(settings.beta_free_tailoring)
     # Usage limits per plan: config/limits.yaml (a bad file stops startup).
-    quota = QuotaGuard(ConfiguredLimitPolicy(LimitsConfig.load(settings.limits_file)))
+    limits_file = (settings.limits_file.with_name("closed-beta-limits.yaml")
+                   if settings.closed_beta else settings.limits_file)
+    quota = QuotaGuard(ConfiguredLimitPolicy(LimitsConfig.load(limits_file)),
+                       beta_timeout_s=settings.tailor_job_timeout_s if settings.closed_beta else 0)
     window = RetentionWindow(settings.application_retention_days)
     janitor = RetentionJanitor(
         db, storage_admin or StorageAdmin(http, str(settings.supabase_url),
@@ -151,7 +154,8 @@ def build_container(settings: Settings, *, providers: dict[str, LlmProvider] | N
         window, timedelta(hours=settings.janitor_every_h), settings.janitor_batch,
         settings.janitor_max_batches)
     profiles = ProfileService(uow)
-    resumes = ResumeService(uow, templates, file_store, settings.tailor_job_timeout_s)
+    resumes = ResumeService(uow, templates, file_store, settings.tailor_job_timeout_s,
+                            closed_beta=settings.closed_beta)
     applications = ApplicationService(uow, file_store, window, settings.application_list_max)
 
     # Day 3: chat agents. One runner for user-made and built-in agents.

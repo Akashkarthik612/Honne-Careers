@@ -6,7 +6,6 @@ import SkillChips from '@/components/SkillChips';
 import SpokenLanguagesEditor from '@/components/SpokenLanguagesEditor';
 import CertificationsEditor from '@/components/CertificationsEditor';
 import { ErrorBanner, PageLoading } from '@/components/Status';
-import { BULLET_TAILOR_CONCURRENCY } from '@/config/limits';
 import {
   STEP_SECTIONS, WIZARD_ORDER, bulletToDoc, mergePrefill, openSuggestions, prefillToDoc, sectionPatch, toResume, validateDoc,
 } from '@/data/cvAdapter';
@@ -15,7 +14,7 @@ import {
 } from '@/data/cvModel';
 import { sectionOrderOf, templateName } from '@/data/templates';
 import useResource from '@/hooks/useResource';
-import { getProfile, getResume, patchResume, saveResumeToProfile, settleBullet, tailorBullet } from '@/services/api';
+import { getProfile, getResume, patchResume, saveResumeToProfile, settleBullet, startTailor, tailorBullet } from '@/services/api';
 import { ApiError, errorText } from '@/services/apiClient';
 import { useAppStore } from '@/state/appStore';
 import BulletEditor from './BulletEditor';
@@ -44,7 +43,6 @@ const ROLE_FIELDS = [['role', 'Role'], ['company', 'Company'], ['start', 'Start'
 const EDU_FIELDS = [['school', 'School'], ['degree', 'Degree'], ['years', 'Years'], ['city', 'City']];
 
 const DOC_KEY = { experience: 'roles', projects: 'projects' };
-const TAILORABLE = new Set(['plain', 'kept']); // "Tailor all" leaves the user's own wording alone (B5)
 
 function Field({ id, label, value, onChange, type = 'text', placeholder, error }) {
   return (
@@ -96,12 +94,6 @@ function bulletError(e) {
   return { message: errorText(e) };
 }
 
-async function runLimited(items, limit, fn) {
-  let next = 0;
-  const worker = async () => { while (next < items.length) { const item = items[next]; next += 1; await fn(item); } };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-}
-
 export default function WizardPage() {
   const [params] = useSearchParams();
   const resumeId = params.get('resume');
@@ -131,7 +123,6 @@ function WizardForm({ resume, stepParam, onReload }) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [note, setNote] = useState(null);
   const [tab, setTab] = useState('edit');
   const [jdOpen, setJdOpen] = useState(false);
 
@@ -232,14 +223,21 @@ function WizardForm({ resume, stepParam, onReload }) {
   }
 
   async function tailorAll() {
-    if (dirty && (await saveSections(['experience'])) === null) return;
-    const queue = doc.roles.flatMap((r) => r.bullets.filter((b) => TAILORABLE.has(b.status) && b.text.trim()).map((b) => [r.id, b]));
-    if (!queue.length) {
-      setNote('Every bullet here is in your own words, so we left them alone. Tap “Tailor to JD” on any bullet to rewrite it.');
-      return;
+    if (locked) return;
+    const version = await saveSections(ORDER.flatMap((key) => STEP_SECTIONS[key]), 'done');
+    if (version === null) return;
+    setSaving(true);
+    try {
+      if ((await getProfile()) === null) await saveResumeToProfile(resume.id, null);
+      await startTailor(resume.id, 'all');
+      if (draft.upload?.resumeId === resume.id) setDraft({ upload: null });
+      navigate(`/tailoring/${resume.id}`);
+    } catch (error) {
+      if (!(error instanceof ApiError)) throw error;
+      setSaveError(error);
+    } finally {
+      setSaving(false);
     }
-    setNote(null);
-    await runLimited(queue, BULLET_TAILOR_CONCURRENCY, ([entryId, b]) => tailor('experience', entryId, b, { saveFirst: false }));
   }
 
   async function settle(section, entryId, b, action) {
@@ -344,13 +342,12 @@ function WizardForm({ resume, stepParam, onReload }) {
               <div key="experience" className="hc-rise" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {tailoring && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#F7F8FD', border: '1px solid var(--hc-hairline)', borderRadius: 14, padding: '10px 12px 10px 14px' }}>
-                    <span style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Tailor every bullet you haven’t edited by hand.</span>
+                    <span style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>Use one of today’s five CV tailorings.</span>
                     <button type="button" className="hc-btn-sm" onClick={tailorAll} disabled={locked} style={{ border: 0, background: 'var(--hc-brand)', color: '#FFFFFF', minHeight: 40, padding: '0 14px' }}>
-                      <Sparkles size={14} aria-hidden="true" />Tailor all bullets
+                      <Sparkles size={14} aria-hidden="true" />Tailor my CV
                     </button>
                   </div>
                 )}
-                {note && <div role="status" style={{ fontSize: 13.5, color: 'var(--hc-ink-muted)' }}>{note}</div>}
                 {doc.roles.map((r, i) => (
                   <div key={r.id} style={entryBox}>
                     {entryHead(`Role ${i + 1}`, removeButton('roles', 'role', r))}

@@ -22,6 +22,10 @@ class Unauthorized(AppError):
     status_code, code, message = 401, "unauthorized", "Please sign in again."
 
 
+class BetaUnavailable(AppError):
+    status_code, code, message = 403, "beta_unavailable", "This beta is invite-only."
+
+
 class NotFound(AppError):
     # Also used for other users' rows: 404, never 403, so ids leak nothing (security §1.4).
     status_code, code, message = 404, "not_found", "Not found."

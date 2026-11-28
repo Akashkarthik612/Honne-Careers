@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import Lenis from 'lenis';
 import { NAV_OFFSET, ScrollContext, useReducedMotion } from './landingHooks';
-import { FitPreview, TrackerPreview, Pricing } from './sections/LaunchSections';
+import { FitPreview, TrackerPreview } from './sections/LaunchSections';
 import Multiplayer from './sections/Multiplayer';
 import Closing from './sections/Closing';
 import Hero from './sections/Hero';
@@ -52,7 +52,6 @@ export default function LandingPage() {
           <FitPreview />
           <TrackerPreview />
           <Multiplayer />
-          <Pricing />
         </main>
         <Closing />
       </div>

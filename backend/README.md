@@ -63,3 +63,7 @@ pytest -q
 | POST | `/resumes/{id}/save-to-profile` | Copies the facts: AI-worded bullets go back to their original text (TRUTH-1) |
 
 Errors: `{"error": {"code", "message", "correlation_id", "details?"}}`. Send `X-Correlation-Id` to trace a request across logs.
+
+## Closed beta deploy
+
+The `beta/dec-7` branch includes `render-beta.yaml` for a separate Render Blueprint. Set the Blueprint path to that file and provision a separate Supabase project. Apply this branch’s migrations there, configure Google login and the beta frontend callback URL, then populate the beta-only Render secrets and `BETA_INVITE_EMAILS` (comma-separated verified sign-in emails). Use the beta project’s public URL and anon key on the beta frontend. The default access window is November 30 through December 6, 2026 in India time.

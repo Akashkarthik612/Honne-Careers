@@ -4,6 +4,7 @@ No defaults for secrets or endpoints (guardrails §3: fail loudly, no silent fal
 Limits that Day_1 B11 fixed have defaults equal to the approved values.
 """
 
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -67,6 +68,12 @@ class Settings(BaseSettings):
     docx_max_uncompressed_bytes: int = Field(default=20 * 1024 * 1024, ge=1024)
     parse_timeout_s: int = Field(default=15, ge=1)
 
+    # Closed beta is enabled only on the isolated Render API.
+    closed_beta: bool = False
+    beta_invite_emails: str = ""
+    beta_starts_at: str = "2026-11-30T00:00:00+05:30"
+    beta_ends_at: str = "2026-12-07T00:00:00+05:30"
+
     # Tailor job (B9: stale job)
     tailor_job_timeout_s: int = Field(default=180, ge=30)
 
@@ -120,6 +127,14 @@ class Settings(BaseSettings):
         if not value or "*" in value:
             raise ValueError("CORS_ORIGINS must be an explicit allowlist, never '*'")
         return value
+
+    @model_validator(mode="after")
+    def _beta_window_is_valid(self) -> "Settings":
+        if self.closed_beta:
+            starts, ends = map(datetime.fromisoformat, (self.beta_starts_at, self.beta_ends_at))
+            if starts.utcoffset() is None or ends.utcoffset() is None or starts >= ends:
+                raise ValueError("Closed beta needs a valid, timezone-aware access window")
+        return self
 
     @model_validator(mode="after")
     def _chat_limits_consistent(self) -> "Settings":

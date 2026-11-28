@@ -1,0 +1,121 @@
+# Render Blueprint (plan v4): free static frontend + one paid Docker API with LaTeX inside.
+# Secrets are never in this file: set them in the "honne-careers-beta-api-secrets" env group.
+# Region: Singapore is Render's closest to India (it has no Mumbai). The Supabase project is
+# in the same region (ap-southeast-1) so the API's many DB round trips stay ~1-2 ms.
+
+envVarGroups:
+  - name: honne-careers-beta-api-secrets
+    envVars:
+      - key: DATABASE_URL          # Supabase session pooler (IPv4), user honne_backend
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY   # used only to delete an account (AUTH-3)
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+services:
+  - type: web
+    name: honne-careers-beta-api
+    runtime: docker
+    plan: free               # beta: 512 MB, 0.1 CPU, sleeps after 15 min idle (~1 min cold start)
+                             # Move to starter (always on) when users arrive; standard (2 GB) if LaTeX memory needs it.
+    region: singapore
+    branch: beta/dec-7
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass   # deploy this beta branch once CI passes
+    envVars:
+      - fromGroup: honne-careers-beta-api-secrets
+      - key: ENV
+        value: prod
+      - key: CLOSED_BETA
+        value: "true"
+      - key: BETA_INVITE_EMAILS
+        sync: false
+      - key: PORT            # the image's uvicorn listens on 8000 (Dockerfile); Render's default is 10000
+        value: "8000"
+      - key: CORS_ORIGINS    # the static site's domains only; add the .com once bought
+        value: https://honne-careers-beta.onrender.com
+      - key: LLM_STRONG
+        value: gemini:gemini-3.8-flash
+      - key: LLM_LIGHT
+        value: gemini:gemini-3.5-flash-lite
+      - key: BETA_FREE_TAILORING
+        value: "true"
+      - key: APPLICATION_RETENTION_DAYS   # applications and chats are deleted this many days after sending/creating
+        value: "40"
+      # Tracing (metadata only) is off until a LangSmith key exists. To turn it on: add
+      # LANGSMITH_API_KEY (sync: false) to the env group above, set it in the dashboard, then "true".
+      - key: LANGSMITH_TRACING
+        value: "false"
+      - key: LANGSMITH_PROJECT
+        value: honne-careers-closed-beta
+      # Free plan has 0.1 CPU: give LaTeX compiles and upload parsing more time than the
+      # defaults (20 s / 30 s / 15 s). Drop these when moving to a paid plan.
+      - key: LATEX_TIMEOUT_S
+        value: "60"
+      - key: LATEX_QUEUE_WAIT_S
+        value: "60"
+      - key: PARSE_TIMEOUT_S
+        value: "30"
+      # Day 3 chat agents: turns run in the background on the same 0.1 CPU. Over this many
+      # at once, a send gets 429 agents_busy (no queue). Raise on a paid plan.
+      - key: CHAT_CONCURRENT_TURNS_MAX
+        value: "2"
+      # LangGraph checkpoint pool (AgentStateStore): one connection per running turn is
+      # enough, on top of DB_POOL_MAX. Keep it equal to CHAT_CONCURRENT_TURNS_MAX.
+      - key: AGENT_STATE_POOL_MAX
+        value: "2"
+      # Per model call in a chat turn. gemini-3.8-flash (strong tier) takes ~32-35s per call
+      # in production, so the 30s default timed out every chat (23 Oct 2026). Max allowed: 120.
+      - key: AGENT_LLM_TIMEOUT_S
+        value: "120"
+      # Separate caps per chat model call: writing and thinking. One shared 4096 cap let
+      # thinking use it all, so replies came back empty (MAX_TOKENS, 26 Oct 2026). Tune
+      # from thinking_tokens in the chat_turn_run log once real users are on.
+      - key: AGENT_MAX_OUTPUT_TOKENS
+        value: "8192"
+      - key: AGENT_THINKING_BUDGET
+        value: "8192"
+
+  - type: web
+    name: honne-careers-beta
+    runtime: static
+    branch: beta/dec-7
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: checksPass   # deploy this beta branch once CI passes
+    pullRequestPreviewsEnabled: false
+    envVars:                 # read at build time; all browser-visible, so no secrets here
+      - key: VITE_API_BASE_URL
+        value: https://honne-careers-beta-api.onrender.com
+      - key: VITE_SUPABASE_URL       # https://<project-ref>.supabase.co
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY  # anon/publishable key, never the service-role key
+        sync: false
+    routes:
+      - type: rewrite        # SPA: let react-router handle every path
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=63072000; includeSubDomains
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; connect-src 'self' https://honne-careers-beta-api.onrender.com https://*.supabase.co; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"

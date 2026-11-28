@@ -22,7 +22,6 @@ export default function Closing() {
               <p style={{ margin: '20px 0 0', fontSize: 18, lineHeight: 1.6, color: '#4E4E4E' }}>Start with a role you want. Bring the job description and choose your CV template.</p>
               <div style={{ marginTop: 30, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                 <Link className="btn-p" to="/new/template">Build my CV <Chevron /></Link>
-                <a className="btn-s" href="#pricing" onClick={jump('pricing')}>View plans</a>
               </div>
             </div>
           </Reveal>

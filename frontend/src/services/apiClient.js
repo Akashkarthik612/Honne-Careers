@@ -52,8 +52,15 @@ export async function apiRequest(path, { method = 'GET', body, form } = {}) {
 
   if (!res.ok) {
     const error = await readError(res, correlationId);
+    if (error.code === 'quota_exceeded' &&
+        ['full_tailor', 'analysis', 'chat_message'].includes(error.details?.action)) {
+      globalThis.window?.dispatchEvent(new CustomEvent('honne-beta-limit', { detail: error.details.action }));
+    }
     if (res.status === 401) await signOut({ scope: 'local' });
     throw error;
+  }
+  if (method === 'POST' && /\/(tailor|analysis|messages|retry|preview)$/.test(path)) {
+    globalThis.window?.dispatchEvent(new Event('honne-beta-usage'));
   }
   return res.status === 204 ? null : res.json();
 }

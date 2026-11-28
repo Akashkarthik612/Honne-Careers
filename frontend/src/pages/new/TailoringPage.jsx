@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { ErrorBanner } from '@/components/Status';
@@ -66,6 +66,9 @@ export default function TailoringPage() {
   }
 
   const done = job.phase === 'ready';
+  useEffect(() => {
+    if (done) window.dispatchEvent(new Event('honne-beta-usage'));
+  }, [done]);
   const jd = job.resume?.jd;
   const meta = [jd?.role, jd?.company].filter(Boolean).join(' · ');
   const failure = job.phase === 'failed' ? (FAILURE[job.resume?.errorCode] ?? 'Tailoring didn’t finish. Your CV is unchanged — try again.') : null;
@@ -76,7 +79,7 @@ export default function TailoringPage() {
       <h1 className="hc-disp" style={{ margin: '6px 0 0', fontSize: 'clamp(28px,3.2vw,40px)', lineHeight: 1.05, fontWeight: 800, letterSpacing: '-0.035em' }}>
         {done ? 'Your CV is ready.' : failure ? 'Tailoring didn’t finish.' : 'Tailoring your CV…'}
       </h1>
-      <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>Using your saved profile. This usually takes under a minute.</p>
+      <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--hc-ink-muted)' }}>We’re matching your CV to the job description.</p>
 
       <div style={{ marginTop: 24, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'stretch' }}>
         <div className="hc-card" role="status" aria-live="polite" style={{ flex: '1 1 360px', minWidth: 0, padding: 22, display: 'flex', flexDirection: 'column', gap: 10 }}>

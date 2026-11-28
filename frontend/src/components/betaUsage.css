@@ -1,0 +1,41 @@
+.hc-beta-usage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 14px 20px;
+  background: #fff;
+  border-bottom: 1px solid var(--hc-hairline);
+}
+.hc-beta-segments {
+  display: grid;
+  flex: 1 1 192px;
+  max-width: 340px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+.hc-beta-segments span {
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--hc-brand-tint);
+  color: var(--hc-brand-hover);
+  transition: background-color .25s, color .25s;
+}
+.hc-beta-segments span[data-filled="true"] {
+  background: var(--hc-brand);
+  color: #fff;
+}
+.hc-beta-other { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; }
+.hc-beta-dialog {
+  width: min(440px, calc(100% - 32px));
+  border-radius: 18px;
+  border: 1px solid var(--hc-hairline);
+  padding: 24px;
+  line-height: 1.55;
+}
+.hc-beta-dialog h2 { margin-top: 0; line-height: 1.25; }
+.hc-beta-dialog::backdrop { background: #161a2b88; }
+@media (prefers-reduced-motion: reduce) { .hc-beta-segments span { transition: none; } }

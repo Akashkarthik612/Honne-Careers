@@ -115,13 +115,13 @@ export function cardFrame(card, i, p) {
 /* ---------- 03 agents ---------- */
 
 export const AGENTS = [
-  { id: 'writer', name: 'CV Writer', handle: '@cv-writer', c: '#6655E8', bg: '#F0EDFF', ink: '#5847D6', status: 'Honne Pro', role: 'Tailors your CV to one job, using only what’s already in your profile.', d1: 'M12 20h9', d2: 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z' },
-  { id: 'fit', name: 'Fit', handle: '@fit', c: '#0E7490', bg: '#E4F3F6', ink: '#0E7490', status: 'Honne Pro', role: 'Checks how well you really fit a JD, from what you’ve done, not from keywords.', d1: 'M9 11l3 3 8-8', d2: 'M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
-  { id: 'analyst', name: 'Analyst', handle: '@analyst', c: '#2F5FD0', bg: '#EAF0FD', ink: '#2F5FD0', status: 'Honne Pro', role: 'Compares a JD with your profile: where you’re strong, where the gaps are.', d1: 'M3 3v18h18', d2: 'M7 15l4-4 3 3 5-6' },
-  { id: 'advisor', name: 'Advisor', handle: '@advisor', c: '#0F7A5C', bg: '#E6F4EE', ink: '#0F7A5C', status: 'Honne Pro', role: 'Turns what the others found into a short list of what to do next.', d1: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', d2: 'm15.5 8.5-2 5-5 2 2-5z' },
+  { id: 'writer', name: 'CV Writer', handle: '@cv-writer', c: '#6655E8', bg: '#F0EDFF', ink: '#5847D6', status: 'Beta', role: 'Tailors your CV to one job, using only what’s already in your profile.', d1: 'M12 20h9', d2: 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z' },
+  { id: 'fit', name: 'Fit', handle: '@fit', c: '#0E7490', bg: '#E4F3F6', ink: '#0E7490', status: 'Beta', role: 'Checks how well you really fit a JD, from what you’ve done, not from keywords.', d1: 'M9 11l3 3 8-8', d2: 'M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
+  { id: 'analyst', name: 'Analyst', handle: '@analyst', c: '#2F5FD0', bg: '#EAF0FD', ink: '#2F5FD0', status: 'Beta', role: 'Compares a JD with your profile: where you’re strong, where the gaps are.', d1: 'M3 3v18h18', d2: 'M7 15l4-4 3 3 5-6' },
+  { id: 'advisor', name: 'Advisor', handle: '@advisor', c: '#0F7A5C', bg: '#E6F4EE', ink: '#0F7A5C', status: 'Beta', role: 'Turns what the others found into a short list of what to do next.', d1: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', d2: 'm15.5 8.5-2 5-5 2 2-5z' },
   { id: 'outreach', name: 'Outreach', handle: '@outreach', c: '#B4236E', bg: '#FCEAF3', ink: '#B4236E', status: 'Job Search · Pro', role: 'Finds the applications worth a referral ask and writes the message for each.', d1: 'M22 2 11 13', d2: 'M22 2 15 22l-4-9-9-4 20-7z' },
   { id: 'strategist', name: 'Strategist', handle: '@strategist', c: '#B4500F', bg: '#FFF2E8', ink: '#B4500F', status: 'Job Search · Pro', role: 'Reviews your week and changes the plan based on what got replies.', d1: 'M21 12a9 9 0 1 1-3-6.7L21 8', d2: 'M21 3v5h-5' },
-  { id: 'custom', name: 'Your agent', handle: '@your-agent', c: '#171717', bg: '#F3F2EF', ink: '#171717', status: 'Honne Pro', role: 'Anything we don’t cover yet. Describe it once, call it with @.', d1: 'M12 5v14', d2: 'M5 12h14' },
+  { id: 'custom', name: 'Your agent', handle: '@your-agent', c: '#171717', bg: '#F3F2EF', ink: '#171717', status: 'Beta', role: 'Anything we don’t cover yet. Describe it once, call it with @.', d1: 'M12 5v14', d2: 'M5 12h14' },
 ];
 
 // "How they connect" diagram (viewBox 520×420): agents sit on a ring around the hub,

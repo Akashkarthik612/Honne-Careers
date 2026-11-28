@@ -102,27 +102,67 @@ class UsageRepository:
         await self._conn.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
                                  (f"{user_id}:{action}",))
 
-    async def count_period(self, user_id: UUID, action: str, period: str) -> int:
+    async def count_period(self, user_id: UUID, action: str, period: str,
+                           timezone: str = "UTC") -> int:
         """Uses the (user_id, action, created_at) index. Period boundaries use UTC."""
         cur = await self._conn.execute(
             """select count(*) as n from app.usage_events
                 where user_id = %s and action = %s
-                  and created_at >= date_trunc(%s::text, now() at time zone 'utc')
-                                    at time zone 'utc'""",
-            (user_id, action, period))
+                  and created_at >= date_trunc(%s::text, now() at time zone %s)
+                                    at time zone %s""",
+            (user_id, action, period, timezone, timezone))
         return (await cur.fetchone())["n"]
 
-    async def counts_today(self, user_id: UUID) -> dict[str, int]:
+    async def counts_today(self, user_id: UUID, timezone: str = "UTC") -> dict[str, int]:
         """Today's (UTC) count per action, for the usage panel. One indexed scan."""
         cur = await self._conn.execute(
             """select action, count(*) as n from app.usage_events
                 where user_id = %s
-                  and created_at >= date_trunc('day', now() at time zone 'utc')
-                                    at time zone 'utc'
+                  and created_at >= date_trunc('day', now() at time zone %s)
+                                    at time zone %s
                 group by action""",
-            (user_id,))
+            (user_id, timezone, timezone))
         return {r["action"]: r["n"] for r in await cur.fetchall()}
 
     async def record(self, user_id: UUID, action: str) -> None:
         await self._conn.execute(
             "insert into app.usage_events (user_id, action) values (%s, %s)", (user_id, action))
+
+    async def beta_cv_count(self, user_id: UUID, timezone: str, timeout_s: int) -> tuple[int, int]:
+        cur = await self._conn.execute(
+            """select count(*) filter (where completed) as completed,
+                      count(*) filter (where not completed and started_at >
+                            now() - make_interval(secs => %s)) as pending
+                 from app.beta_cv_jobs where user_id = %s
+                   and started_at >= date_trunc('day', now() at time zone %s)
+                                     at time zone %s""",
+            (timeout_s, user_id, timezone, timezone))
+        row = await cur.fetchone()
+        return row["completed"], row["pending"]
+
+    async def beta_cv_pending(self, user_id: UUID, resume_id: UUID, version: int,
+                              timeout_s: int) -> bool:
+        cur = await self._conn.execute(
+            """select 1 from app.beta_cv_jobs
+                where user_id = %s and resume_id = %s and job_version = %s
+                  and not completed and started_at > now() - make_interval(secs => %s)""",
+            (user_id, resume_id, version, timeout_s))
+        return await cur.fetchone() is not None
+
+    async def reserve_beta_cv(self, user_id: UUID, resume_id: UUID, version: int) -> None:
+        await self._conn.execute(
+            "insert into app.beta_cv_jobs (user_id, resume_id, job_version) values (%s, %s, %s)",
+            (user_id, resume_id, version))
+
+    async def settle_beta_cv(self, user_id: UUID, resume_id: UUID, version: int,
+                             success: bool) -> None:
+        if success:
+            await self._conn.execute(
+                """update app.beta_cv_jobs set completed = true
+                    where user_id = %s and resume_id = %s and job_version = %s""",
+                (user_id, resume_id, version))
+        else:
+            await self._conn.execute(
+                """delete from app.beta_cv_jobs
+                    where user_id = %s and resume_id = %s and job_version = %s and not completed""",
+                (user_id, resume_id, version))

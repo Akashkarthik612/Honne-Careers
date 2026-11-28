@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { flushPendingSaves } from '@/services/applicationSaver';
 import Sidebar from './Sidebar';
+import BetaUsage from './BetaUsage';
 import { ErrorBanner } from './Status';
 
 // Layout for every signed-in screen: sidebar on the left, the routed page on the right.
@@ -20,6 +21,7 @@ export default function AppShell() {
     <div style={{ minHeight: '100vh', background: 'var(--hc-app-ground)', display: 'flex' }}>
       <Sidebar />
       <div style={{ flex: '1 1 0', minWidth: 0 }}>
+        <BetaUsage />
         {lost > 0 && (
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 20px' }}>
             <ErrorBanner

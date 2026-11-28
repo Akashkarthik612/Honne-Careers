@@ -213,10 +213,17 @@ class TailorService:
                 raise InvalidInput("Add some experience or projects first.", reason="empty_cv")
             account = await uow.accounts.get(user.id)
             self._entitlements.require(account.plan if account else "free", "tailor_mode")
-            await self._quota.consume(uow, user.id, DailyAction.FULL_TAILOR)
-            started = await uow.resumes.start_tailoring(user.id, resume_id, self._job_timeout_s)
+            if self._quota.beta_timeout_s:
+                await self._quota.check_beta_cv(uow, user.id)
+            else:
+                await self._quota.consume(uow, user.id, DailyAction.FULL_TAILOR)
+            started = await uow.resumes.start_tailoring(
+                user.id, resume_id, self._job_timeout_s,
+                new_version=bool(self._quota.beta_timeout_s))
             if started is None:
                 raise JobAlreadyRunning(reason="full_tailor")
+            if self._quota.beta_timeout_s:
+                await uow.usage.reserve_beta_cv(user.id, resume_id, started)
         log.info("tailor_job_started", resume_id=resume_id, row_version=started)
         return started
 
@@ -228,12 +235,16 @@ class TailorService:
                                          scope=scope) as span:
                 await self._run(span, user, resume_id, started_version, scope)
         except AppError as exc:
-            await self._fail(user, resume_id, exc.code)
+            await self._fail(user, resume_id, exc.code, started_version)
             log.warning("tailor_job_failed", resume_id=resume_id, code=exc.code)
         except Exception:
             # Job boundary: log with traceback, leave a clear state, never stuck "tailoring".
             log.exception("tailor_job_crashed", resume_id=resume_id)
-            await self._fail(user, resume_id, "internal_error")
+            await self._fail(user, resume_id, "internal_error", started_version)
+        finally:
+            if self._quota.beta_timeout_s:
+                async with self._uow(user.id) as uow:
+                    await uow.usage.settle_beta_cv(user.id, resume_id, started_version, False)
 
     async def _run(self, span: Span, user: AuthUser, resume_id: UUID, started_version: int,
                    scope: str) -> None:
@@ -283,9 +294,17 @@ class TailorService:
                         count=len(report.violations), rules=summary["rules"])
 
         async with self._uow(user.id) as uow:
+            if self._quota.beta_timeout_s:
+                await uow.usage.lock(user.id, DailyAction.FULL_TAILOR)
+                if not await uow.usage.beta_cv_pending(
+                    user.id, resume_id, started_version, self._quota.beta_timeout_s
+                ):
+                    return
             version = await uow.resumes.finish_tailoring(
                 user.id, resume_id, merged.content, content_hash(merged.content), missing,
                 gaps, summary, started_version)
+            if version is not None and self._quota.beta_timeout_s:
+                await uow.usage.settle_beta_cv(user.id, resume_id, started_version, True)
         if version is None:
             log.warning("tailor_job_result_discarded", resume_id=resume_id,
                         reason="resume deleted, timed out or changed")
@@ -303,6 +322,7 @@ class TailorService:
             log.warning("tailor_job_gone", resume_id=resume_id, step=step)
         return live
 
-    async def _fail(self, user: AuthUser, resume_id: UUID, code: str) -> None:
+    async def _fail(self, user: AuthUser, resume_id: UUID, code: str, version: int) -> None:
         async with self._uow(user.id) as uow:
-            await uow.resumes.fail_tailoring(user.id, resume_id, code)
+            await uow.resumes.fail_tailoring(
+                user.id, resume_id, code, version if self._quota.beta_timeout_s else None)
